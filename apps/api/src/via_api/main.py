@@ -11,7 +11,7 @@ from via_api import __version__
 from via_api.config import Settings, get_settings
 from via_api.errors import ErrorResponse, install_error_handlers
 from via_api.middleware import CSRFMiddleware, RequestContextMiddleware
-from via_api.routes import auth, health, users
+from via_api.routes import activity, auth, health, organizations, projects, users
 
 API_PREFIX = "/api/v1"
 
@@ -53,5 +53,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(health.router)
     v1.include_router(auth.router)
     v1.include_router(users.router)
+    v1.include_router(organizations.router)
+    v1.include_router(projects.router)
+    v1.include_router(activity.router)
     app.include_router(v1)
     return app
