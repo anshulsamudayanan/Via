@@ -1,0 +1,117 @@
+/*
+ * VIA design tokens.
+ * Dark-first: the dark palette applies by default and for [data-theme="dark"];
+ * [data-theme="light"] switches to the light palette. Components only use the
+ * semantic utilities below (bg-surface, text-muted, border-border, ...), never
+ * raw colours, so both themes stay consistent.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --via-background: #0b0d10;
+  --via-surface: #111418;
+  --via-surface-raised: #171b21;
+  --via-surface-hover: #1d222a;
+  --via-border: #262c35;
+  --via-border-strong: #343b47;
+  --via-foreground: #e7e9ec;
+  --via-muted: #8e96a3;
+  --via-subtle: #636b78;
+  --via-accent: #5b9cff;
+  --via-accent-hover: #78afff;
+  --via-accent-foreground: #08111f;
+  --via-accent-soft: rgb(91 156 255 / 0.12);
+  --via-success: #3fb27f;
+  --via-success-soft: rgb(63 178 127 / 0.12);
+  --via-warning: #d6a43a;
+  --via-warning-soft: rgb(214 164 58 / 0.12);
+  --via-danger: #f0605d;
+  --via-danger-soft: rgb(240 96 93 / 0.12);
+  --via-ring: rgb(91 156 255 / 0.55);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --via-background: #f6f7f9;
+  --via-surface: #ffffff;
+  --via-surface-raised: #ffffff;
+  --via-surface-hover: #f0f2f5;
+  --via-border: #e1e4e9;
+  --via-border-strong: #cdd2d9;
+  --via-foreground: #15181d;
+  --via-muted: #5a6371;
+  --via-subtle: #7d8693;
+  --via-accent: #2563eb;
+  --via-accent-hover: #1d4fd8;
+  --via-accent-foreground: #ffffff;
+  --via-accent-soft: rgb(37 99 235 / 0.08);
+  --via-success: #1a8a5a;
+  --via-success-soft: rgb(26 138 90 / 0.1);
+  --via-warning: #a76f06;
+  --via-warning-soft: rgb(167 111 6 / 0.1);
+  --via-danger: #d03a37;
+  --via-danger-soft: rgb(208 58 55 / 0.08);
+  --via-ring: rgb(37 99 235 / 0.45);
+}
+
+@theme inline {
+  --color-background: var(--via-background);
+  --color-surface: var(--via-surface);
+  --color-surface-raised: var(--via-surface-raised);
+  --color-surface-hover: var(--via-surface-hover);
+  --color-border: var(--via-border);
+  --color-border-strong: var(--via-border-strong);
+  --color-foreground: var(--via-foreground);
+  --color-muted: var(--via-muted);
+  --color-subtle: var(--via-subtle);
+  --color-accent: var(--via-accent);
+  --color-accent-hover: var(--via-accent-hover);
+  --color-accent-foreground: var(--via-accent-foreground);
+  --color-accent-soft: var(--via-accent-soft);
+  --color-success: var(--via-success);
+  --color-success-soft: var(--via-success-soft);
+  --color-warning: var(--via-warning);
+  --color-warning-soft: var(--via-warning-soft);
+  --color-danger: var(--via-danger);
+  --color-danger-soft: var(--via-danger-soft);
+  --color-ring: var(--via-ring);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
