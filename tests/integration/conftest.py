@@ -13,9 +13,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from tests.conftest import require_env
 from via_api.config import Settings, StorageBackendName, get_settings
 from via_api.db import alembic_config, get_db
-from via_api.deps import get_email_sender
+from via_api.deps import get_email_sender, get_job_queue
 from via_api.emails import MemoryEmailSender
 from via_api.main import create_app
+from via_api.parsing.importer import process_revision
+from via_api.parsing.sandbox import SandboxLimits
 from via_api.redis_client import get_redis
 from via_api.storage import LocalStorage, get_storage
 
@@ -81,14 +83,43 @@ def mailer() -> MemoryEmailSender:
     return MemoryEmailSender()
 
 
+class InlineQueue:
+    """Runs import jobs synchronously in the request (tests only), with the real sandbox."""
+
+    def __init__(self, db: Session, storage_root: Path) -> None:
+        self.db = db
+        self.storage_root = storage_root
+        self.enqueued: list[uuid.UUID] = []
+        self.run = True
+        self.fail = False
+
+    def enqueue_import(self, revision_id: uuid.UUID) -> None:
+        if self.fail:
+            raise ConnectionError("queue down")
+        self.enqueued.append(revision_id)
+        if self.run:
+            process_revision(
+                self.db,
+                LocalStorage(self.storage_root),
+                revision_id,
+                SandboxLimits(timeout_seconds=30, memory_bytes=1024**3),
+            )
+
+
 @pytest.fixture
-def app(settings: Settings, db: Session, test_redis, mailer: MemoryEmailSender):
+def job_queue(db: Session, settings: Settings) -> InlineQueue:
+    return InlineQueue(db, settings.local_storage_path)
+
+
+@pytest.fixture
+def app(settings: Settings, db: Session, test_redis, mailer: MemoryEmailSender, job_queue: InlineQueue):
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_redis] = lambda: test_redis
     app.dependency_overrides[get_storage] = lambda: LocalStorage(settings.local_storage_path)
     app.dependency_overrides[get_email_sender] = lambda: mailer
+    app.dependency_overrides[get_job_queue] = lambda: job_queue  # import jobs run inline
     return app
 
 

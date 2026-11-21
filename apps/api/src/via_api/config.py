@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     forwarded_allow_ips: str = "127.0.0.1"
 
     max_upload_bytes: int = 50 * 1024 * 1024
+    #: Wall-clock limit for one parse; CPU time is limited to the same number of seconds.
+    parser_timeout_seconds: int = 60
+    #: Address-space limit for the parser subprocess.
+    parser_memory_limit_mb: int = 1024
+    #: Redis queue used for PCB import jobs.
+    import_queue_name: str = "via-pcb-import"
     enable_docs: bool = True
 
     # --- Sessions & auth ---------------------------------------------------

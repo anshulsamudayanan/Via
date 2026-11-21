@@ -64,6 +64,9 @@ class DesignRevision(UUIDPk, Timestamps, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     warnings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
     object_counts: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    #: Small, display-oriented extract of the parsed design (title, source info,
+    #: constraints, geometry summary) so summaries don't need the full JSON.
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     design: Mapped[Design] = relationship(back_populates="revisions", foreign_keys=[design_id])

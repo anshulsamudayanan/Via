@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
 from redis import Redis
@@ -16,6 +16,10 @@ from via_api.ratelimit import RateLimiter
 from via_api.redis_client import get_redis
 from via_api.services.activity import ClientInfo
 from via_api.services.auth import AuthContext, resolve_session
+from via_api.storage import StorageBackend, get_storage
+
+if TYPE_CHECKING:
+    from via_api.jobs import JobQueue
 
 DB = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
@@ -66,3 +70,13 @@ def require_auth(ctx: Annotated[AuthContext | None, Depends(optional_auth)]) -> 
 
 
 CurrentAuth = Annotated[AuthContext, Depends(require_auth)]
+
+
+def get_job_queue(redis: Annotated[Redis, Depends(get_redis)], settings: AppSettings) -> JobQueue:
+    from via_api.jobs import RQJobQueue
+
+    return RQJobQueue(redis, settings)
+
+
+Queue = Annotated["JobQueue", Depends(get_job_queue)]
+Storage = Annotated[StorageBackend, Depends(get_storage)]

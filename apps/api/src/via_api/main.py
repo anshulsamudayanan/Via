@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from via_api import __version__
 from via_api.config import Settings, get_settings
 from via_api.errors import ErrorResponse, install_error_handlers
-from via_api.middleware import CSRFMiddleware, RequestContextMiddleware
-from via_api.routes import activity, auth, health, organizations, projects, users
+from via_api.middleware import CSRFMiddleware, RequestContextMiddleware, UploadSizeMiddleware
+from via_api.routes import activity, auth, designs, files, health, organizations, pcb, projects, users
 
 API_PREFIX = "/api/v1"
 
@@ -36,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         },
     )
     # Starlette runs the last-added middleware first: request context wraps CSRF.
+    app.add_middleware(UploadSizeMiddleware, paths={pcb.IMPORT_PATH}, max_bytes=settings.max_upload_bytes)
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
@@ -56,5 +57,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(organizations.router)
     v1.include_router(projects.router)
     v1.include_router(activity.router)
+    v1.include_router(pcb.router)
+    v1.include_router(designs.router)
+    v1.include_router(files.router)
     app.include_router(v1)
     return app

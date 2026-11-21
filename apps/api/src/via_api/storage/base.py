@@ -43,7 +43,7 @@ def validate_key(key: str) -> str:
 
 def revision_object_key(project_id: uuid.UUID, revision_id: uuid.UUID, kind: str) -> str:
     """Canonical key layout: ``projects/<project>/revisions/<revision>/<kind>``."""
-    if kind not in {"source", "normalized.json"}:
+    if kind not in {"source", "normalized.json.gz"}:
         raise InvalidKeyError(f"Unknown object kind {kind!r}")
     return validate_key(f"projects/{project_id}/revisions/{revision_id}/{kind}")
 

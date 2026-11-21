@@ -19,6 +19,8 @@ dependencies = [
   "redis==8.1.0",
   "boto3==1.44.9",
   "argon2-cffi==25.1.0",
+  "python-multipart==0.0.33",
+  "rq==2.12.0",
   "via-pcb-engine==0.1.0",
 ]
 

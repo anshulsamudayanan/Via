@@ -215,7 +215,7 @@ def delete(db: Session, ctx: AuthContext, project: Project, client: ClientInfo) 
         target_id=project.id,
         details={"name": project.name},
     )
-    # CP4 note: stored design files must be deleted from object storage here as well.
+    # Stored files are removed by the route after commit (services/designs.delete_objects).
     db.delete(project)
 
 

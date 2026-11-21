@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from via_api.deps import DB, Client, CurrentAuth, Limiter
+from via_api.deps import DB, Client, CurrentAuth, Limiter, Storage
 from via_api.errors import error_responses
 from via_api.models import User
 from via_api.models.enums import ProjectRole
@@ -26,6 +26,7 @@ from via_api.schemas.projects import (
     UserRef,
 )
 from via_api.services import access
+from via_api.services import designs as design_svc
 from via_api.services import projects as svc
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -112,11 +113,13 @@ def unarchive_project(project_id: uuid.UUID, db: DB, client: Client, ctx: Curren
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, responses=FORBIDDEN)
-def delete_project(project_id: uuid.UUID, db: DB, client: Client, ctx: CurrentAuth) -> None:
-    """Permanently delete a project and everything in it (owner only)."""
+def delete_project(project_id: uuid.UUID, db: DB, storage: Storage, client: Client, ctx: CurrentAuth) -> None:
+    """Permanently delete a project and everything in it, including stored files (owner only)."""
     project, _ = access.get_project(db, ctx.user.id, project_id, ProjectRole.OWNER, action="delete projects")
+    keys = design_svc.storage_keys(db, project_id=project.id)
     svc.delete(db, ctx, project, client)
     db.commit()
+    design_svc.delete_objects(storage, keys)
 
 
 @router.get("/{project_id}/members", response_model=list[ProjectMemberOut], responses=NOT_FOUND)

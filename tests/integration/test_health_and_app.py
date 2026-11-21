@@ -21,7 +21,7 @@ def test_readiness_checks_database_migrations_redis_and_storage(client):
     body = resp.json()
     assert body["status"] == "ok"
     assert set(body["checks"]) == {"database", "redis", "storage"}
-    assert body["checks"]["database"]["detail"] == "migrations at 0001"
+    assert body["checks"]["database"]["detail"] == "migrations at 0002"
     assert all(c["status"] == "ok" for c in body["checks"].values())
 
 

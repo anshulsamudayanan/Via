@@ -10,6 +10,7 @@ import uuid
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp
 
 logger = logging.getLogger("via_api.access")
 
@@ -81,3 +82,44 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 },
             )
         return await call_next(request)
+
+
+#: Multipart framing + form fields allowance on top of the file size limit.
+MULTIPART_OVERHEAD = 1024 * 1024
+
+
+class UploadSizeMiddleware(BaseHTTPMiddleware):
+    """Reject oversized uploads before the body is read.
+
+    FastAPI parses multipart bodies before the route runs, so the size check
+    must happen here. The route re-checks the actual bytes read.
+    """
+
+    def __init__(self, app: ASGIApp, paths: set[str], max_bytes: int) -> None:
+        super().__init__(app)
+        self.paths = paths
+        self.max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if request.method == "POST" and request.url.path in self.paths:
+            length = request.headers.get("content-length")
+            if length is None or not length.isdigit():
+                return _error(request, 411, "length_required", "Uploads must include a Content-Length header.")
+            if int(length) > self.max_bytes + MULTIPART_OVERHEAD:
+                mb = self.max_bytes // (1024 * 1024)
+                return _error(request, 413, "payload_too_large", f"The file is larger than the {mb} MB limit.")
+        return await call_next(request)
+
+
+def _error(request: Request, status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        content={
+            "error": {
+                "code": code,
+                "message": message,
+                "details": None,
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
