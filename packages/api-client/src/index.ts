@@ -4,6 +4,7 @@ import type {
   Design,
   DesignDetail,
   ImportResponse,
+  PCBDesign,
   PcbComponent,
   PcbLayer,
   PcbNet,
@@ -256,6 +257,9 @@ export function createViaClient(options: ClientOptions = {}) {
         params: { q?: string; revision_id?: string; limit?: number; offset?: number } = {},
         signal?: AbortSignal,
       ) => request<Page<PcbNet>>(`/api/v1/pcb/${enc(designId)}/nets${q(params)}`, { signal }),
+      /** The full normalized design for rendering (gzip on the wire; the browser decodes it). */
+      normalized: (designId: string, revisionId?: string, signal?: AbortSignal) =>
+        request<PCBDesign>(`/api/v1/pcb/${enc(designId)}/normalized${q({ revision_id: revisionId })}`, { signal }),
       layers: (designId: string, revisionId?: string) =>
         request<PcbLayer[]>(`/api/v1/pcb/${enc(designId)}/layers${q({ revision_id: revisionId })}`),
       /**

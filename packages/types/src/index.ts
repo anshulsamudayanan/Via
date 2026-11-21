@@ -300,3 +300,118 @@ export interface PcbLayer {
   source_type: string | null;
   user_name: string | null;
 }
+
+// ---------------------------------------------------------------- normalized PCB model
+// Mirror of services/pcb-engine/src/via_pcb/models (schema 1.x). Millimetres,
+// degrees (CCW on screen, normalized to [0, 360)), absolute board coordinates,
+// KiCad's +Y-down axis.
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface BoundingBox {
+  min_x: number;
+  min_y: number;
+  max_x: number;
+  max_y: number;
+}
+
+export type LayerKind =
+  | "copper" | "silkscreen" | "solder_mask" | "solder_paste" | "adhesive" | "fabrication"
+  | "courtyard" | "edge" | "margin" | "documentation" | "user";
+export type Side = "top" | "bottom" | "inner" | "none";
+
+export interface PcbLayerDef {
+  index: number;
+  name: string;
+  kind: LayerKind;
+  side: Side;
+  source_type: string | null;
+  user_name: string | null;
+}
+
+export interface Graphic {
+  kind: "line" | "arc" | "circle" | "rect" | "polygon";
+  layer: string;
+  width: number;
+  points: Point[];
+  filled: boolean;
+}
+
+export interface Pad {
+  number: string;
+  type: "smd" | "through_hole" | "npth" | "connect";
+  shape: string;
+  position: Point;
+  rotation: number;
+  size: Point;
+  layers: string[];
+  net: string | null;
+  drill: { diameter: number; slot_length: number | null; offset: Point | null } | null;
+}
+
+export interface Footprint {
+  reference: string;
+  value: string | null;
+  footprint: string;
+  layer: string;
+  side: Side;
+  position: Point;
+  rotation: number;
+  attributes: string[];
+  properties: Record<string, string>;
+  pads: Pad[];
+  graphics: Graphic[];
+  uuid: string | null;
+}
+
+export interface Track {
+  kind: "segment" | "arc";
+  start: Point;
+  end: Point;
+  mid: Point | null;
+  width: number;
+  layer: string;
+  net: string | null;
+  length: number;
+}
+
+export interface ViaDef {
+  position: Point;
+  diameter: number;
+  drill: number;
+  layers: string[];
+  net: string | null;
+  via_type: string;
+}
+
+export interface Zone {
+  net: string | null;
+  layers: string[];
+  outline: Point[];
+  area: number;
+  filled: boolean;
+  keepout: boolean;
+  name: string | null;
+}
+
+/** GET /api/v1/pcb/{design_id}/normalized */
+export interface PCBDesign {
+  schema_version: string;
+  engine_version: string;
+  source: { format: string; filename: string | null; sha256: string; size_bytes: number; y_axis: string; [k: string]: unknown };
+  title: string | null;
+  layers: PcbLayerDef[];
+  nets: { code: number; name: string }[];
+  components: Footprint[];
+  tracks: Track[];
+  vias: ViaDef[];
+  zones: Zone[];
+  graphics: Graphic[];
+  outline: { graphics: Graphic[]; closed: boolean; bbox: BoundingBox | null; area: number | null };
+  bbox: BoundingBox | null;
+  stats: DesignStats;
+  warnings: ParseWarning[];
+}

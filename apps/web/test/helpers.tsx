@@ -69,7 +69,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
     files: { list: vi.fn().mockResolvedValue([]), downloadUrl: (id: string) => `/api/v1/files/${id}/download` },
     pcb: {
       limits: vi.fn().mockResolvedValue({ max_upload_bytes: 1024, formats: [{ id: "kicad", name: "KiCad PCB", extensions: [".kicad_pcb"] }] }),
-      summary: vi.fn(), components: vi.fn(), nets: vi.fn(), layers: vi.fn(), upload: vi.fn(),
+      summary: vi.fn(), components: vi.fn(), nets: vi.fn(), layers: vi.fn(), upload: vi.fn(), normalized: vi.fn().mockReturnValue(new Promise(() => {})),
     },
     request: vi.fn(),
   } as Record<string, unknown>;

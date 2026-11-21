@@ -18,17 +18,17 @@ import {
   Input,
   Skeleton,
 } from "@via/ui";
-import { AlertTriangle, FolderX, Pencil, ScanEye, Trash2 } from "lucide-react";
+import { AlertTriangle, FolderX, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
-import { ComingSoon } from "@/components/coming-soon";
 import { ComponentsTable, LayersTable, NetsTable } from "@/components/designs/data-tables";
 import { isTerminal, RevisionStatusBadge } from "@/components/designs/revision-status";
 import { UploadPanel } from "@/components/designs/upload-panel";
 import { useRevisionPoll } from "@/components/designs/use-revision-poll";
+import { BoardViewer } from "@/components/viewer/board-viewer";
 import { errorMessage } from "@/lib/errors";
 import { formatBytes, formatDateTime, mm } from "@/lib/format";
 import { useAsync } from "@/lib/use-async";
@@ -225,10 +225,12 @@ function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail;
 
       {s.warnings.length ? <Warnings summary={s} /> : null}
 
-      <ComingSoon
-        icon={<ScanEye />}
-        title="Board viewer"
-        description="An interactive view of this board (layers, components, tracks, vias, zoom and selection) is coming in the next update. It will render this parsed data, never sample layouts."
+      <BoardViewer
+        designId={design.id}
+        revisionId={isCurrent ? undefined : revisionId}
+        designName={design.name}
+        expandHref={`${pathname}/viewer${isCurrent ? "" : `?revision=${revisionId}`}`}
+        className="h-[560px]"
       />
 
       <nav aria-label="Design data" className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1">

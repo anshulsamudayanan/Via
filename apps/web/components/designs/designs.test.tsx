@@ -119,7 +119,8 @@ describe("DesignView", () => {
     expect(screen.getByText("1500 mm²")).toBeTruthy();
     expect(screen.getByText("Parser warnings (1)")).toBeTruthy();
     expect(screen.getByText("unsupported_curve")).toBeTruthy();
-    expect(screen.getByText("Board viewer")).toBeTruthy(); // honest coming-soon, no fake rendering
+    // The board viewer loads this design's parsed data (rendering is covered in viewer tests).
+    await waitFor(() => expect(client.pcb.normalized).toHaveBeenCalledWith("d1", undefined, expect.anything()));
     expect(await screen.findByText("R1")).toBeTruthy();
     await waitFor(() => expect(client.pcb.components).toHaveBeenCalledWith("d1", expect.objectContaining({ limit: 50, offset: 0 }), expect.anything()));
   });
