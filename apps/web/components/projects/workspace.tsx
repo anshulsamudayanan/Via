@@ -3,13 +3,15 @@
 import { ApiError } from "@via/api-client";
 import type { Project } from "@via/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, cn, EmptyState, ErrorState, Skeleton } from "@via/ui";
-import { Archive, BarChart3, Cpu, FileStack, FolderX, Layers } from "lucide-react";
+import { Archive, BarChart3, FolderX } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 
 import { ActivityList } from "@/components/activity-list";
 import { useApi } from "@/components/api-context";
 import { ComingSoon } from "@/components/coming-soon";
+import { FilesTable } from "@/components/designs/files-table";
+import { DesignsSection, ProjectComponentsSection } from "@/components/designs/project-sections";
 import { ArchivedBadge, RoleBadge, VisibilityBadge } from "@/components/projects/badges";
 import { ProjectSettings } from "@/components/projects/project-settings";
 import { errorMessage } from "@/lib/errors";
@@ -104,45 +106,27 @@ export function ProjectWorkspace() {
         ))}
       </nav>
 
-      <TabPanel tab={tab} project={p} onChange={project.setData} />
+      <TabPanel tab={tab} project={p} onChange={project.setData} onReload={project.reload} />
     </div>
   );
 }
 
-function TabPanel({ tab, project, onChange }: { tab: TabId; project: Project; onChange: (p: Project) => void }) {
+function TabPanel({ tab, project, onChange, onReload }: { tab: TabId; project: Project; onChange: (p: Project) => void; onReload: () => void }) {
   switch (tab) {
     case "overview":
       return <Overview project={project} />;
     case "designs":
-      return (
-        <ComingSoon
-          icon={<Layers />}
-          title="PCB designs"
-          description="Upload KiCad boards (.kicad_pcb) to this project. Each upload is validated, parsed and stored as a revision. Arrives in the next update."
-        />
-      );
+      return <DesignsSection project={project} onChanged={onReload} />;
     case "files":
-      return (
-        <ComingSoon
-          icon={<FileStack />}
-          title="Files"
-          description="Original uploads and their metadata (size, SHA-256, upload time) will be listed here once PCB upload is available."
-        />
-      );
+      return <FilesTable projectId={project.id} />;
     case "components":
-      return (
-        <ComingSoon
-          icon={<Cpu />}
-          title="Components"
-          description="Footprints extracted from parsed boards (references, values, positions) will be searchable here after the first upload."
-        />
-      );
+      return <ProjectComponentsSection project={project} />;
     case "analysis":
       return (
         <ComingSoon
           icon={<BarChart3 />}
           title="Analysis"
-          description="Design analysis is planned for a later stage. VIA will never show analysis results it hasn't actually computed."
+          description="Design analysis (rule checks, AI review) is planned for a later stage. Import results and parser warnings are on each design's page. VIA will never show analysis results it hasn't actually computed."
         />
       );
     case "activity":

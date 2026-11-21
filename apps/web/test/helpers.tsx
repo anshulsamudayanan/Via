@@ -1,5 +1,5 @@
 import type { ViaClient } from "@via/api-client";
-import type { MeResponse, Page, Project } from "@via/types";
+import type { DesignDetail, MeResponse, Page, Project, Revision } from "@via/types";
 import { TooltipProvider } from "@via/ui";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -30,6 +30,27 @@ export function project(overrides: Partial<Project> = {}): Project {
   };
 }
 
+export function revision(overrides: Partial<Revision> = {}): Revision {
+  return {
+    id: "r1", design_id: "d1", project_id: "p1", revision_number: 1, status: "ready", source_format: "kicad",
+    source_sha256: "a".repeat(64), parser_version: "0.1.0", schema_version: "1.0.0", imported_at: "2026-11-21T10:00:00Z",
+    error_code: null, error_message: null, warnings: [],
+    object_counts: { component_count: 4, net_count: 3, layer_count: 18, copper_layer_count: 2 },
+    created_by: { id: "u1", display_name: "Ada Lovelace" }, created_at: "2026-11-21T10:00:00Z",
+    source_file: { id: "f1", kind: "source", original_filename: "board.kicad_pcb", content_type: "application/octet-stream", size_bytes: 512, sha256: "a".repeat(64), created_at: "2026-11-21T10:00:00Z", revision_id: "r1" },
+    ...overrides,
+  };
+}
+
+export function design(overrides: Partial<DesignDetail> = {}): DesignDetail {
+  const rev = revision();
+  return {
+    id: "d1", project_id: "p1", name: "Motor board", description: "", created_by: { id: "u1", display_name: "Ada Lovelace" },
+    created_at: "2026-11-21T10:00:00Z", updated_at: "2026-11-21T10:00:00Z", revision_count: 1,
+    current_revision: rev, latest_revision: rev, revisions: [rev], ...overrides,
+  };
+}
+
 export function page<T>(items: T[], total = items.length): Page<T> {
   return { items, total, limit: 25, offset: 0 };
 }
@@ -43,6 +64,13 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
     organizations: { list: vi.fn(), create: vi.fn() },
     projects: { list: vi.fn(), summary: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), unarchive: vi.fn(), delete: vi.fn(), members: vi.fn(), addMember: vi.fn(), updateMember: vi.fn(), removeMember: vi.fn() },
     activity: { list: vi.fn().mockResolvedValue(page([])) },
+    designs: { list: vi.fn().mockResolvedValue([]), get: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    revisions: { get: vi.fn() },
+    files: { list: vi.fn().mockResolvedValue([]), downloadUrl: (id: string) => `/api/v1/files/${id}/download` },
+    pcb: {
+      limits: vi.fn().mockResolvedValue({ max_upload_bytes: 1024, formats: [{ id: "kicad", name: "KiCad PCB", extensions: [".kicad_pcb"] }] }),
+      summary: vi.fn(), components: vi.fn(), nets: vi.fn(), layers: vi.fn(), upload: vi.fn(),
+    },
     request: vi.fn(),
   } as Record<string, unknown>;
   for (const [k, v] of Object.entries(overrides)) base[k] = { ...(base[k] as object), ...v };

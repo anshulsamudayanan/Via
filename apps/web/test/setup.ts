@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => router,
   useSearchParams: () => navigation.search,
   usePathname: () => navigation.pathname,
-  useParams: () => ({ projectId: "p1" }),
+  useParams: () => ({ projectId: "p1", designId: "d1" }),
 }));
 
 beforeEach(() => {

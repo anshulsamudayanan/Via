@@ -1,12 +1,13 @@
 "use client";
 
-import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, ErrorState, Skeleton, Tooltip } from "@via/ui";
-import { ArrowRight, FolderKanban, FolderPlus, Plus, Upload } from "lucide-react";
+import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, ErrorState, Skeleton } from "@via/ui";
+import { ArrowRight, FolderKanban, FolderPlus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ActivityList } from "@/components/activity-list";
 import { useApi } from "@/components/api-context";
+import { UploadShortcut } from "@/components/designs/upload-shortcut";
 import { PageHeader } from "@/components/app-shell";
 import { RoleBadge } from "@/components/projects/badges";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
@@ -43,13 +44,7 @@ export default function DashboardPage() {
         description="Your projects and recent activity."
         actions={
           <>
-            <Tooltip content="PCB upload arrives in the next update.">
-              <span tabIndex={0} className="rounded-md">
-                <Button variant="secondary" disabled aria-label="Upload PCB (coming soon)">
-                  <Upload /> Upload PCB
-                </Button>
-              </span>
-            </Tooltip>
+            {isNew ? null : <UploadShortcut />}
             <NewProjectDialog onCreated={(p) => goTo(p.id)} />
           </>
         }
@@ -62,7 +57,7 @@ export default function DashboardPage() {
           <EmptyState
             icon={<FolderPlus />}
             title="Create your first project"
-            description="A project is a private workspace for a PCB design. You'll be able to upload KiCad boards into it and inspect them."
+            description="A project is a private workspace for PCB designs. Create one, then upload a KiCad board into it."
             action={
               <NewProjectDialog
                 onCreated={(p) => goTo(p.id)}

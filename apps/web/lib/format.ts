@@ -24,3 +24,21 @@ export function formatDateTime(iso: string): string {
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
+
+/** Millimetre values from the PCB engine, trimmed to a sensible precision. */
+export function mm(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined) return "-";
+  return `${Number(value.toFixed(digits))} mm`;
+}

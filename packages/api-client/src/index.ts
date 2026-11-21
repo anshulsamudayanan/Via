@@ -1,5 +1,15 @@
 import type {
   ActivityItem,
+  BoardSummary,
+  Design,
+  DesignDetail,
+  ImportResponse,
+  PcbComponent,
+  PcbLayer,
+  PcbNet,
+  ProjectFile,
+  Revision,
+  UploadLimits,
   ErrorResponse,
   LivenessResponse,
   MeResponse,
@@ -46,9 +56,21 @@ export class ApiError extends Error {
   }
 }
 
+export interface UploadOptions {
+  projectId: string;
+  file: File;
+  designId?: string;
+  name?: string;
+  /** Called with bytes sent and total while the file uploads. */
+  onProgress?: (loaded: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
 export interface ClientOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
+  /** XMLHttpRequest implementation (tests). */
+  xhr?: typeof XMLHttpRequest;
 }
 
 interface RequestOptions {
@@ -65,6 +87,19 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
   if (typeof value !== "object" || value === null || !("error" in value)) return false;
   const err = (value as { error: unknown }).error;
   return typeof err === "object" && err !== null && "code" in err && "message" in err;
+}
+
+function parseErrorBody(status: number, text: string, requestId: string | null): ApiError {
+  try {
+    const data: unknown = JSON.parse(text);
+    if (isErrorResponse(data)) {
+      const { code, message, request_id, details } = data.error;
+      return new ApiError(status, code, message, request_id, details);
+    }
+  } catch {
+    // fall through
+  }
+  return new ApiError(status, "http_error", `The API returned HTTP ${status}.`, requestId);
 }
 
 export function createViaClient(options: ClientOptions = {}) {
@@ -190,6 +225,83 @@ export function createViaClient(options: ClientOptions = {}) {
     activity: {
       list: (params: { project_id?: string; limit?: number; offset?: number } = {}) =>
         request<Page<ActivityItem>>(`/api/v1/activity${q(params)}`),
+    },
+    designs: {
+      list: (projectId: string, signal?: AbortSignal) =>
+        request<Design[]>(`/api/v1/designs${q({ project_id: projectId })}`, { signal }),
+      get: (id: string, signal?: AbortSignal) => request<DesignDetail>(`/api/v1/designs/${enc(id)}`, { signal }),
+      update: (id: string, body: { name?: string; description?: string }) =>
+        request<DesignDetail>(`/api/v1/designs/${enc(id)}`, { method: "PATCH", body }),
+      delete: (id: string) => request<void>(`/api/v1/designs/${enc(id)}`, { method: "DELETE" }),
+    },
+    revisions: {
+      get: (id: string, signal?: AbortSignal) => request<Revision>(`/api/v1/revisions/${enc(id)}`, { signal }),
+    },
+    files: {
+      list: (projectId: string) => request<ProjectFile[]>(`/api/v1/files${q({ project_id: projectId })}`),
+      /** Same-origin URL; the browser sends the session cookie. */
+      downloadUrl: (id: string) => `${baseUrl}/api/v1/files/${enc(id)}/download`,
+    },
+    pcb: {
+      limits: () => request<UploadLimits>("/api/v1/pcb/limits"),
+      summary: (designId: string, revisionId?: string, signal?: AbortSignal) =>
+        request<BoardSummary>(`/api/v1/pcb/${enc(designId)}${q({ revision_id: revisionId })}`, { signal }),
+      components: (
+        designId: string,
+        params: { q?: string; side?: "top" | "bottom"; revision_id?: string; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<Page<PcbComponent>>(`/api/v1/pcb/${enc(designId)}/components${q(params)}`, { signal }),
+      nets: (
+        designId: string,
+        params: { q?: string; revision_id?: string; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<Page<PcbNet>>(`/api/v1/pcb/${enc(designId)}/nets${q(params)}`, { signal }),
+      layers: (designId: string, revisionId?: string) =>
+        request<PcbLayer[]>(`/api/v1/pcb/${enc(designId)}/layers${q({ revision_id: revisionId })}`),
+      /**
+       * Upload a PCB file with progress and cancellation (XMLHttpRequest: fetch
+       * can't report upload progress). Resolves when the API has accepted and
+       * stored the file; parsing continues in the background.
+       */
+      upload: (opts: UploadOptions) =>
+        new Promise<ImportResponse>((resolve, reject) => {
+          const XHR = options.xhr ?? globalThis.XMLHttpRequest;
+          const xhr = new XHR();
+          const form = new FormData();
+          form.append("project_id", opts.projectId);
+          if (opts.designId) form.append("design_id", opts.designId);
+          if (opts.name) form.append("name", opts.name);
+          form.append("file", opts.file, opts.file.name);
+          xhr.open("POST", `${baseUrl}/api/v1/pcb/import`);
+          xhr.withCredentials = true;
+          xhr.setRequestHeader("X-VIA-Request", "1");
+          xhr.setRequestHeader("Accept", "application/json");
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) opts.onProgress?.(e.loaded, e.total);
+          };
+          xhr.onload = () => {
+            if (xhr.status === 202 || xhr.status === 200) {
+              try {
+                resolve(JSON.parse(xhr.responseText) as ImportResponse);
+              } catch {
+                reject(new ApiError(xhr.status, "invalid_response", "The API returned an unexpected response."));
+              }
+            } else {
+              reject(parseErrorBody(xhr.status, xhr.responseText, xhr.getResponseHeader("x-request-id")));
+            }
+          };
+          xhr.onerror = () =>
+            reject(new ApiError(0, "network_error", "The upload was interrupted. Check your connection and try again."));
+          xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+          if (opts.signal) {
+            if (opts.signal.aborted) {
+              reject(new DOMException("Upload cancelled", "AbortError"));
+              return;
+            }
+            opts.signal.addEventListener("abort", () => xhr.abort(), { once: true });
+          }
+          xhr.send(form);
+        }),
     },
   };
 }

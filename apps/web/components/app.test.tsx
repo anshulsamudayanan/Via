@@ -83,7 +83,7 @@ describe("ProjectsBrowser", () => {
 describe("ProjectWorkspace", () => {
   it("shows project details and honest coming-soon sections", async () => {
     navigation.pathname = "/projects/p1";
-    navigation.search = new URLSearchParams("tab=designs");
+    navigation.search = new URLSearchParams("tab=analysis");
     renderWith(<ProjectWorkspace />, mockClient({ projects: { get: vi.fn().mockResolvedValue(project()) } }));
     expect(await screen.findByRole("heading", { name: "Motor Controller" })).toBeTruthy();
     expect(screen.getByText("Coming soon")).toBeTruthy();

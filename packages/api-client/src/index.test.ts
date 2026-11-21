@@ -81,3 +81,77 @@ describe("resource methods", () => {
     expect(fetch.mock.calls[0]![1].headers["X-VIA-Request"]).toBe("1");
   });
 });
+
+class FakeXHR {
+  static last: FakeXHR;
+  method = "";
+  url = "";
+  headers: Record<string, string> = {};
+  withCredentials = false;
+  status = 0;
+  responseText = "";
+  body: FormData | null = null;
+  upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  aborted = false;
+  constructor() {
+    FakeXHR.last = this;
+  }
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+  setRequestHeader(k: string, v: string) {
+    this.headers[k] = v;
+  }
+  getResponseHeader() {
+    return "req-1";
+  }
+  send(body: FormData) {
+    this.body = body;
+  }
+  abort() {
+    this.aborted = true;
+    this.onabort?.();
+  }
+  respond(status: number, body: unknown) {
+    this.status = status;
+    this.responseText = JSON.stringify(body);
+    this.onload?.();
+  }
+}
+
+describe("pcb.upload", () => {
+  const xhr = FakeXHR as unknown as typeof XMLHttpRequest;
+  const file = new File(["(kicad_pcb)"], "board.kicad_pcb");
+
+  it("posts multipart with the CSRF header and reports progress", async () => {
+    const progress = vi.fn();
+    const p = createViaClient({ xhr }).pcb.upload({ projectId: "p1", file, name: "Main", onProgress: progress });
+    const req = FakeXHR.last;
+    expect([req.method, req.url, req.headers["X-VIA-Request"], req.withCredentials]).toEqual(["POST", "/api/v1/pcb/import", "1", true]);
+    expect(req.body?.get("project_id")).toBe("p1");
+    expect(req.body?.get("name")).toBe("Main");
+    expect((req.body?.get("file") as File).name).toBe("board.kicad_pcb");
+    req.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
+    expect(progress).toHaveBeenCalledWith(5, 10);
+    req.respond(202, { design: { id: "d1" }, revision: { id: "r1" } });
+    await expect(p).resolves.toMatchObject({ design: { id: "d1" } });
+  });
+
+  it("maps API errors from the upload", async () => {
+    const p = createViaClient({ xhr }).pcb.upload({ projectId: "p1", file });
+    FakeXHR.last.respond(409, { error: { code: "duplicate_file", message: "Already uploaded", details: { design_id: "d1" }, request_id: "x" } });
+    await expect(p).rejects.toMatchObject({ status: 409, code: "duplicate_file", details: { design_id: "d1" } });
+  });
+
+  it("cancels via AbortSignal", async () => {
+    const ac = new AbortController();
+    const p = createViaClient({ xhr }).pcb.upload({ projectId: "p1", file, signal: ac.signal });
+    ac.abort();
+    await expect(p).rejects.toMatchObject({ name: "AbortError" });
+    expect(FakeXHR.last.aborted).toBe(true);
+  });
+});
