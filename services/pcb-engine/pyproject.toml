@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "via-pcb-engine"
+version = "0.1.0"
+description = "VIA PCB engine: format adapters, S-expression parser, normalized PCB model and geometry."
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic==2.14.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/via_pcb"]
