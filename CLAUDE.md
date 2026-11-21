@@ -13,10 +13,21 @@ checkpoints; do not build features from later checkpoints or stages early.
 
 ## Commands
 ```bash
-.venv/bin/pytest                                   # Python tests (unit, engineering, integration)
+.venv/bin/pytest -ra                               # Python tests; integration tests need VIA_TEST_* (see tests/conftest.py)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-.venv/bin/mypy services/pcb-engine/src
+.venv/bin/mypy services/pcb-engine/src apps/api/src
+.venv/bin/python scripts/fetch_real_fixtures.py    # real KiCad boards (CC BY-SA, never commit them)
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+docker compose config --quiet                      # after editing compose or .env.example
+cd apps/api && alembic revision --autogenerate -m "..."   # review by hand; `alembic check` must pass
 ```
+
+## Conventions
+- Database: UUID PKs, timestamptz, VARCHAR+CHECK enums, deterministic constraint names. Every schema change ships with a migration; `tests/integration/test_migrations.py` enforces model/migration parity.
+- API: everything under `/api/v1`; errors use the envelope in `via_api/errors.py`; project-scoped data returns 404 when the caller lacks access.
+- Organization and project membership are independent; never infer project access from organization roles (see docs/DATABASE.md).
+- Frontend: only semantic design tokens (`bg-surface`, `text-muted`...), never raw colours. Browser code talks only to same-origin `/api/*`.
+- Pin JS versions that are at least two weeks old; Python deps are locked in `apps/api/requirements.lock`.
 
 ## Tests
 - Engineering fixtures need documented provenance and licence (`tests/engineering/fixtures/README.md`). Expected values are derived by hand, not copied from parser output.

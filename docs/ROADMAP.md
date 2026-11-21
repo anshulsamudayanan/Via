@@ -8,21 +8,21 @@ and tests passing before it's marked done.
 | CP | Deliverable | Status |
 |---|---|---|
 | 1 | Repository architecture, implementation plan, **PCB engine core** (S-expr parser, normalized model, geometry, KiCad 5–9 adapter, engineering tests) | ✅ done |
-| 2 | Frontend, backend and database running | ⏳ next |
-| 3 | Authentication and project management | — |
+| 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done (pending review) |
+| 3 | Authentication and project management | ⏳ next, after CP2 review |
 | 4 | Working PCB upload and parser pipeline | — |
 | 5 | PCB viewer, project workspace, AI foundation interfaces | — |
 | 6 | Testing hardening, CI, documentation | — |
 
-### CP2 — Frontend, backend and database running
-- `apps/api`: FastAPI app factory, settings (pydantic-settings), structured logging, consistent error envelope, `/api/v1/health` (DB + Redis + storage checks), OpenAPI.
-- SQLAlchemy models for **all** Stage 1 entities + initial Alembic migration; `alembic upgrade head` / `downgrade base` tested against Postgres.
-- Storage abstraction (S3/MinIO + local filesystem).
-- `apps/web`: Next.js App Router, Tailwind 4, dark-first theme tokens, app shell; `/api/*` rewrite to the API.
-- `packages/types`, `packages/api-client` (health only at this stage).
-- `docker-compose.yml`: postgres, redis, minio (+ bucket bootstrap), api (runs migrations), worker, web. Dockerfiles in `infrastructure/docker`.
-- `.env.example` complete; `scripts/dev.sh` for running natively without Docker.
-- **Exit:** compose config validates; API, web and DB run natively; migration round-trip test passes.
+### CP2 — Frontend, backend and database running ✅
+- `apps/api`: FastAPI app factory, settings (pydantic-settings) with production safety checks, request IDs, security headers, strict CORS, consistent error envelope, `/api/v1/health` + `/api/v1/health/ready` (DB with migration state, Redis, storage), OpenAPI.
+- SQLAlchemy models for **all** Stage 1 entities (18 tables) + initial Alembic migration; round trip and model-parity tests on real Postgres.
+- Storage abstraction (S3/MinIO + local filesystem) with server-generated, validated keys.
+- `apps/web`: Next.js App Router, Tailwind 4, dark-first tokens with light theme, accessible primitives, live system status page; `/api/*` same-origin rewrite; CSP.
+- `packages/types`, `packages/api-client` (typed client, error envelope, CSRF header), `packages/ui`.
+- `docker-compose.yml`: postgres, redis, minio (built from pinned official source), migrate job, api, web. Dockerfiles in `infrastructure/docker`.
+- PCB engine: real-board validation (KiCad 5.1–9.0), pad-angle investigation, two bugs fixed.
+- GitHub Actions CI. *Changed from plan:* the worker service moved to CP4 (no jobs exist yet); `scripts/dev.sh` replaced by README instructions (Compose infra + native API/web).
 
 ### CP3 — Authentication and project management
 - Register, login, logout, `GET /auth/me`, session listing/revocation, password-reset request/confirm (token foundation; email delivery logs in dev).
@@ -35,7 +35,7 @@ and tests passing before it's marked done.
 
 ### CP4 — PCB upload and parser pipeline
 - `/api/v1/pcb/import`, designs, revisions, files endpoints; size limit, extension + sniff validation, SHA-256 duplicate detection, upload records.
-- RQ worker + constrained parser subprocess (`python -I -m via_pcb.cli`, rlimits, timeout, empty env).
+- Worker service (`via_api.worker`, Compose `worker`) + RQ + constrained parser subprocess (`python -I -m via_pcb.cli`, rlimits, timeout, empty env).
 - Persist normalized JSON to object storage, extracted rows to `pcb_*` tables, analysis run + activity.
 - `/api/v1/pcb/{design_id}`, `/components`, `/nets`, `/layers` (paginated, searchable).
 - Web upload UI: drag-and-drop, file picker, client-side validation, progress (XHR), cancellation, metadata display, duplicate and parse error messages.

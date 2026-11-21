@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from functools import lru_cache
 
+from alembic.config import Config as AlembicConfig
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -33,3 +34,15 @@ def get_db() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+def alembic_config(database_url: str | None = None) -> AlembicConfig:
+    """Alembic config for the migrations bundled in the ``via_api.migrations`` package.
+
+    Works the same from a source checkout and from an installed wheel (Docker).
+    """
+    cfg = AlembicConfig()
+    cfg.set_main_option("script_location", "via_api:migrations")
+    if database_url:
+        cfg.set_main_option("sqlalchemy.url", database_url)
+    return cfg

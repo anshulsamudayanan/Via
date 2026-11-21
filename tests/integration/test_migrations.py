@@ -12,7 +12,8 @@ from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from tests.integration.conftest import alembic_config, reset_schema
+from tests.integration.conftest import reset_schema
+from via_api.db import alembic_config
 from via_api.models import (
     ActivityLog,
     Base,

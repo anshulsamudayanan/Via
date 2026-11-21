@@ -10,16 +10,46 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
-
-ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 
 
 def _migrate() -> int:
     from alembic import command
-    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import create_engine
 
-    command.upgrade(Config(str(ALEMBIC_INI)), "head")
+    from via_api.config import get_settings
+    from via_api.db import alembic_config
+
+    url = get_settings().database_url
+
+    def current() -> str | None:
+        engine = create_engine(url)
+        try:
+            with engine.connect() as conn:
+                return MigrationContext.configure(conn).get_current_revision()
+        finally:
+            engine.dispose()
+
+    before = current()
+    command.upgrade(alembic_config(url), "head")
+    after = current()
+    print(
+        f"database migrations: {before or 'empty'} -> {after}" if before != after else f"database up to date ({after})"
+    )
+    return 0
+
+
+def _init_storage() -> int:
+    """Verify object storage; create the bucket only when VIA_S3_AUTO_CREATE_BUCKET=true (dev)."""
+    from via_api.storage import StorageError, get_storage
+
+    storage = get_storage()
+    try:
+        storage.check()
+    except StorageError as exc:
+        print(f"storage check failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"storage ok ({storage.name})")
     return 0
 
 
@@ -54,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="via-api")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="apply database migrations")
+    sub.add_parser("init-storage", help="verify object storage (creates the bucket when auto-create is enabled)")
     serve = sub.add_parser("serve", help="run the API server")
     serve.add_argument("--host", default="0.0.0.0")  # noqa: S104 - container entrypoint
     serve.add_argument("--port", type=int, default=8000)
@@ -62,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "migrate":
         return _migrate()
+    if args.command == "init-storage":
+        return _init_storage()
     if args.command == "serve":
         return _serve(args.host, args.port, args.reload)
     return _check()

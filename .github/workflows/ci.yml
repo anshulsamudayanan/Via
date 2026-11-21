@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (lint, types, tests)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env:
+          POSTGRES_USER: via
+          POSTGRES_PASSWORD: via
+          POSTGRES_DB: via_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U via -d via_test" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7.4.7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      CI: "true"
+      VIA_TEST_DATABASE_URL: postgresql+psycopg://via:via@localhost:5432/via_test
+      VIA_TEST_REDIS_URL: redis://localhost:6379/15
+      VIA_TEST_S3_ENDPOINT: http://localhost:9000
+      VIA_TEST_S3_ACCESS_KEY: via-minio
+      VIA_TEST_S3_SECRET_KEY: via-minio-ci-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - name: Start MinIO (built from pinned official source)
+        run: |
+          docker build -f infrastructure/docker/minio.Dockerfile -t via/minio:ci .
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=via-minio -e MINIO_ROOT_PASSWORD=via-minio-ci-secret via/minio:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && break; sleep 1; done
+      - name: Install
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -r apps/api/requirements.lock
+          uv pip install --python .venv/bin/python -e services/pcb-engine -e "apps/api[dev]"
+      - name: Lint and format
+        run: .venv/bin/ruff check . && .venv/bin/ruff format --check .
+      - name: Type check
+        run: .venv/bin/mypy services/pcb-engine/src apps/api/src
+      - name: Fetch real KiCad boards (CC BY-SA, internal testing only)
+        run: .venv/bin/python scripts/fetch_real_fixtures.py
+      - name: Tests
+        run: .venv/bin/pytest -ra -W error
+
+  web:
+    name: Web (lint, types, tests, build)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.21.1"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  docker:
+    name: Docker (compose config, image builds)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose configuration
+        run: cp .env.example .env && docker compose config --quiet
+      - name: Build images
+        run: docker compose build

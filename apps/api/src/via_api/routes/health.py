@@ -5,10 +5,8 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from enum import StrEnum
-from pathlib import Path
 from typing import Annotated
 
-from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
@@ -17,13 +15,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from via_api import __version__
-from via_api.db import get_db
+from via_api.db import alembic_config, get_db
 from via_api.redis_client import get_redis
 from via_api.storage import StorageBackend, get_storage
 
 router = APIRouter(prefix="/health", tags=["health"])
-
-ALEMBIC_DIR = Path(__file__).resolve().parents[3] / "alembic"
 
 
 class CheckStatus(StrEnum):
@@ -61,7 +57,7 @@ def _timed(fn: Callable[[], str | None]) -> CheckResult:
 
 
 def expected_migration_head() -> str | None:
-    return ScriptDirectory.from_config(Config(str(ALEMBIC_DIR.parent / "alembic.ini"))).get_current_head()
+    return ScriptDirectory.from_config(alembic_config()).get_current_head()
 
 
 @router.get("", response_model=LivenessResponse, summary="Liveness: the process is up")

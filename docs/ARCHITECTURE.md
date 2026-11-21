@@ -1,6 +1,7 @@
 # VIA Architecture (Stage 1 — Foundation)
 
-Status: **Checkpoint 1** — architecture agreed, PCB engine core implemented and tested.
+Status: **Checkpoint 2**. PCB engine validated against real KiCad boards. API foundation,
+database schema and migrations, storage, web foundation and the Docker Compose stack are running.
 Sections marked *(planned)* describe the design for later checkpoints and will be
 updated as they are built.
 
@@ -45,32 +46,37 @@ same Python codebase started with a different entry point.
 ```
 via/
   apps/
-    web/                Next.js (App Router) application            (planned, CP2)
-    api/                FastAPI app + worker, Alembic migrations    (planned, CP2)
+    api/                          ✅ FastAPI app (CP2 foundation)
+      src/via_api/
+        config.py                 settings from VIA_* env vars, production safety checks
+        db.py                     engine, sessions, alembic_config()
+        errors.py middleware.py   error envelope; request id, security headers
+        models/                   SQLAlchemy models for all Stage 1 entities
+        migrations/               Alembic env + versions (bundled in the package)
+        storage/                  StorageBackend: S3-compatible (MinIO) and local
+        routes/                   one router per resource (health today)
+        cli.py                    via-api migrate | init-storage | serve | check
+      requirements.lock           locked third-party deps for the Docker image
+    web/                          ✅ Next.js (App Router) app (CP2 foundation)
   packages/
-    ui/                 shared design-system components (shadcn-style)  (planned, CP3)
-    types/              TypeScript types for API + normalized PCB model (planned, CP2)
-    api-client/         typed fetch client used by apps/web            (planned, CP2)
+    ui/                           ✅ design tokens + accessible primitives (grows in CP3)
+    types/                        ✅ TS mirror of API schemas
+    api-client/                   ✅ typed fetch client (error envelope, CSRF header)
   services/
-    pcb-engine/         ✅ implemented
-      src/via_pcb/
-        parser/         S-expression syntax parser (format-level, no semantics)
-        models/         normalized PCB model (Pydantic) — the internal contract
-        geometry/       pure geometry helpers (rotation, arcs, outline assembly)
-        adapters/       format adapters + registry (KiCad today)
-    ai-engine/          provider abstraction + project context  (planned, CP5)
-      src/via_ai/{providers,prompts,schemas,context}
+    pcb-engine/                   ✅ parser, normalized model, geometry, KiCad adapter
+      src/via_pcb/{parser,models,geometry,adapters}
+    ai-engine/                    provider abstraction + project context  (planned, CP5)
   infrastructure/
-    docker/             Dockerfiles                               (planned, CP2)
-    database/           Postgres init (test database, extensions)  (planned, CP2)
-    storage/            bucket bootstrap for MinIO                 (planned, CP2)
+    docker/                       ✅ api, web, minio Dockerfiles
+    database/                     ✅ Postgres init (creates the integration-test database)
   tests/
-    unit/               fast, isolated tests (engine, API units)
-    engineering/        ✅ parser verified against known source designs
-    integration/        API + DB + storage tests                   (planned, CP3)
-    e2e/                Playwright                                 (planned, CP6)
-  docs/                 PRD, ARCHITECTURE, DATABASE, API_SPEC, ENGINEERING, SECURITY, ROADMAP
-  scripts/              developer scripts                          (planned, CP2)
+    unit/                         ✅ engine + API units
+    engineering/                  ✅ hand-computed fixtures + real KiCad 5.1-9.0 boards
+    integration/                  ✅ real Postgres, Redis, MinIO
+    e2e/                          Playwright                          (planned, CP6)
+  scripts/                        ✅ fetch_real_fixtures.py
+  docs/                           PRD, ARCHITECTURE, DATABASE, API_SPEC, ENGINEERING, SECURITY, ROADMAP
+  docker-compose.yml  .env.example  .github/workflows/ci.yml
 ```
 
 ### Deviations from the brief's layout (and why)
@@ -79,7 +85,9 @@ via/
 |---|---|---|
 | `services/pcb-engine/{parser,models,geometry,adapters}` | `services/pcb-engine/src/via_pcb/{...}` | Python needs an importable package; a top-level `parser` module would shadow other packages. `src/` layout prevents accidentally importing the uninstalled tree in tests. |
 | `services/ai-engine/{providers,prompts,schemas}` | `services/ai-engine/src/via_ai/{providers,prompts,schemas,context}` | Same reason; `context/` added for the project-context interface required by the AI foundation. |
-| Worker not listed | Worker lives in `apps/api` (`via_api.worker`) | It shares models, settings and storage code with the API; a separate app would duplicate them. |
+| Worker not listed | Worker will live in `apps/api` (`via_api.worker`, CP4) | It shares models, settings and storage code with the API; a separate app would duplicate them. Not created in CP2: it would be an empty module until jobs exist. |
+| `infrastructure/storage/` | Not created | Bucket bootstrap is `via-api init-storage` (dev only, guarded by `VIA_S3_AUTO_CREATE_BUCKET`), run by the Compose `migrate` job. |
+| `apps/api/alembic/` | `apps/api/src/via_api/migrations/` | Migrations ship inside the package, so a normal (non-editable) install in Docker finds them. `apps/api/alembic.ini` remains for the `alembic` CLI. |
 | Vitest tests under `tests/` | Colocated `*.test.ts` in each TS package | Vitest/TS path resolution is simplest per package. Python and Playwright tests stay in `tests/`. |
 | Empty module directories | Created only when they get code | Per the brief: no empty modules. |
 
@@ -97,9 +105,14 @@ via/
 | CSRF | SameSite=Lax cookie + required `X-VIA-Request: 1` header on unsafe methods for cookie-authenticated requests | Double-submit tokens — unnecessary given same-origin + custom header. |
 | PCB viewer | SVG, rendered from a viewer-specific *render model* derived from the API's normalized JSON (`apps/web/lib/pcb/render-model.ts`) | Canvas/WebGL — better for very large boards; the render-model boundary lets us swap renderers later without touching the data model. |
 | Object storage | `StorageBackend` interface with S3 (boto3; MinIO in dev) and local-filesystem implementations | Storing files in Postgres — explicitly disallowed. |
-| Authorization | Central `authorize(user, project, action)` in the API service layer; roles `owner/editor/viewer`; projects private by default | Postgres RLS — valuable later, adds complexity now. |
+| Authorization | Central `authorize(user, project, action)` in the API service layer; roles `owner/editor/viewer`; projects private by default; organization and project membership enforced independently (see DATABASE.md) | Postgres RLS — valuable later, adds complexity now. |
+| Enum columns | `VARCHAR + CHECK` | Native Postgres enums: adding values requires special migration handling. |
+| Migrations | Hand-reviewed Alembic autogenerate; `alembic check` + a parity test in CI | Raw SQL migrations: no model parity check. |
+| Local MinIO | Built from official source (`github.com/minio/minio` at a pinned commit, via the Go module proxy) in `infrastructure/docker/minio.Dockerfile`; prebuilt image optional via `MINIO_IMAGE` | `minio/minio` on Docker Hub is no longer published; `quay.io` isn't reachable from every network; community forks are third-party code. |
+| Builds behind TLS-intercepting proxies | Optional BuildKit secret `build_ca` (`VIA_BUILD_CA_CERT`), applied only when non-empty and never stored in a layer | Baking a CA into images: leaks environment-specific trust into production artefacts. |
+| Integration tests | Real Postgres/Redis/MinIO via `VIA_TEST_*` env; skip locally when absent, **fail** when `CI=true` | SQLite/mocks: would not catch Postgres-specific behaviour (JSONB, CHECK, cascades). |
 
-## 4. Data model *(planned, CP2 — details in DATABASE.md once implemented)*
+## 4. Data model (implemented in CP2, details in DATABASE.md)
 
 All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC.
 
@@ -132,7 +145,40 @@ All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC
 | 2 | **Legally usable real-world fixtures** | Brief requires real sample projects | Hand-authored fixtures (original work) cover exact-value checks today. Third-party boards must have a permissive licence (CC0, CC-BY, CERN-OHL-P, MIT); provenance + licence recorded in `tests/engineering/fixtures/README.md`. Needs a decision from the project owner on GPL-licensed KiCad demo boards. |
 | 3 | **Large boards** (50k+ primitives; multi-MB JSON) | Slow viewer, slow API | Gzip responses; per-section endpoints; SVG grouped per layer; render-model boundary allows a Canvas/WebGL renderer later. |
 | 4 | **Untrusted file parsing** (zip bombs don't apply, but pathological nesting/size do) | DoS of API/worker | Size limit before storage; parser in subprocess with CPU/memory/time limits; iterative (non-recursive) parser; warning caps. |
-| 5 | **Pad/graphic transform semantics** (pad angle stored as absolute; bottom-side local coordinates pre-mirrored) | Misplaced pads in viewer | Verified with hand-computed rotated fixtures; must be confirmed against real KiCad-exported boards in CP4. |
-| 6 | **No Docker daemon in the current dev container** | `docker compose up` can't be executed here | Services verified natively (Postgres 16 and Redis are installed); images built and smoke-tested in GitHub Actions. |
+| 5 | ~~Pad/graphic transform semantics~~ | — | **Resolved in CP2:** investigated on real KiCad 5.1-9.0 boards (docs/ENGINEERING.md). Pad angles are absolute; a missing angle means 0 (bug fixed). Positions confirmed by a track-endpoint electrical check. |
+| 6 | **Sandboxed build environment** (TLS-intercepting proxy, no `quay.io`) | Image builds fail without workarounds | Optional `build_ca` build secret; MinIO built from pinned source. The committed Compose file needs no sandbox-specific settings. |
 | 7 | **Bleeding-edge frontend stack** (Next 16, React 19, Tailwind 4) | Integration friction | Exact pins; shadcn components vendored into `packages/ui` rather than generated at install time. |
 | 8 | **Scope creep** | Stage 1 never finishes | Coming-soon states for non-Stage-1 sections; no fabricated data or AI output. |
+
+## 7. Dependencies
+
+Exact versions are pinned everywhere: `pyproject.toml` (direct), `apps/api/requirements.lock`
+(all transitive Python deps for images), `pnpm-lock.yaml` (JS). JS versions were chosen to
+be at least two weeks old at the time of pinning.
+
+| Dependency | Why |
+|---|---|
+| fastapi, uvicorn[standard] | HTTP API + ASGI server |
+| pydantic, pydantic-settings | Schemas; settings from env |
+| sqlalchemy, psycopg[binary] | ORM / Postgres driver |
+| alembic | Migrations |
+| redis | Readiness check now; job queue (CP4) and rate limiting (CP3) |
+| boto3 | S3-compatible storage (MinIO, AWS S3) |
+| httpx2 (dev) | Starlette 1.10's test client (plain `httpx` is deprecated there) |
+| next, react, react-dom | Web app |
+| tailwindcss, @tailwindcss/postcss | Styling via design tokens |
+| class-variance-authority, clsx, tailwind-merge, @radix-ui/react-slot | Component variants and composition (shadcn approach, vendored components) |
+| lucide-react | Icons |
+| vitest, vite, jsdom, @testing-library/react (dev) | Frontend unit/component tests |
+| eslint 9 + eslint-config-next | Linting (ESLint 10 is not yet supported by Next's plugins) |
+
+Deferred until needed: argon2-cffi (CP3), rq + python-multipart (CP4), Playwright (CP6,
+pinned to the browser build available in CI), Radix dialog/tooltip primitives (CP3).
+
+Regenerating the Python lock:
+
+```bash
+printf -- "-e ./services/pcb-engine\n-e ./apps/api\n" > /tmp/req.in
+uv pip compile /tmp/req.in --python-version 3.13 --no-emit-package via-pcb-engine --no-emit-package via-api --no-header -o apps/api/requirements.lock
+```
+(then delete the `-e` lines and keep the two header comment lines).

@@ -6,25 +6,16 @@ from pathlib import Path
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from tests.conftest import require_env
 from via_api.config import Settings, StorageBackendName, get_settings
-from via_api.db import get_db
+from via_api.db import alembic_config, get_db
 from via_api.main import create_app
 from via_api.redis_client import get_redis
 from via_api.storage import LocalStorage, get_storage
-
-ALEMBIC_INI = Path(__file__).resolve().parents[2] / "apps" / "api" / "alembic.ini"
-
-
-def alembic_config(url: str) -> Config:
-    cfg = Config(str(ALEMBIC_INI))
-    cfg.set_main_option("sqlalchemy.url", url)
-    return cfg
 
 
 def reset_schema(engine: Engine) -> None:
