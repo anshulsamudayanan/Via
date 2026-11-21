@@ -4,9 +4,9 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 1, Checkpoint 2 of 6.** The PCB engine, the API foundation
-> (database schema, migrations, storage, health) and the web foundation run
-> locally and in Docker Compose. Accounts and projects arrive in Checkpoint 3.
+> **Status: Stage 1, Checkpoint 3 of 6.** Accounts, projects, sharing and the
+> activity feed work end to end. PCB upload and parsing in the app arrive in
+> Checkpoint 4 (the engine itself is already built and validated).
 > See [docs/ROADMAP.md](docs/ROADMAP.md). This README only describes what works today.
 
 ## What works today
@@ -15,11 +15,15 @@ model, then exploring them in a secure, project-based workspace.
   normalized `PCBDesign` model. Validated against real boards from KiCad 5.1, 6.0,
   7.0, 8.0 and 9.0 (see [docs/ENGINEERING.md](docs/ENGINEERING.md) for exactly what is
   and isn't covered).
-- **API** (`apps/api`): FastAPI app with liveness/readiness endpoints, consistent
-  errors, the full Stage 1 database schema with Alembic migrations, and an
-  S3-compatible storage layer (MinIO locally).
-- **Web** (`apps/web`): Next.js app with VIA's design system (dark-first, light
-  theme) and a live system status page.
+- **Accounts:** register, sign in/out, password reset, profile, password change,
+  signed-in devices. Argon2id passwords, server-side sessions, CSRF protection,
+  rate limits, audit log.
+- **Projects:** create, rename, describe, archive/restore, delete, search and filter;
+  private by default; share with other users as editor or viewer.
+- **Dashboard, project workspace and activity feed** built on real data only.
+  Sections that depend on PCB upload show honest "coming soon" states.
+- **API** (`apps/api`): versioned REST API with OpenAPI docs, consistent errors, the full
+  Stage 1 schema with Alembic migrations, S3-compatible storage (MinIO locally).
 
 ## Prerequisites
 
@@ -48,7 +52,7 @@ The first build compiles MinIO from source and takes a few minutes. When it's up
 
 | What | URL |
 |---|---|
-| Web app | http://localhost:3000 (system status: `/status`) |
+| Web app | http://localhost:3000 (create an account at `/register`; system status: `/status`) |
 | API docs (OpenAPI) | http://localhost:8000/api/docs |
 | API readiness | http://localhost:8000/api/v1/health/ready |
 | MinIO console | http://localhost:9001 (user `MINIO_ROOT_USER`, password `MINIO_ROOT_PASSWORD`) |
@@ -58,6 +62,9 @@ verifies storage, then exits), `api`, `web`. All host ports bind to `127.0.0.1`.
 
 Behind a corporate TLS-intercepting proxy, set `VIA_BUILD_CA_CERT=/path/to/ca.pem` in
 `.env` so image builds can reach package registries.
+
+Password reset emails aren't delivered in Stage 1: in development the API logs them,
+link included (`docker compose logs api | grep -A8 EMAIL`).
 
 Stop with `docker compose down` (add `-v` to delete the database and stored files).
 

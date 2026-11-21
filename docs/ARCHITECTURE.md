@@ -1,7 +1,8 @@
 # VIA Architecture (Stage 1 — Foundation)
 
-Status: **Checkpoint 2**. PCB engine validated against real KiCad boards. API foundation,
-database schema and migrations, storage, web foundation and the Docker Compose stack are running.
+Status: **Checkpoint 3**. Accounts, sessions, organizations, projects, membership and the
+activity feed work end to end (API + web). PCB engine validated against real KiCad boards;
+the upload pipeline is next (CP4).
 Sections marked *(planned)* describe the design for later checkpoints and will be
 updated as they are built.
 
@@ -54,10 +55,19 @@ via/
         models/                   SQLAlchemy models for all Stage 1 entities
         migrations/               Alembic env + versions (bundled in the package)
         storage/                  StorageBackend: S3-compatible (MinIO) and local
-        routes/                   one router per resource (health today)
+        security.py ratelimit.py  Argon2id + token hashing; Redis fixed-window limits
+        deps.py                   current user (cookie/Bearer), client info, limiter, mailer
+        services/                 business logic: auth, access (authorization), projects, activity
+        schemas/                  request/response models
+        routes/                   health, auth, users, organizations, projects, activity
         cli.py                    via-api migrate | init-storage | serve | check
       requirements.lock           locked third-party deps for the Docker image
-    web/                          ✅ Next.js (App Router) app (CP2 foundation)
+    web/                          ✅ Next.js (App Router)
+      app/(public)/               landing, system status
+      app/(auth)/                 login, register, forgot/reset password
+      app/(app)/                  protected: dashboard, projects, project workspace, activity, settings
+      components/ lib/ test/      UI composition, client helpers, Vitest helpers
+      proxy.ts                    signed-out page-load redirect (UX only; API is the boundary)
   packages/
     ui/                           ✅ design tokens + accessible primitives (grows in CP3)
     types/                        ✅ TS mirror of API schemas
@@ -102,6 +112,8 @@ via/
 | Background parsing | RQ (Redis) worker, parser in a **subprocess** with rlimits + timeout + empty env | FastAPI `BackgroundTasks` — runs in the API process (violates isolation). Celery — heavier. A separate no-network parser container — stronger, but premature; documented as future hardening. |
 | Authentication | Server-side sessions: random 256-bit token in an httpOnly cookie, SHA-256 hash stored in `user_sessions`; Argon2id passwords | JWT — cannot be revoked without a denylist; logout/session management are requirements. |
 | Web ↔ API | Next.js rewrites `/api/*` to the API, so the browser is same-origin; API also accepts `Authorization: Bearer <session token>` for programmatic clients | Cross-origin cookies + CORS — more CSRF/CORS surface. |
+| Route protection (web) | Client `SessionProvider` asks the API (`/auth/me`) and redirects on 401; `proxy.ts` additionally redirects signed-out *page loads* (detected via `Sec-Fetch-Dest: document`) | Server components fetching the API with forwarded cookies: more moving parts for no security gain, since the API enforces every request anyway. Redirecting RSC prefetches in the proxy broke client navigation after sign-out. |
+| Frontend data fetching | Small `useAsync` hook + typed client; no SWR/React Query yet | A caching library: unnecessary at Stage 1 scale. |
 | CSRF | SameSite=Lax cookie + required `X-VIA-Request: 1` header on unsafe methods for cookie-authenticated requests | Double-submit tokens — unnecessary given same-origin + custom header. |
 | PCB viewer | SVG, rendered from a viewer-specific *render model* derived from the API's normalized JSON (`apps/web/lib/pcb/render-model.ts`) | Canvas/WebGL — better for very large boards; the render-model boundary lets us swap renderers later without touching the data model. |
 | Object storage | `StorageBackend` interface with S3 (boto3; MinIO in dev) and local-filesystem implementations | Storing files in Postgres — explicitly disallowed. |
@@ -162,18 +174,21 @@ be at least two weeks old at the time of pinning.
 | pydantic, pydantic-settings | Schemas; settings from env |
 | sqlalchemy, psycopg[binary] | ORM / Postgres driver |
 | alembic | Migrations |
-| redis | Readiness check now; job queue (CP4) and rate limiting (CP3) |
+| redis | Rate limiting; readiness; job queue (CP4) |
+| argon2-cffi | Argon2id password hashing |
 | boto3 | S3-compatible storage (MinIO, AWS S3) |
 | httpx2 (dev) | Starlette 1.10's test client (plain `httpx` is deprecated there) |
 | next, react, react-dom | Web app |
 | tailwindcss, @tailwindcss/postcss | Styling via design tokens |
 | class-variance-authority, clsx, tailwind-merge, @radix-ui/react-slot | Component variants and composition (shadcn approach, vendored components) |
+| @radix-ui/react-dialog, -tooltip, -dropdown-menu | Accessible overlay primitives (focus trap, keyboard, ARIA) |
+| @testing-library/user-event (dev) | Realistic interaction in form tests |
 | lucide-react | Icons |
 | vitest, vite, jsdom, @testing-library/react (dev) | Frontend unit/component tests |
 | eslint 9 + eslint-config-next | Linting (ESLint 10 is not yet supported by Next's plugins) |
 
-Deferred until needed: argon2-cffi (CP3), rq + python-multipart (CP4), Playwright (CP6,
-pinned to the browser build available in CI), Radix dialog/tooltip primitives (CP3).
+Deferred until needed: rq + python-multipart (CP4), Playwright (CP6, pinned to the
+browser build available in CI).
 
 Regenerating the Python lock:
 

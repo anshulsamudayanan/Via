@@ -8,9 +8,9 @@ and tests passing before it's marked done.
 | CP | Deliverable | Status |
 |---|---|---|
 | 1 | Repository architecture, implementation plan, **PCB engine core** (S-expr parser, normalized model, geometry, KiCad 5–9 adapter, engineering tests) | ✅ done |
-| 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done (pending review) |
-| 3 | Authentication and project management | ⏳ next, after CP2 review |
-| 4 | Working PCB upload and parser pipeline | — |
+| 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done |
+| 3 | Authentication and project management | ✅ done (pending review) |
+| 4 | Working PCB upload and parser pipeline | ⏳ next, after CP3 review |
 | 5 | PCB viewer, project workspace, AI foundation interfaces | — |
 | 6 | Testing hardening, CI, documentation | — |
 
@@ -24,14 +24,15 @@ and tests passing before it's marked done.
 - PCB engine: real-board validation (KiCad 5.1–9.0), pad-angle investigation, two bugs fixed.
 - GitHub Actions CI. *Changed from plan:* the worker service moved to CP4 (no jobs exist yet); `scripts/dev.sh` replaced by README instructions (Compose infra + native API/web).
 
-### CP3 — Authentication and project management
-- Register, login, logout, `GET /auth/me`, session listing/revocation, password-reset request/confirm (token foundation; email delivery logs in dev).
-- Argon2id hashing, session cookies, CSRF header check, Redis rate limiting on auth.
-- Personal organization on registration; organizations + memberships endpoints (read/list, minimal create).
-- Projects: create, rename, edit description, archive/unarchive, delete, search/filter, pagination; owner + project memberships; private by default.
-- Activity log + audit events; `/api/v1/activity`.
-- Web: design system (buttons, inputs, cards, dialogs, tables, navigation, tooltips, badges, empty/loading/error states), auth pages, protected routes, dashboard (real data only), project list + details.
-- **Exit:** pytest integration tests for auth, projects, ownership, cross-user isolation; Vitest for client + forms.
+### CP3 — Authentication and project management ✅
+- Register, login, logout, `/auth/me`, session listing/revocation, password reset (hashed single-use tokens; dev logs the email), profile and password change.
+- Argon2id, server-side sessions (cookie or Bearer), CSRF header enforcement, Redis rate limiting, audit events.
+- Personal organization on registration; organizations: list, read, create team org, list members.
+- Projects: create, rename, describe, visibility, archive/unarchive, delete, search/filter/sort/paginate, members (add by email, role change, remove, leave). Central authorization service; org and project permissions independent.
+- Activity feed (`/api/v1/activity`).
+- Web: design system additions (inputs, field, select, dialog, tooltip, dropdown menu, table), auth pages, protected app shell, dashboard (real data), projects list, project workspace, activity, account settings.
+- Tests: auth, projects, security isolation suite (pytest); auth flows, session guard, project creation, projects table, workspace roles (Vitest); end-to-end walkthrough in a real browser.
+- *Changed from plan:* the full project workspace (Overview, PCB Designs, Files, Components, Analysis, Activity, Settings) was built now, with honest coming-soon panels for the sections that depend on CP4/CP5. Organization invitations are out of Stage 1 scope.
 
 ### CP4 — PCB upload and parser pipeline
 - `/api/v1/pcb/import`, designs, revisions, files endpoints; size limit, extension + sniff validation, SHA-256 duplicate detection, upload records.

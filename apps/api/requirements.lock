@@ -11,12 +11,18 @@ anyio==4.16.0
     #   fastapi
     #   starlette
     #   watchfiles
+argon2-cffi==25.1.0
+    # via via-api
+argon2-cffi-bindings==26.2.0
+    # via argon2-cffi
 boto3==1.44.9
     # via via-api
 botocore==1.44.9
     # via
     #   boto3
     #   s3transfer
+cffi==2.1.1
+    # via argon2-cffi-bindings
 click==8.5.1
     # via uvicorn
 fastapi==0.165.0
@@ -41,6 +47,8 @@ psycopg==3.3.9
     # via via-api
 psycopg-binary==3.3.9
     # via psycopg
+pycparser==3.12
+    # via cffi
 pydantic==2.14.4
     # via
     #   fastapi
