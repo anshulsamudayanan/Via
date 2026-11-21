@@ -63,3 +63,21 @@ describe("createViaClient", () => {
     await expect(client.health.live()).rejects.toBe(abort);
   });
 });
+
+describe("resource methods", () => {
+  it("builds query strings, skipping empty values, and encodes ids", async () => {
+    const fetch = vi.fn().mockImplementation(async () => jsonResponse(200, { items: [], total: 0, limit: 25, offset: 0 }));
+    const client = createViaClient({ fetch });
+    await client.projects.list({ q: "motor driver", status: "all", sort: undefined, offset: 0 });
+    expect(fetch.mock.calls[0]![0]).toBe("/api/v1/projects?q=motor+driver&status=all&offset=0");
+    await client.projects.get("a/b");
+    expect(fetch.mock.calls[1]![0]).toBe("/api/v1/projects/a%2Fb");
+  });
+
+  it("returns undefined for 204 No Content", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(createViaClient({ fetch }).projects.delete("p1")).resolves.toBeUndefined();
+    expect(fetch.mock.calls[0]![1].method).toBe("DELETE");
+    expect(fetch.mock.calls[0]![1].headers["X-VIA-Request"]).toBe("1");
+  });
+});

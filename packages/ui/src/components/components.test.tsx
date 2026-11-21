@@ -43,3 +43,35 @@ describe("design system", () => {
     expect(screen.getByText("Failed").className).toContain("text-danger");
   });
 });
+
+describe("forms and overlays", () => {
+  it("Field wires label, error and aria attributes to the control", async () => {
+    const { Field, Input } = await import("../index");
+    render(<Field label="Email" error="Enter a valid email address.">{(p) => <Input {...p} />}</Field>);
+    const input = screen.getByLabelText("Email");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    const describedBy = input.getAttribute("aria-describedby")!;
+    expect(document.getElementById(describedBy)?.textContent).toBe("Enter a valid email address.");
+  });
+
+  it("Dialog is labelled by its title and closes on Escape", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const { Dialog, DialogContent, DialogTrigger } = await import("../index");
+    const user = userEvent.setup();
+    render(
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button>Open</Button>
+        </DialogTrigger>
+        <DialogContent title="New project" description="Create a project">
+          <p>Body</p>
+        </DialogContent>
+      </Dialog>,
+    );
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    const dialog = screen.getByRole("dialog", { name: "New project" });
+    expect(dialog.textContent).toContain("Body");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});

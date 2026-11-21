@@ -1,11 +1,10 @@
 import { ApiError } from "@via/api-client";
 import type { ReadinessResponse } from "@via/types";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { SystemStatus } from "./system-status";
 
-afterEach(cleanup);
 
 const healthy: ReadinessResponse = {
   status: "ok",

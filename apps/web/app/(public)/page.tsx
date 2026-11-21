@@ -31,13 +31,12 @@ export default function HomePage() {
           VIA turns PCB design files into structured engineering data you can explore, review and build on.
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="primary" disabled title="Accounts are not enabled in this build yet">
-            Create account
+          <Button asChild variant="primary">
+            <Link href="/register">Create account</Link>
           </Button>
-          <Button variant="secondary" disabled title="Accounts are not enabled in this build yet">
-            Sign in
+          <Button asChild variant="secondary">
+            <Link href="/login">Sign in</Link>
           </Button>
-          <span className="text-xs text-muted">Accounts are not enabled in this build yet.</span>
         </div>
       </section>
 

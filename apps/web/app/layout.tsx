@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import { SiteHeader } from "@/components/site-header";
+import { TooltipProvider } from "@via/ui";
 import { themeInitScript } from "@/lib/theme";
 
 import "./globals.css";
@@ -31,10 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           Skip to content
         </a>
-        <SiteHeader />
-        <main id="main" className="mx-auto max-w-6xl px-4 py-8">
-          {children}
-        </main>
+        <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>
   );

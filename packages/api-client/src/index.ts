@@ -1,4 +1,21 @@
-import type { ErrorResponse, LivenessResponse, ReadinessResponse } from "@via/types";
+import type {
+  ActivityItem,
+  ErrorResponse,
+  LivenessResponse,
+  MeResponse,
+  Message,
+  Organization,
+  Page,
+  Project,
+  ProjectMember,
+  ProjectRole,
+  ProjectSort,
+  ProjectStatusFilter,
+  ProjectSummary,
+  ProjectVisibility,
+  ReadinessResponse,
+  SessionInfo,
+} from "@via/types";
 
 /**
  * Typed client for the VIA API.
@@ -103,12 +120,76 @@ export function createViaClient(options: ClientOptions = {}) {
     );
   }
 
+  const q = (params: Record<string, string | number | undefined | null>) => {
+    const search = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") search.set(k, String(v));
+    const s = search.toString();
+    return s ? `?${s}` : "";
+  };
+  const enc = encodeURIComponent;
+
   return {
     request,
     health: {
       live: (signal?: AbortSignal) => request<LivenessResponse>("/api/v1/health", { signal }),
       ready: (signal?: AbortSignal) =>
         request<ReadinessResponse>("/api/v1/health/ready", { signal, acceptStatuses: [503] }),
+    },
+    auth: {
+      register: (body: { email: string; password: string; display_name: string }) =>
+        request<MeResponse>("/api/v1/auth/register", { method: "POST", body }),
+      login: (body: { email: string; password: string }) =>
+        request<MeResponse>("/api/v1/auth/login", { method: "POST", body }),
+      logout: () => request<Message>("/api/v1/auth/logout", { method: "POST" }),
+      me: (signal?: AbortSignal) => request<MeResponse>("/api/v1/auth/me", { signal }),
+      sessions: () => request<SessionInfo[]>("/api/v1/auth/sessions"),
+      revokeSession: (id: string) => request<void>(`/api/v1/auth/sessions/${enc(id)}`, { method: "DELETE" }),
+      requestPasswordReset: (email: string) =>
+        request<Message>("/api/v1/auth/password-reset/request", { method: "POST", body: { email } }),
+      confirmPasswordReset: (token: string, new_password: string) =>
+        request<Message>("/api/v1/auth/password-reset/confirm", { method: "POST", body: { token, new_password } }),
+    },
+    users: {
+      updateMe: (body: { display_name: string }) => request<MeResponse>("/api/v1/users/me", { method: "PATCH", body }),
+      changePassword: (current_password: string, new_password: string) =>
+        request<Message>("/api/v1/users/me/password", { method: "POST", body: { current_password, new_password } }),
+    },
+    organizations: {
+      list: () => request<Organization[]>("/api/v1/organizations"),
+      create: (name: string) => request<Organization>("/api/v1/organizations", { method: "POST", body: { name } }),
+    },
+    projects: {
+      list: (
+        params: {
+          q?: string;
+          status?: ProjectStatusFilter;
+          organization_id?: string;
+          sort?: ProjectSort;
+          limit?: number;
+          offset?: number;
+        } = {},
+        signal?: AbortSignal,
+      ) => request<Page<Project>>(`/api/v1/projects${q(params)}`, { signal }),
+      summary: () => request<ProjectSummary>("/api/v1/projects/summary"),
+      get: (id: string, signal?: AbortSignal) => request<Project>(`/api/v1/projects/${enc(id)}`, { signal }),
+      create: (body: { name: string; description?: string; organization_id?: string; visibility?: ProjectVisibility }) =>
+        request<Project>("/api/v1/projects", { method: "POST", body }),
+      update: (id: string, body: { name?: string; description?: string; visibility?: ProjectVisibility }) =>
+        request<Project>(`/api/v1/projects/${enc(id)}`, { method: "PATCH", body }),
+      archive: (id: string) => request<Project>(`/api/v1/projects/${enc(id)}/archive`, { method: "POST" }),
+      unarchive: (id: string) => request<Project>(`/api/v1/projects/${enc(id)}/unarchive`, { method: "POST" }),
+      delete: (id: string) => request<void>(`/api/v1/projects/${enc(id)}`, { method: "DELETE" }),
+      members: (id: string) => request<ProjectMember[]>(`/api/v1/projects/${enc(id)}/members`),
+      addMember: (id: string, email: string, role: Exclude<ProjectRole, "owner">) =>
+        request<ProjectMember>(`/api/v1/projects/${enc(id)}/members`, { method: "POST", body: { email, role } }),
+      updateMember: (id: string, userId: string, role: Exclude<ProjectRole, "owner">) =>
+        request<ProjectMember>(`/api/v1/projects/${enc(id)}/members/${enc(userId)}`, { method: "PATCH", body: { role } }),
+      removeMember: (id: string, userId: string) =>
+        request<void>(`/api/v1/projects/${enc(id)}/members/${enc(userId)}`, { method: "DELETE" }),
+    },
+    activity: {
+      list: (params: { project_id?: string; limit?: number; offset?: number } = {}) =>
+        request<Page<ActivityItem>>(`/api/v1/activity${q(params)}`),
     },
   };
 }

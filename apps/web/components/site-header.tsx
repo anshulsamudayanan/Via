@@ -1,3 +1,4 @@
+import { Button } from "@via/ui";
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,8 +24,11 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Sign in</Link>
+          </Button>
         </div>
       </div>
     </header>
