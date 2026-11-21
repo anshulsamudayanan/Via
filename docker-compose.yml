@@ -121,9 +121,10 @@ networks:
 
 secrets:
   # Optional extra CA bundle for image builds behind a TLS-intercepting proxy.
-  # Empty by default (no effect); never baked into images.
+  # Defaults to an intentionally empty file (no effect); never baked into images.
+  # (Not /dev/null: newer Buildx rejects secret sources outside the context.)
   build_ca:
-    file: ${VIA_BUILD_CA_CERT:-/dev/null}
+    file: ${VIA_BUILD_CA_CERT:-./infrastructure/docker/no-extra-ca.pem}
 
 volumes:
   postgres-data:
