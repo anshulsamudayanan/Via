@@ -11,8 +11,16 @@ repository. Record provenance here **before** adding a file.
 Expected values in `../test_kicad_fixtures.py` were derived by hand from these
 files (see comments in the tests), not copied from parser output.
 
-## Pending: third-party real-world boards (CP4)
+## Third-party real boards (not committed)
 
-Acceptable licences: CC0, CC-BY, CERN-OHL-P, MIT, Apache-2.0. Copyleft
-(GPL, CC-BY-SA, CERN-OHL-S) needs an explicit decision from the project owner
-because the fixtures would be redistributed with the repository.
+Licence policy (project owner decision, CP2): prefer CC0, CC-BY, MIT, CERN-OHL-P, which may be
+committed here with provenance. Copyleft boards (GPL, CC BY-SA, CERN-OHL-S) may be used only
+for isolated internal testing: fetched on demand, pinned by SHA-256, documented, never committed
+or redistributed.
+
+| Files | Source | Licence | Handling |
+|---|---|---|---|
+| `pic_programmer_<tag>.kicad_pcb`, `video_<tag>.kicad_pcb` for tags 5.1.12, 6.0.11, 7.0.11, 8.0.8, 9.0.0 | KiCad official demos, `gitlab.com/kicad/code/kicad`, `demos/<project>/<project>.kicad_pcb` at each tag | CC BY-SA 4.0 (per KiCad `LICENSE.README`) | Copyleft: internal testing only. `scripts/fetch_real_fixtures.py` → git-ignored `tests/engineering/real/`. Manifest with SHA-256: `../real_fixtures.json` |
+
+Still wanted: permissively licensed (CC0/CC-BY/MIT/CERN-OHL-P) real boards that can be
+committed, ideally with blind/micro vias, keep-outs and more than 2 copper layers on KiCad 9.

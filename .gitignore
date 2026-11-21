@@ -30,3 +30,6 @@ test-results/
 /data/
 *.log
 .DS_Store
+
+# Third-party engineering fixtures (copyleft; fetched on demand, never committed)
+tests/engineering/real/

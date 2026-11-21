@@ -101,6 +101,8 @@ _IGNORED_TOP = {
 
 _NUM_RE = re.compile(r"^-?\d+$")
 
+_COPPER_TYPES = {"signal", "power", "mixed", "jumper"}
+
 
 def _layer_kind(name: str) -> tuple[LayerKind, Side]:
     side = Side.NONE
@@ -182,6 +184,12 @@ class _Context:
         for code, count in self._warned.items():
             if count > 5:
                 self.warnings.append(ParseWarning(code=code, message=f"{count - 5} more '{code}' warnings suppressed"))
+
+    def layer_side(self, name: str) -> Side:
+        for layer in self.layers:
+            if layer.name == name:
+                return layer.side
+        return _layer_kind(name)[1]
 
     @property
     def copper_layers(self) -> list[str]:
@@ -337,14 +345,20 @@ class KiCadAdapter(PCBAdapter):
             except ValueError:
                 continue
             name = atoms[1]
+            source_type = atoms[2] if len(atoms) > 2 else None
             kind, side = _layer_kind(name)
+            if source_type in _COPPER_TYPES and kind != LayerKind.COPPER:
+                # Legacy (KiCad <= 5) boards may rename copper layers, e.g. "top_layer".
+                # Their ordinals are fixed there: 0 = front, 31 = back, 1..30 = inner.
+                kind = LayerKind.COPPER
+                side = Side.TOP if index == 0 else Side.BOTTOM if index == 31 else Side.INNER
             layers.append(
                 Layer(
                     index=index,
                     name=name,
                     kind=kind,
                     side=side,
-                    source_type=atoms[2] if len(atoms) > 2 else None,
+                    source_type=source_type,
                     user_name=atoms[3] if len(atoms) > 3 else None,
                 )
             )
@@ -377,9 +391,12 @@ class KiCadAdapter(PCBAdapter):
         footprint = next((a for a in atoms if a not in {"locked", "placed"}), "") or ""
         at = node.numbers("at")
         origin: geo.Vec = (at[0], at[1]) if len(at) >= 2 else (0.0, 0.0)
-        rotation = at[2] if len(at) >= 3 else 0.0
+        rotation = _angle(at[2]) if len(at) >= 3 else 0.0
         layer = node.atom("layer") or "F.Cu"
-        side = Side.BOTTOM if layer.startswith("B.") else Side.TOP
+        side = ctx.layer_side(layer)
+        if side not in (Side.TOP, Side.BOTTOM):
+            ctx.warn("footprint_side", f"Footprint on non-outer layer '{layer}' treated as top side")
+            side = Side.TOP
 
         properties: dict[str, str] = {}
         for prop in node.children("property"):
@@ -431,8 +448,11 @@ class KiCadAdapter(PCBAdapter):
             pad_type = PadType.SMD
         at = node.numbers("at")
         local = (at[0], at[1]) if len(at) >= 2 else (0.0, 0.0)
-        # KiCad stores the pad angle as absolute (already includes footprint rotation).
-        rotation = at[2] if len(at) >= 3 else fp_rot
+        # The stored pad angle is absolute: footprint rotation + the pad's own rotation.
+        # KiCad omits it when the absolute angle is 0, so a missing angle means 0, not
+        # the footprint angle. Verified against KiCad 5.1-9.0 demo boards: see
+        # docs/ENGINEERING.md "Pad angle investigation".
+        rotation = _angle(at[2]) if len(at) >= 3 else 0.0
         size = node.numbers("size")
         drill = None
         drill_node = node.child("drill")
@@ -669,12 +689,13 @@ class KiCadAdapter(PCBAdapter):
             return per_net[name]
 
         pads = [p for c in components for p in c.pads]
+        copper = set(ctx.copper_layers)
         unconnected = 0
         for p in pads:
             s = ns(p.net)
             if s:
                 s.pad_count += 1
-            elif p.type != PadType.NPTH and any(layer.endswith(".Cu") for layer in p.layers):
+            elif p.type != PadType.NPTH and copper.intersection(p.layers):
                 unconnected += 1
         for t in tracks:
             s = ns(t.net)
@@ -713,6 +734,12 @@ class KiCadAdapter(PCBAdapter):
             unconnected_pad_count=unconnected,
         )
         return stats, sorted(per_net.values(), key=lambda s: s.name)
+
+
+def _angle(deg: float) -> float:
+    """Normalize an angle to [0, 360)."""
+    a = round(deg % 360.0, 6)
+    return 0.0 if a in (0.0, 360.0) else a
 
 
 def _is_number(token: str) -> bool:
