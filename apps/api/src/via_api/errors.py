@@ -94,3 +94,8 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled error", extra={"request_id": getattr(request.state, "request_id", None)})
         return _response(request, 500, "internal_error", "An internal error occurred")
+
+
+def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
+    """OpenAPI ``responses=`` entry documenting the error envelope for these statuses."""
+    return {code: {"model": ErrorResponse} for code in status_codes}

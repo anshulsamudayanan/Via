@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from tests.conftest import require_env
 from via_api.config import Settings, StorageBackendName, get_settings
 from via_api.db import alembic_config, get_db
+from via_api.deps import get_email_sender
+from via_api.emails import MemoryEmailSender
 from via_api.main import create_app
 from via_api.redis_client import get_redis
 from via_api.storage import LocalStorage, get_storage
@@ -66,16 +68,58 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-def client(settings: Settings, db: Session) -> Iterator[TestClient]:
+def test_redis(settings: Settings):
     from redis import Redis
 
+    redis = Redis.from_url(settings.redis_url, socket_connect_timeout=2)
+    redis.flushdb()  # fresh rate-limit counters for every test (dedicated test DB index)
+    return redis
+
+
+@pytest.fixture
+def mailer() -> MemoryEmailSender:
+    return MemoryEmailSender()
+
+
+@pytest.fixture
+def app(settings: Settings, db: Session, test_redis, mailer: MemoryEmailSender):
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_db] = lambda: db
-    app.dependency_overrides[get_redis] = lambda: Redis.from_url(settings.redis_url, socket_connect_timeout=2)
+    app.dependency_overrides[get_redis] = lambda: test_redis
     app.dependency_overrides[get_storage] = lambda: LocalStorage(settings.local_storage_path)
-    with TestClient(app) as c:
-        yield c
+    app.dependency_overrides[get_email_sender] = lambda: mailer
+    return app
+
+
+@pytest.fixture
+def make_client(app) -> Iterator[Callable[..., TestClient]]:
+    """Factory for independent clients (separate cookie jars = separate users)."""
+    clients: list[TestClient] = []
+
+    def factory(csrf: bool = True) -> TestClient:
+        c = TestClient(app, headers={"X-VIA-Request": "1"} if csrf else {})
+        c.__enter__()
+        clients.append(c)
+        return c
+
+    yield factory
+    for c in clients:
+        c.__exit__(None, None, None)
+
+
+@pytest.fixture
+def client(make_client) -> TestClient:
+    return make_client()
+
+
+PASSWORD = "correct horse battery"
+
+
+def register(client: TestClient, email: str, name: str = "Test User", password: str = PASSWORD) -> dict:
+    resp = client.post("/api/v1/auth/register", json={"email": email, "password": password, "display_name": name})
+    assert resp.status_code == 201, resp.json()
+    return resp.json()
 
 
 def new_id() -> uuid.UUID:

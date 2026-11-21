@@ -9,7 +9,7 @@ import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("via_api.access")
 
@@ -46,3 +46,38 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             extra={"request_id": request_id},
         )
         return response
+
+
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+CSRF_HEADER = "x-via-request"
+
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Reject cross-site state-changing requests.
+
+    Browsers cannot attach custom headers to cross-site form posts or simple
+    requests, and CORS blocks them for scripts from other origins. Requiring
+    ``X-VIA-Request: 1`` on every unsafe ``/api/v1`` request therefore stops
+    CSRF for cookie sessions (including login CSRF). Bearer-token clients are
+    exempt: their credential is not sent automatically by a browser.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if (
+            request.method in _UNSAFE_METHODS
+            and request.url.path.startswith("/api/v1/")
+            and not request.headers.get("authorization", "").lower().startswith("bearer ")
+            and request.headers.get(CSRF_HEADER) != "1"
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": {
+                        "code": "csrf_failed",
+                        "message": "Missing X-VIA-Request header.",
+                        "details": None,
+                        "request_id": getattr(request.state, "request_id", None),
+                    }
+                },
+            )
+        return await call_next(request)

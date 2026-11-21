@@ -55,6 +55,22 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 50 * 1024 * 1024
     enable_docs: bool = True
 
+    # --- Sessions & auth ---------------------------------------------------
+    session_cookie_name: str = "via_session"
+    session_ttl_hours: int = 24 * 14
+    #: None = Secure cookies in production only.
+    session_cookie_secure: bool | None = None
+    password_reset_ttl_minutes: int = 60
+    #: Public URL of the web app, used to build links in emails (password reset).
+    public_web_url: str = "http://localhost:3000"
+    rate_limit_enabled: bool = True
+
+    @property
+    def cookie_secure(self) -> bool:
+        if self.session_cookie_secure is not None:
+            return self.session_cookie_secure
+        return self.env == Environment.PRODUCTION
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:

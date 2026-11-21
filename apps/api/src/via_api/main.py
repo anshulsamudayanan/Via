@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from via_api import __version__
 from via_api.config import Settings, get_settings
 from via_api.errors import ErrorResponse, install_error_handlers
-from via_api.middleware import RequestContextMiddleware
-from via_api.routes import health
+from via_api.middleware import CSRFMiddleware, RequestContextMiddleware
+from via_api.routes import auth, health, users
 
 API_PREFIX = "/api/v1"
 
@@ -35,6 +35,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             500: {"model": ErrorResponse, "description": "Internal error"},
         },
     )
+    # Starlette runs the last-added middleware first: request context wraps CSRF.
+    app.add_middleware(CSRFMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -49,5 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     v1 = APIRouter(prefix=API_PREFIX)
     v1.include_router(health.router)
+    v1.include_router(auth.router)
+    v1.include_router(users.router)
     app.include_router(v1)
     return app
