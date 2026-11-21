@@ -56,7 +56,8 @@ class Settings(BaseSettings):
     #: Wall-clock limit for one parse; CPU time is limited to the same number of seconds.
     parser_timeout_seconds: int = 60
     #: Address-space limit for the parser subprocess.
-    parser_memory_limit_mb: int = 1024
+    #: ~35x the input size is needed at peak (measured: 45 MB board -> 1.65 GB RSS); 3 GiB covers 50 MB uploads.
+    parser_memory_limit_mb: int = 3072
     #: Redis queue used for PCB import jobs.
     import_queue_name: str = "via-pcb-import"
     enable_docs: bool = True

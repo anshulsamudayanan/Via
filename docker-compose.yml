@@ -27,6 +27,8 @@ x-api-env: &api-env
   VIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
   VIA_S3_AUTO_CREATE_BUCKET: ${VIA_S3_AUTO_CREATE_BUCKET:-true}
   VIA_MAX_UPLOAD_BYTES: ${VIA_MAX_UPLOAD_BYTES:-52428800}
+  VIA_PARSER_TIMEOUT_SECONDS: ${VIA_PARSER_TIMEOUT_SECONDS:-60}
+  VIA_PARSER_MEMORY_LIMIT_MB: ${VIA_PARSER_MEMORY_LIMIT_MB:-3072}
   VIA_PUBLIC_WEB_URL: ${VIA_PUBLIC_WEB_URL:-http://localhost:3000}
   VIA_SESSION_TTL_HOURS: ${VIA_SESSION_TTL_HOURS:-336}
   VIA_PASSWORD_RESET_TTL_MINUTES: ${VIA_PASSWORD_RESET_TTL_MINUTES:-60}
@@ -106,6 +108,20 @@ services:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     networks: [backend, frontend]
 
+  # Background jobs: PCB imports. Parsing runs in a credential-free, resource-limited
+  # subprocess inside this container (see apps/api/src/via_api/parsing/sandbox.py).
+  worker:
+    image: via/api:dev
+    command: ["via-api", "worker"]
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      disable: true  # the image's HTTP healthcheck is for the API
+    networks: [backend]
+    restart: unless-stopped
+
   web:
     image: via/web:dev
     build:
@@ -114,6 +130,7 @@ services:
       secrets: [build_ca]
       args:
         VIA_API_INTERNAL_URL: http://api:8000
+        VIA_MAX_UPLOAD_BYTES: ${VIA_MAX_UPLOAD_BYTES:-52428800}
     depends_on:
       api: { condition: service_healthy }
     ports:

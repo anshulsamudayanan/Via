@@ -28,6 +28,9 @@ COPY apps/web ./apps/web
 # Where the Next.js server proxies /api/*; baked into the standalone build's routes.
 ARG VIA_API_INTERNAL_URL=http://api:8000
 ENV VIA_API_INTERNAL_URL=${VIA_API_INTERNAL_URL}
+# The web proxy must accept request bodies at least this large (PCB uploads).
+ARG VIA_MAX_UPLOAD_BYTES=52428800
+ENV VIA_MAX_UPLOAD_BYTES=${VIA_MAX_UPLOAD_BYTES}
 RUN pnpm --filter @via/web build
 
 FROM node:22.21.1-alpine AS runtime

@@ -13,7 +13,7 @@ import uuid
 from typing import Any, Protocol
 
 from redis import Redis
-from rq import Queue
+from rq import Callback, Queue
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -44,7 +44,7 @@ class RQJobQueue:
             job_timeout=self.job_timeout,
             result_ttl=3600,
             failure_ttl=7 * 24 * 3600,
-            on_failure="via_api.jobs.on_import_failure",
+            on_failure=Callback("via_api.jobs.on_import_failure", timeout=60),
             job_id=f"import-{revision_id}",
         )
 

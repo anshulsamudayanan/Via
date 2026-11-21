@@ -70,6 +70,23 @@ def _serve(host: str, port: int, reload: bool) -> int:
     return 0
 
 
+def _worker(burst: bool) -> int:
+    """Run an RQ worker for the import queue (forks one work-horse process per job)."""
+    import logging
+
+    from rq import Queue, Worker
+
+    from via_api.config import get_settings
+    from via_api.redis_client import get_redis
+
+    settings = get_settings()
+    logging.basicConfig(level=settings.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    redis = get_redis()
+    worker = Worker([Queue(settings.import_queue_name, connection=redis)], connection=redis)
+    worker.work(burst=burst, with_scheduler=False)
+    return 0
+
+
 def _check() -> int:
     from fastapi.testclient import TestClient
 
@@ -89,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--host", default="0.0.0.0")  # noqa: S104 - container entrypoint
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--reload", action="store_true")
+    worker = sub.add_parser("worker", help="process background jobs (PCB imports)")
+    worker.add_argument("--burst", action="store_true", help="exit when the queue is empty")
     sub.add_parser("check", help="run readiness checks")
     args = parser.parse_args(argv)
     if args.command == "migrate":
@@ -97,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         return _init_storage()
     if args.command == "serve":
         return _serve(args.host, args.port, args.reload)
+    if args.command == "worker":
+        return _worker(args.burst)
     return _check()
 
 

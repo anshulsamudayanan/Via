@@ -12,6 +12,7 @@ import type { NextConfig } from "next";
  */
 const apiUrl = (process.env.VIA_API_INTERNAL_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const isDev = process.env.NODE_ENV !== "production";
+const maxUploadBodyBytes = Number(process.env.VIA_MAX_UPLOAD_BYTES ?? 50 * 1024 * 1024) + 2 * 1024 * 1024;
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -32,6 +33,12 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(process.cwd(), "..", ".."),
   transpilePackages: ["@via/ui", "@via/api-client", "@via/types"],
   poweredByHeader: false,
+  experimental: {
+    // Next.js buffers proxied request bodies and truncates them at 10 MB by default,
+    // which breaks PCB uploads. Must stay above the API's VIA_MAX_UPLOAD_BYTES
+    // (+ multipart overhead). See docs/ARCHITECTURE.md "Uploads through the web proxy".
+    proxyClientMaxBodySize: maxUploadBodyBytes,
+  },
   reactStrictMode: true,
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
