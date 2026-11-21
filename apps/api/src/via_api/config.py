@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     #: Public URL of the web app, used to build links in emails (password reset).
     public_web_url: str = "http://localhost:3000"
     rate_limit_enabled: bool = True
+
+    # --- AI (disabled unless configured; see services/ai-engine) -------------
+    ai_provider: Literal["none", "anthropic"] = "none"
+    ai_model: str = "claude-opus-5-5"
+    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
 
     @property
     def cookie_secure(self) -> bool:

@@ -93,7 +93,7 @@ uv pip install --python .venv/bin/python -r apps/api/requirements.lock
 ```
 
 ```bash
-uv pip install --python .venv/bin/python -e services/pcb-engine -e "apps/api[dev]"
+uv pip install --python .venv/bin/python -e services/pcb-engine -e services/ai-engine -e "apps/api[dev]"
 ```
 
 Start the API with auto-reload. Export the native-run variables from `.env.example`
@@ -124,7 +124,7 @@ pnpm dev
 Python lint, format and types:
 
 ```bash
-.venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy services/pcb-engine/src apps/api/src
+.venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy services/pcb-engine/src services/ai-engine/src apps/api/src
 ```
 
 Python tests. Integration tests need Postgres, Redis and MinIO: with the Compose stack

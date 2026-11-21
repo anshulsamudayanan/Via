@@ -57,6 +57,7 @@ pydantic==2.14.4
     # via
     #   fastapi
     #   pydantic-settings
+    #   via-ai-engine
     #   via-api
     #   via-pcb-engine
 pydantic-core==2.50.5
@@ -120,4 +121,5 @@ websockets==17.4
 
 # The following packages were excluded from the output:
 # via-pcb-engine
+# via-ai-engine
 # via-api

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "via-ai-engine"
+version = "0.1.0"
+description = "VIA AI foundation: provider interfaces, model routing and project-context schemas."
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic==2.14.4",
+]
+
+[project.optional-dependencies]
+# Only needed when VIA_AI_PROVIDER=anthropic. Not installed by default.
+anthropic = ["anthropic==2.6.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/via_ai"]

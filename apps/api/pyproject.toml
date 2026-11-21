@@ -22,6 +22,7 @@ dependencies = [
   "python-multipart==0.0.33",
   "rq==2.12.0",
   "via-pcb-engine==0.1.0",
+  "via-ai-engine==0.1.0",
 ]
 
 [project.optional-dependencies]
