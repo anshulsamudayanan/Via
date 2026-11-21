@@ -1,6 +1,6 @@
 # VIA Security & Privacy
 
-Status: updated at Checkpoint 4. Items are marked ✅ (implemented and tested)
+Status: updated at Checkpoint 5. Items are marked ✅ (implemented and tested)
 or *(planned, CPn)*.
 
 ## Threat model (Stage 1)
@@ -38,7 +38,11 @@ Also recorded: design uploaded / upload rejected (with reason) / parsed / parse 
 ## Privacy & consent
 - Uploaded files are **never** automatically contributed to VIA Learn or used for model training.
 - `data_consents` records explicit, scoped, revocable consent. No consent is granted by default and Stage 1 has no flow that uses it *(CP2 schema)*.
-- AI providers are disabled unless configured. Any future operation that sends project data to an external model must be user-initiated and authorized per project *(CP5 interfaces)*.
+- AI providers are **disabled by default** (`VIA_AI_PROVIDER=none`): the disabled provider raises on every call and nothing fabricates output in its place ✅.
+- API keys only come from the environment, read by the provider SDK; `/ai/status` never exposes them ✅.
+- Project data reaches a model only through `ContextProvider` (`via_api/ai/context.py`), which checks project access (404 otherwise) and, for external providers, an active per-project `external_ai_processing` consent granted by the project owner (403 `consent_required` otherwise). Consent is policy-versioned, revocable with immediate effect, and audited ✅.
+- The context is a bounded summary from database rows: counts, layers, net names, component list, warnings. No source files, normalized geometry, storage keys, emails or upload hashes; truncation is reported ✅ (`tests/integration/test_ai.py`).
+- Refusals raise `AIRefusedError` and are never replaced by invented output ✅. No feature calls a model in Stage 1.
 
 ## Future hardening (post Stage 1)
 Parser in a separate no-network container (gVisor/Firecracker) instead of a subprocess in the worker container, presigned direct-to-storage uploads (avoids proxy buffering), Postgres row-level security, 2FA/WebAuthn, malware scanning of uploads, signed and expiring download URLs everywhere.

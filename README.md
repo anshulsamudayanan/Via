@@ -4,10 +4,9 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 1, Checkpoint 4 of 6.** Accounts, projects, sharing, and the PCB
-> pipeline work end to end: upload a KiCad board, it's validated and parsed in an
-> isolated worker, and you can browse its board information, components, nets and
-> layers. The interactive board viewer arrives in Checkpoint 5.
+> **Status: Stage 1, Checkpoint 5 of 6.** Accounts, projects, sharing, the PCB pipeline
+> and an interactive board viewer work end to end. The AI foundation is in place but
+> disabled by default; no feature calls a model yet.
 > See [docs/ROADMAP.md](docs/ROADMAP.md). This README only describes what works today.
 
 ## What works today
@@ -26,6 +25,10 @@ model, then exploring them in a secure, project-based workspace.
   background by a worker in a credential-free, resource-limited sandbox.
 - **Design pages:** board dimensions, layers, counts, source metadata, parser warnings,
   searchable components, nets and layers, revisions, original file download.
+- **Board viewer:** see the real parsed board: toggle layers, zoom and pan, fit,
+  click or search components and inspect their properties and pad nets.
+- **AI foundation:** provider interfaces, disabled unless configured; project data is
+  only usable with the project owner's explicit consent.
 - **Dashboard, project workspace and activity feed** built on real data only.
 - **API** (`apps/api`): versioned REST API with OpenAPI docs, consistent errors, the full
   Stage 1 schema with Alembic migrations, S3-compatible storage (MinIO locally).

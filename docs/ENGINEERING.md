@@ -61,6 +61,27 @@ Accepted file versions: anything that parses. Outside `20171130`…`20250324` a
 | Bezier curves (`gr_curve`, `fp_curve`) | ❌ | Skipped with `unsupported_curve` warning. |
 | Unknown top-level objects | ❌ | Skipped with `unsupported_object` warning. |
 
+## Board viewer (Checkpoint 5)
+
+The web viewer renders `GET /api/v1/pcb/{design_id}/normalized` through its own render model
+(`apps/web/lib/pcb/render-model.ts`); the normalized model never changes for rendering.
+
+| Drawn | How |
+|---|---|
+| Board outline | `Edge.Cuts` graphics (lines, arcs, circles, rects, polygons) |
+| Tracks | Segments and arcs (arcs sampled at 8° chords; < 0.003 mm error on the test arc), true widths |
+| Pads | Rotated outlines on every copper layer they're on: `circle` as a circle, `oval` as a stadium, everything else (`rect`, `roundrect`, `trapezoid`, `chamfered_rect`, `custom`) as its rotated bounding rectangle. Corner radii and custom pad primitives aren't in the normalized model, so they aren't drawn |
+| Drills | Round and slotted (oval) holes, punched out in the background colour |
+| Vias | Annular ring + drill |
+| Zones | Outline polygon at low opacity. Filled copper isn't stored, so pours are not shown as filled areas (stated in the viewer) |
+| Silkscreen, fab, courtyard, mask, paste, user layers | Their graphics; text is not parsed, so it isn't drawn |
+| Components | Selection box from the courtyard (falls back to fab/silk graphics, then pads) |
+
+Performance (Chromium, 1440×900): the 8k-track `video` board renders at about 32 ms per
+zoom step. Boards with more than 40,000 tracks + pads switch to a snapshot preview while you
+zoom or pan and redraw in full detail when you stop (351k tracks: about 31 ms per
+interactive frame instead of about 536 ms).
+
 ## Running inside VIA (Checkpoint 4)
 
 The API never parses in-process. The worker runs `python -I -B -m via_pcb.cli --filename <name>`

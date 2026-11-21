@@ -126,7 +126,17 @@ Invitations and organization role management are not part of Stage 1.
 
 Deleting a project also deletes its stored objects.
 
+### AI (`/api/v1/ai`)
+No endpoint calls a model in Stage 1.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/status` | any | `{enabled, provider, text, structured_output, embeddings, external, default_model}`; `enabled: false, provider: "none"` unless configured. Never includes keys |
+| GET | `/consent/{project_id}` | viewer | Whether the project allows sending its parsed data to an external AI provider: `{scope, granted, policy_version, granted_at}` |
+| PUT | `/consent/{project_id}` | owner | Grant (idempotent, audited) |
+| DELETE | `/consent/{project_id}` | owner | Revoke → `204`; takes effect immediately |
+
 ### Planned
 | Checkpoint | Endpoints |
 |---|---|
-| CP5 | Viewer reads `/api/v1/pcb/{design_id}/normalized`; AI foundation has no public endpoints yet |
+| CP6 | No new endpoints; end-to-end and security test suites |

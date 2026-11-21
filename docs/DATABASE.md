@@ -72,7 +72,7 @@ storage. These tables hold what the API paginates, searches and summarizes:
 |---|---|---|
 | `analysis_runs` | Processing runs | Stage 1 writes only `kind = pcb_import`; status queued/running/succeeded/failed, timings, safe error, `result_summary` |
 | `activity_logs` | Activity feed + security audit | append-only; `project_id`/`organization_id` are SET NULL on delete so entries outlive their subject; `target_id` has no FK; indexes `(project_id, created_at desc)`, `(actor_id, created_at desc)`, `(action)` |
-| `data_consents` | Explicit, revocable consent | `scope` ∈ via_learn_contribution / external_ai_processing, `policy_version`, `granted_at`, `revoked_at`. No row = no consent. Nothing in Stage 1 grants or reads consent. |
+| `data_consents` | Explicit, revocable consent | `scope` ∈ via_learn_contribution / external_ai_processing, `policy_version`, `granted_at`, `revoked_at`. No row = no consent. Since CP5, project owners can grant/revoke `external_ai_processing` (`/api/v1/ai/consent/{project_id}`), and the AI context provider requires it; `via_learn_contribution` is still unused. |
 
 ## Authorization model (enforced in the API service layer, CP3+)
 

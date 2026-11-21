@@ -10,9 +10,9 @@ and tests passing before it's marked done.
 | 1 | Repository architecture, implementation plan, **PCB engine core** (S-expr parser, normalized model, geometry, KiCad 5–9 adapter, engineering tests) | ✅ done |
 | 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done |
 | 3 | Authentication and project management | ✅ done |
-| 4 | Working PCB upload and parser pipeline | ✅ done (pending review) |
-| 5 | PCB viewer, AI foundation interfaces | ⏳ next, after CP4 review |
-| 6 | Testing hardening, CI, documentation | — |
+| 4 | Working PCB upload and parser pipeline | ✅ done |
+| 5 | PCB viewer, AI foundation interfaces | ✅ done (pending review) |
+| 6 | Testing hardening, CI, documentation | ⏳ next, after CP5 review |
 
 ### CP2 — Frontend, backend and database running ✅
 - `apps/api`: FastAPI app factory, settings (pydantic-settings) with production safety checks, request IDs, security headers, strict CORS, consistent error envelope, `/api/v1/health` + `/api/v1/health/ready` (DB with migration state, Redis, storage), OpenAPI.
@@ -42,9 +42,10 @@ and tests passing before it's marked done.
 - Verified with the real KiCad 8 `video` board end to end and a 47 MB stress board. Findings fixed: Next.js truncated proxied bodies at 10 MB; parser memory default raised to 3 GiB (~35× input).
 - *Not done:* committing permissively licensed real boards (CC0/CC-BY/MIT/CERN-OHL-P). Not attempted in CP4; validation still uses the CC BY-SA KiCad demos, fetched on demand.
 
-### CP5 — PCB viewer, AI foundation
-- SVG viewer from a render model: outline, layer visibility, components, selection, tracks, vias, zones, zoom, pan, fit-to-board, info panel, component search.
-- `services/ai-engine`: provider interfaces (text, structured output, embeddings, model selection), disabled-by-default provider config, project-context interface with authorization and explicit per-operation consent. No AI output in the UI yet.
+### CP5 — PCB viewer, AI foundation ✅
+- Board viewer (Canvas 2D) from the normalized design through a separate render model: outline, layer visibility (grouped, colour-coded, sensible defaults), components, selection (click or search), tracks, vias, drills, zone outlines, zoom (wheel, buttons, keys), pan (drag, arrows), fit, info panel with properties and pad nets, accessible canvas description. Embedded on the design page plus a full-page route. Large boards use snapshot previews while interacting.
+- `services/ai-engine`: provider interface (text, structured output, embeddings, capabilities), model routing per task, disabled default, Anthropic adapter (optional extra), `ProjectContext` schema. API: `/ai/status`, per-project external-AI consent, consent-gated `DatabaseContextProvider`.
+- *Changed from plan:* no `prompts/` module yet (no prompts exist until the first AI feature); the project workspace already shipped in CP3/CP4.
 
 ### CP6 — Testing and documentation
 - Playwright e2e: register → create project → upload → view board → select component → logout/login.

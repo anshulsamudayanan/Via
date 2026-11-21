@@ -1,8 +1,8 @@
 # VIA Architecture (Stage 1 — Foundation)
 
-Status: **Checkpoint 4**. Accounts, projects and sharing, plus the full PCB pipeline: upload,
-validation, duplicate detection, sandboxed background parsing, persistence and browsing of
-board data. The interactive viewer is next (CP5).
+Status: **Checkpoint 5**. Accounts, projects and sharing; the PCB pipeline (upload,
+validation, sandboxed parsing, persistence); an interactive board viewer; and the AI
+foundation (interfaces, disabled by default, consent-gated context). CP6 hardens tests and docs.
 Sections marked *(planned)* describe the design for later checkpoints and will be
 updated as they are built.
 
@@ -69,6 +69,8 @@ via/
       app/(auth)/                 login, register, forgot/reset password
       app/(app)/                  protected: dashboard, projects, project workspace, activity, settings
       components/ lib/ test/      UI composition, client helpers, Vitest helpers
+      lib/pcb/                    viewer: render model, viewport math, Canvas renderer, palette
+      components/viewer/          BoardViewer (canvas, layers, components, info panel)
       proxy.ts                    signed-out page-load redirect (UX only; API is the boundary)
   packages/
     ui/                           ✅ design tokens + accessible primitives (grows in CP3)
@@ -77,7 +79,8 @@ via/
   services/
     pcb-engine/                   ✅ parser, normalized model, geometry, KiCad adapter
       src/via_pcb/{parser,models,geometry,adapters}
-    ai-engine/                    provider abstraction + project context  (planned, CP5)
+    ai-engine/                    ✅ provider interface, routing, context schema (no AI features yet)
+      src/via_ai/{providers/, routing.py, context.py}
   infrastructure/
     docker/                       ✅ api, web, minio Dockerfiles
     database/                     ✅ Postgres init (creates the integration-test database)
@@ -96,7 +99,7 @@ via/
 | Brief | Actual | Reason |
 |---|---|---|
 | `services/pcb-engine/{parser,models,geometry,adapters}` | `services/pcb-engine/src/via_pcb/{...}` | Python needs an importable package; a top-level `parser` module would shadow other packages. `src/` layout prevents accidentally importing the uninstalled tree in tests. |
-| `services/ai-engine/{providers,prompts,schemas}` | `services/ai-engine/src/via_ai/{providers,prompts,schemas,context}` | Same reason; `context/` added for the project-context interface required by the AI foundation. |
+| `services/ai-engine/{providers,prompts,schemas}` | `services/ai-engine/src/via_ai/{providers/, routing.py, context.py}` | Importable package (same reason as the PCB engine). Schemas live with their modules; `routing.py` is model selection; `context.py` is the project-context contract. No `prompts/` until a feature has prompts (no empty modules). |
 | Worker not listed | Worker will live in `apps/api` (`via_api.worker`, CP4) | It shares models, settings and storage code with the API; a separate app would duplicate them. Not created in CP2: it would be an empty module until jobs exist. |
 | `infrastructure/storage/` | Not created | Bucket bootstrap is `via-api init-storage` (dev only, guarded by `VIA_S3_AUTO_CREATE_BUCKET`), run by the Compose `migrate` job. |
 | `apps/api/alembic/` | `apps/api/src/via_api/migrations/` | Migrations ship inside the package, so a normal (non-editable) install in Docker finds them. `apps/api/alembic.ini` remains for the `alembic` CLI. |
@@ -119,7 +122,8 @@ via/
 | Route protection (web) | Client `SessionProvider` asks the API (`/auth/me`) and redirects on 401; `proxy.ts` additionally redirects signed-out *page loads* (detected via `Sec-Fetch-Dest: document`) | Server components fetching the API with forwarded cookies: more moving parts for no security gain, since the API enforces every request anyway. Redirecting RSC prefetches in the proxy broke client navigation after sign-out. |
 | Frontend data fetching | Small `useAsync` hook + typed client; no SWR/React Query yet | A caching library: unnecessary at Stage 1 scale. |
 | CSRF | SameSite=Lax cookie + required `X-VIA-Request: 1` header on unsafe methods for cookie-authenticated requests | Double-submit tokens — unnecessary given same-origin + custom header. |
-| PCB viewer | SVG, rendered from a viewer-specific *render model* derived from the API's normalized JSON (`apps/web/lib/pcb/render-model.ts`) | Canvas/WebGL — better for very large boards; the render-model boundary lets us swap renderers later without touching the data model. |
+| PCB viewer | **Canvas 2D**, rendered from a viewer-specific *render model* derived from the normalized JSON (`apps/web/lib/pcb/render-model.ts`); geometry cached as Path2D per layer and stroke width; snapshot previews while interacting on very large boards | SVG (the original plan): one DOM node per primitive, which fails at 100k+ tracks. WebGL: fastest, much more code; the render-model boundary keeps it possible later. |
+| AI providers | Interface in `via_ai`, disabled default, optional Anthropic adapter on the official SDK; consent-gated context built by the API | Calling a vendor SDK from features directly: no single place to enforce disabled-by-default, consent and no-fabrication rules. |
 | Object storage | `StorageBackend` interface with S3 (boto3; MinIO in dev) and local-filesystem implementations | Storing files in Postgres — explicitly disallowed. |
 | Authorization | Central `authorize(user, project, action)` in the API service layer; roles `owner/editor/viewer`; projects private by default; organization and project membership enforced independently (see DATABASE.md) | Postgres RLS — valuable later, adds complexity now. |
 | Enum columns | `VARCHAR + CHECK` | Native Postgres enums: adding values requires special migration handling. |
@@ -189,6 +193,7 @@ be at least two weeks old at the time of pinning.
 | class-variance-authority, clsx, tailwind-merge, @radix-ui/react-slot | Component variants and composition (shadcn approach, vendored components) |
 | @radix-ui/react-dialog, -tooltip, -dropdown-menu | Accessible overlay primitives (focus trap, keyboard, ARIA) |
 | @testing-library/user-event (dev) | Realistic interaction in form tests |
+| anthropic (optional extra of via-ai-engine) | Anthropic provider adapter; not installed by default or in images |
 | lucide-react | Icons |
 | vitest, vite, jsdom, @testing-library/react (dev) | Frontend unit/component tests |
 | eslint 9 + eslint-config-next | Linting (ESLint 10 is not yet supported by Next's plugins) |
