@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "via-api"
+version = "0.1.0"
+description = "VIA REST API (FastAPI) and background worker."
+requires-python = ">=3.12"
+# Exact pins; see docs/ARCHITECTURE.md "Dependencies" for why each one is here.
+dependencies = [
+  "fastapi==0.165.0",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.14.4",
+  "pydantic-settings==2.16.3",
+  "sqlalchemy==2.1.9",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.9",
+  "redis==8.1.0",
+  "boto3==1.44.9",
+  "via-pcb-engine==0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.2.0",
+  "httpx2==2.16.2",  # Starlette 1.10 test client; plain httpx is deprecated there
+  "ruff==0.17.6",
+  "mypy==2.4.1",
+]
+
+[project.scripts]
+via-api = "via_api.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/via_api"]
