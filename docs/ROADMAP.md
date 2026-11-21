@@ -9,9 +9,9 @@ and tests passing before it's marked done.
 |---|---|---|
 | 1 | Repository architecture, implementation plan, **PCB engine core** (S-expr parser, normalized model, geometry, KiCad 5–9 adapter, engineering tests) | ✅ done |
 | 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done |
-| 3 | Authentication and project management | ✅ done (pending review) |
-| 4 | Working PCB upload and parser pipeline | ⏳ next, after CP3 review |
-| 5 | PCB viewer, project workspace, AI foundation interfaces | — |
+| 3 | Authentication and project management | ✅ done |
+| 4 | Working PCB upload and parser pipeline | ✅ done (pending review) |
+| 5 | PCB viewer, AI foundation interfaces | ⏳ next, after CP4 review |
 | 6 | Testing hardening, CI, documentation | — |
 
 ### CP2 — Frontend, backend and database running ✅
@@ -34,17 +34,16 @@ and tests passing before it's marked done.
 - Tests: auth, projects, security isolation suite (pytest); auth flows, session guard, project creation, projects table, workspace roles (Vitest); end-to-end walkthrough in a real browser.
 - *Changed from plan:* the full project workspace (Overview, PCB Designs, Files, Components, Analysis, Activity, Settings) was built now, with honest coming-soon panels for the sections that depend on CP4/CP5. Organization invitations are out of Stage 1 scope.
 
-### CP4 — PCB upload and parser pipeline
-- `/api/v1/pcb/import`, designs, revisions, files endpoints; size limit, extension + sniff validation, SHA-256 duplicate detection, upload records.
-- Worker service (`via_api.worker`, Compose `worker`) + RQ + constrained parser subprocess (`python -I -m via_pcb.cli`, rlimits, timeout, empty env).
-- Persist normalized JSON to object storage, extracted rows to `pcb_*` tables, analysis run + activity.
-- `/api/v1/pcb/{design_id}`, `/components`, `/nets`, `/layers` (paginated, searchable).
-- Web upload UI: drag-and-drop, file picker, client-side validation, progress (XHR), cancellation, metadata display, duplicate and parse error messages.
-- Third-party, permissively licensed real KiCad boards added to engineering tests.
+### CP4 — PCB upload and parser pipeline ✅
+- `POST /api/v1/pcb/import` with Content-Length guard, streaming size + SHA-256, extension/sniff validation, per-project duplicate detection, upload records; designs, revisions (polling), files (list + download), board summary, normalized JSON, components/nets/layers (paginated, searchable). Design/project deletion removes stored objects.
+- RQ worker (`via-api worker`, Compose `worker`) with a failure callback; parser in a credential-free, rlimited subprocess; results validated, persisted as gzipped JSON in storage plus queryable rows; analysis runs and activity.
+- Migration `0002` (`design_revisions.summary`).
+- Web: drag-and-drop/file-picker upload with progress, cancel, live parse status, duplicate and failure messages; design page (board info, source, warnings, components, nets, layers, revisions); Files and Components tabs; dashboard upload shortcut.
+- Verified with the real KiCad 8 `video` board end to end and a 47 MB stress board. Findings fixed: Next.js truncated proxied bodies at 10 MB; parser memory default raised to 3 GiB (~35× input).
+- *Not done:* committing permissively licensed real boards (CC0/CC-BY/MIT/CERN-OHL-P). Not attempted in CP4; validation still uses the CC BY-SA KiCad demos, fetched on demand.
 
-### CP5 — PCB viewer, workspace, AI foundation
+### CP5 — PCB viewer, AI foundation
 - SVG viewer from a render model: outline, layer visibility, components, selection, tracks, vias, zones, zoom, pan, fit-to-board, info panel, component search.
-- Workspace tabs: Overview, PCB Designs, Files, Components, Analysis (coming soon + import runs), Activity, Settings.
 - `services/ai-engine`: provider interfaces (text, structured output, embeddings, model selection), disabled-by-default provider config, project-context interface with authorization and explicit per-operation consent. No AI output in the UI yet.
 
 ### CP6 — Testing and documentation

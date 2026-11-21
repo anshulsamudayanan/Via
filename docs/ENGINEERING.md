@@ -61,6 +61,25 @@ Accepted file versions: anything that parses. Outside `20171130`…`20250324` a
 | Bezier curves (`gr_curve`, `fp_curve`) | ❌ | Skipped with `unsupported_curve` warning. |
 | Unknown top-level objects | ❌ | Skipped with `unsupported_object` warning. |
 
+## Running inside VIA (Checkpoint 4)
+
+The API never parses in-process. The worker runs `python -I -B -m via_pcb.cli --filename <name>`
+in a sandbox (`apps/api/src/via_api/parsing/sandbox.py`): file bytes on stdin, one JSON object
+on stdout (`{"ok": true, "design": ...}` or `{"ok": false, "error": {code, message}}`), validated
+against `PCBDesign` before anything is stored. See docs/SECURITY.md for the sandbox limits.
+
+### Performance and memory (measured)
+
+| Input | Content | Peak RSS | Time (parse + JSON) |
+|---|---|---|---|
+| 6.2 MB | KiCad 8 `video` demo: 189 footprints, 7,932 tracks, 808 vias | 160 MB | 1.5 s |
+| 45 MB | synthetic: reference board + 351,408 segments | 1.65 GB | 15 s |
+
+Peak memory is roughly **35× the file size** (S-expression tree + Pydantic models + JSON
+output). The worker's default limit is therefore 3 GiB (`VIA_PARSER_MEMORY_LIMIT_MB`), which
+covers the 50 MB upload limit; larger limits need more memory per worker. Reducing the engine's
+memory footprint (streaming tokenizer, slots-based nodes) is future work.
+
 ## Real-board validation (Checkpoint 2)
 
 Run `python scripts/fetch_real_fixtures.py` to download the boards (pinned by tag and SHA-256,

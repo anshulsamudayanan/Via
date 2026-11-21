@@ -1,8 +1,8 @@
 # VIA Architecture (Stage 1 — Foundation)
 
-Status: **Checkpoint 3**. Accounts, sessions, organizations, projects, membership and the
-activity feed work end to end (API + web). PCB engine validated against real KiCad boards;
-the upload pipeline is next (CP4).
+Status: **Checkpoint 4**. Accounts, projects and sharing, plus the full PCB pipeline: upload,
+validation, duplicate detection, sandboxed background parsing, persistence and browsing of
+board data. The interactive viewer is next (CP5).
 Sections marked *(planned)* describe the design for later checkpoints and will be
 updated as they are built.
 
@@ -59,7 +59,9 @@ via/
         deps.py                   current user (cookie/Bearer), client info, limiter, mailer
         services/                 business logic: auth, access (authorization), projects, activity
         schemas/                  request/response models
-        routes/                   health, auth, users, organizations, projects, activity
+        routes/                   health, auth, users, organizations, projects, activity, pcb, designs, files
+        parsing/                  sandbox.py (constrained parser subprocess), importer.py (persist results)
+        jobs.py                   RQ queue + job entry points + failure callback
         cli.py                    via-api migrate | init-storage | serve | check
       requirements.lock           locked third-party deps for the Docker image
     web/                          ✅ Next.js (App Router)
@@ -109,7 +111,9 @@ via/
 | Normalized PCB model | Pydantic v2 models in `via_pcb.models`, mm units, absolute coordinates, semver `SCHEMA_VERSION` | Protobuf/JSON Schema first — more ceremony; we export JSON Schema from Pydantic when needed. |
 | Format support | Adapter registry (`PCBAdapter`): sniff + parse → `PCBDesign` | Using KiCad's own Python API (`pcbnew`) — needs a full KiCad install and executes native code against untrusted input. A pure-Python parser is portable and safer. |
 | Parsed data persistence | Full normalized JSON in object storage (one per revision) **plus** queryable rows (`pcb_components`, `pcb_nets`, `pcb_layers`, `pcb_geometry` summary) | Every track/pad as a row — huge tables for no Stage 1 query need. JSON-only — no pagination/search for components & nets. |
-| Background parsing | RQ (Redis) worker, parser in a **subprocess** with rlimits + timeout + empty env | FastAPI `BackgroundTasks` — runs in the API process (violates isolation). Celery — heavier. A separate no-network parser container — stronger, but premature; documented as future hardening. |
+| Background parsing | RQ 2.12 (Redis) worker, fork per job; parser in a **subprocess** with rlimits + timeout + empty env | FastAPI `BackgroundTasks` — runs in the API process (violates isolation). Celery — heavier. RQ 3.0 — new major, not yet needed. A separate no-network parser container — stronger, but premature; documented as future hardening. |
+| Parsed data in storage | Normalized `PCBDesign` stored gzipped (`normalized.json.gz`), served with `Content-Encoding: gzip` without re-encoding | Storing the JSON in Postgres JSONB: multi-MB rows for data that's only read whole. |
+| Uploads through the web proxy | Browser → Next.js rewrite → API, with `experimental.proxyClientMaxBodySize` set from `VIA_MAX_UPLOAD_BYTES` (Next buffers and truncates proxied bodies at 10 MB by default; found with a 47 MB stress board) | Presigned direct-to-S3 uploads: better for large files and for Vercel, more moving parts. Planned if upload sizes or hosting require it. |
 | Authentication | Server-side sessions: random 256-bit token in an httpOnly cookie, SHA-256 hash stored in `user_sessions`; Argon2id passwords | JWT — cannot be revoked without a denylist; logout/session management are requirements. |
 | Web ↔ API | Next.js rewrites `/api/*` to the API, so the browser is same-origin; API also accepts `Authorization: Bearer <session token>` for programmatic clients | Cross-origin cookies + CORS — more CSRF/CORS surface. |
 | Route protection (web) | Client `SessionProvider` asks the API (`/auth/me`) and redirects on 401; `proxy.ts` additionally redirects signed-out *page loads* (detected via `Sec-Fetch-Dest: document`) | Server components fetching the API with forwarded cookies: more moving parts for no security gain, since the API enforces every request anyway. Redirecting RSC prefetches in the proxy broke client navigation after sign-out. |
@@ -139,7 +143,7 @@ All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC
 - **activity_logs** — user-visible activity and security audit events (actor, action, target, ip, metadata)
 - **data_consents** — explicit, revocable consent records for future VIA Learn contribution (none granted by default)
 
-## 5. Request flow: PCB import *(planned, CP4)*
+## 5. Request flow: PCB import (implemented in CP4)
 
 1. `POST /api/v1/pcb/import` (multipart) → auth + `editor` permission on project → rate limit.
 2. Stream to a temp file while hashing and enforcing `MAX_UPLOAD_BYTES`; check extension + sniff header via the adapter registry (no parsing in the API).
@@ -174,7 +178,9 @@ be at least two weeks old at the time of pinning.
 | pydantic, pydantic-settings | Schemas; settings from env |
 | sqlalchemy, psycopg[binary] | ORM / Postgres driver |
 | alembic | Migrations |
-| redis | Rate limiting; readiness; job queue (CP4) |
+| redis | Rate limiting; readiness; job queue |
+| rq | Background job queue (worker) |
+| python-multipart | Multipart parsing for uploads (required by FastAPI `UploadFile`) |
 | argon2-cffi | Argon2id password hashing |
 | boto3 | S3-compatible storage (MinIO, AWS S3) |
 | httpx2 (dev) | Starlette 1.10's test client (plain `httpx` is deprecated there) |
@@ -187,8 +193,7 @@ be at least two weeks old at the time of pinning.
 | vitest, vite, jsdom, @testing-library/react (dev) | Frontend unit/component tests |
 | eslint 9 + eslint-config-next | Linting (ESLint 10 is not yet supported by Next's plugins) |
 
-Deferred until needed: rq + python-multipart (CP4), Playwright (CP6, pinned to the
-browser build available in CI).
+Deferred until needed: Playwright (CP6, pinned to the browser build available in CI).
 
 Regenerating the Python lock:
 

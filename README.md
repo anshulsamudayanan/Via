@@ -4,9 +4,10 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 1, Checkpoint 3 of 6.** Accounts, projects, sharing and the
-> activity feed work end to end. PCB upload and parsing in the app arrive in
-> Checkpoint 4 (the engine itself is already built and validated).
+> **Status: Stage 1, Checkpoint 4 of 6.** Accounts, projects, sharing, and the PCB
+> pipeline work end to end: upload a KiCad board, it's validated and parsed in an
+> isolated worker, and you can browse its board information, components, nets and
+> layers. The interactive board viewer arrives in Checkpoint 5.
 > See [docs/ROADMAP.md](docs/ROADMAP.md). This README only describes what works today.
 
 ## What works today
@@ -20,8 +21,12 @@ model, then exploring them in a secure, project-based workspace.
   rate limits, audit log.
 - **Projects:** create, rename, describe, archive/restore, delete, search and filter;
   private by default; share with other users as editor or viewer.
+- **PCB upload:** drag and drop a `.kicad_pcb` file (up to 50 MB). It's validated
+  (type, size, duplicate by SHA-256), stored in object storage and parsed in the
+  background by a worker in a credential-free, resource-limited sandbox.
+- **Design pages:** board dimensions, layers, counts, source metadata, parser warnings,
+  searchable components, nets and layers, revisions, original file download.
 - **Dashboard, project workspace and activity feed** built on real data only.
-  Sections that depend on PCB upload show honest "coming soon" states.
 - **API** (`apps/api`): versioned REST API with OpenAPI docs, consistent errors, the full
   Stage 1 schema with Alembic migrations, S3-compatible storage (MinIO locally).
 
@@ -58,7 +63,8 @@ The first build compiles MinIO from source and takes a few minutes. When it's up
 | MinIO console | http://localhost:9001 (user `MINIO_ROOT_USER`, password `MINIO_ROOT_PASSWORD`) |
 
 Services: `postgres`, `redis`, `minio`, `migrate` (one-shot: applies migrations and
-verifies storage, then exits), `api`, `web`. All host ports bind to `127.0.0.1`.
+verifies storage, then exits), `api`, `worker` (parses uploads), `web`. All host ports
+bind to `127.0.0.1`.
 
 Behind a corporate TLS-intercepting proxy, set `VIA_BUILD_CA_CERT=/path/to/ca.pem` in
 `.env` so image builds can reach package registries.
@@ -95,6 +101,12 @@ first (`VIA_DATABASE_URL`, `VIA_REDIS_URL`, `VIA_S3_*`), using your `.env` passw
 
 ```bash
 .venv/bin/via-api serve --reload
+```
+
+In a second terminal (same variables), start the worker that parses uploads:
+
+```bash
+.venv/bin/via-api worker
 ```
 
 Web app (proxies `/api/*` to `VIA_API_INTERNAL_URL`, default `http://localhost:8000`):
