@@ -11,8 +11,8 @@ and tests passing before it's marked done.
 | 2 | Frontend, backend and database running; PCB engine validated on real KiCad 5.1–9.0 boards | ✅ done |
 | 3 | Authentication and project management | ✅ done |
 | 4 | Working PCB upload and parser pipeline | ✅ done |
-| 5 | PCB viewer, AI foundation interfaces | ✅ done (pending review) |
-| 6 | Testing hardening, CI, documentation | ⏳ next, after CP5 review |
+| 5 | PCB viewer, AI foundation interfaces | ✅ done |
+| 6 | Testing hardening, CI, documentation | ✅ done (pending review) |
 
 ### CP2 — Frontend, backend and database running ✅
 - `apps/api`: FastAPI app factory, settings (pydantic-settings) with production safety checks, request IDs, security headers, strict CORS, consistent error envelope, `/api/v1/health` + `/api/v1/health/ready` (DB with migration state, Redis, storage), OpenAPI.
@@ -47,11 +47,12 @@ and tests passing before it's marked done.
 - `services/ai-engine`: provider interface (text, structured output, embeddings, capabilities), model routing per task, disabled default, Anthropic adapter (optional extra), `ProjectContext` schema. API: `/ai/status`, per-project external-AI consent, consent-gated `DatabaseContextProvider`.
 - *Changed from plan:* no `prompts/` module yet (no prompts exist until the first AI feature); the project workspace already shipped in CP3/CP4.
 
-### CP6 — Testing and documentation
-- Playwright e2e: register → create project → upload → view board → select component → logout/login.
-- Security regression suite (IDOR, cross-user, invalid uploads, rate limits).
-- GitHub Actions: lint, typecheck, unit/integration (Postgres + Redis services), web build, e2e, Docker image build.
-- Final PRD, DATABASE, API_SPEC, ENGINEERING, SECURITY, README.
+### CP6 — Testing and documentation ✅
+- Playwright end-to-end suite (`apps/web/e2e`) against the full Compose stack: register → create project → edit details → upload → components, nets, layers → viewer → search and select a component → sign out → redirect → sign in → project still there; private-project isolation between two real users (UI and every read endpoint); invalid, spoofed, duplicate and unparseable uploads; signed-out redirect with return.
+- Route-wide security regression suite (`tests/integration/test_security_regression.py`): walks every API route, so new endpoints are covered automatically: authentication required (401), CSRF header required on every unsafe route, 404 for every project/design/revision/file/organization/session-scoped route to a user without access (and nothing changed), each rate limit enforced on its real endpoint, account lockout, client address never taken from request headers, upload filename sanitization.
+- GitHub Actions: the Docker job now builds the images, starts the whole stack (`docker compose up --wait`) and runs the Playwright suite against it; logs and the Playwright report are uploaded on failure.
+- Docs: PRD acceptance criteria mapped to the tests that verify them; README, ARCHITECTURE, SECURITY, API_SPEC updated.
+- *Found:* `X-Forwarded-For` sent by a browser passes through Next.js unchanged (Next only sets it when absent), so with the API trusting the web container a client could choose the IP used for per-IP rate limits. Safe only behind a reverse proxy that overwrites the header; documented as a deployment requirement in SECURITY.md and README. Per-account and per-user limits are unaffected.
 
 ## Later stages (not in Stage 1)
 - **VIA Intelligence** — AI review grounded in parsed design data.

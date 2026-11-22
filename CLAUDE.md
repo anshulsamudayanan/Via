@@ -18,6 +18,7 @@ checkpoints; do not build features from later checkpoints or stages early.
 .venv/bin/mypy services/pcb-engine/src services/ai-engine/src apps/api/src
 .venv/bin/python scripts/fetch_real_fixtures.py    # real KiCad boards (CC BY-SA, never commit them)
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
+pnpm --filter @via/web e2e                        # Playwright; needs the Compose stack running
 docker compose config --quiet                      # after editing compose or .env.example
 cd apps/api && alembic revision --autogenerate -m "..."   # review by hand; `alembic check` must pass
 ```
@@ -32,3 +33,4 @@ cd apps/api && alembic revision --autogenerate -m "..."   # review by hand; `ale
 ## Tests
 - Engineering fixtures need documented provenance and licence (`tests/engineering/fixtures/README.md`). Expected values are derived by hand, not copied from parser output.
 - A checkpoint is done only when lint, types and tests pass.
+- New API routes are picked up by `tests/integration/test_security_regression.py`: public routes go in `PUBLIC`, query-scoped ones in `QUERY_SCOPED`, write bodies in `BODIES`.

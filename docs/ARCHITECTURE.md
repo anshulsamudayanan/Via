@@ -1,8 +1,9 @@
 # VIA Architecture (Stage 1 — Foundation)
 
-Status: **Checkpoint 5**. Accounts, projects and sharing; the PCB pipeline (upload,
-validation, sandboxed parsing, persistence); an interactive board viewer; and the AI
-foundation (interfaces, disabled by default, consent-gated context). CP6 hardens tests and docs.
+Status: **Checkpoint 6, Stage 1 complete**. Accounts, projects and sharing; the PCB pipeline
+(upload, validation, sandboxed parsing, persistence); an interactive board viewer; the AI
+foundation (interfaces, disabled by default, consent-gated context); unit, integration,
+route-wide security and end-to-end browser tests in CI.
 Sections marked *(planned)* describe the design for later checkpoints and will be
 updated as they are built.
 
@@ -88,7 +89,6 @@ via/
     unit/                         ✅ engine + API units
     engineering/                  ✅ hand-computed fixtures + real KiCad 5.1-9.0 boards
     integration/                  ✅ real Postgres, Redis, MinIO
-    e2e/                          Playwright                          (planned, CP6)
   scripts/                        ✅ fetch_real_fixtures.py
   docs/                           PRD, ARCHITECTURE, DATABASE, API_SPEC, ENGINEERING, SECURITY, ROADMAP
   docker-compose.yml  .env.example  .github/workflows/ci.yml
@@ -103,7 +103,8 @@ via/
 | Worker not listed | Worker will live in `apps/api` (`via_api.worker`, CP4) | It shares models, settings and storage code with the API; a separate app would duplicate them. Not created in CP2: it would be an empty module until jobs exist. |
 | `infrastructure/storage/` | Not created | Bucket bootstrap is `via-api init-storage` (dev only, guarded by `VIA_S3_AUTO_CREATE_BUCKET`), run by the Compose `migrate` job. |
 | `apps/api/alembic/` | `apps/api/src/via_api/migrations/` | Migrations ship inside the package, so a normal (non-editable) install in Docker finds them. `apps/api/alembic.ini` remains for the `alembic` CLI. |
-| Vitest tests under `tests/` | Colocated `*.test.ts` in each TS package | Vitest/TS path resolution is simplest per package. Python and Playwright tests stay in `tests/`. |
+| Vitest tests under `tests/` | Colocated `*.test.ts` in each TS package | Vitest/TS path resolution is simplest per package. Python tests stay in `tests/`. |
+| Playwright tests in `tests/e2e/` | `apps/web/e2e/` (`*.spec.ts`), run against the Compose stack | Uses the web app's pnpm dependencies and strict tsconfig (typechecked and linted with it); no separate JS package. |
 | Empty module directories | Created only when they get code | Per the brief: no empty modules. |
 
 ## 3. Key decisions
@@ -196,9 +197,9 @@ be at least two weeks old at the time of pinning.
 | anthropic (optional extra of via-ai-engine) | Anthropic provider adapter; not installed by default or in images |
 | lucide-react | Icons |
 | vitest, vite, jsdom, @testing-library/react (dev) | Frontend unit/component tests |
+| @playwright/test (dev) | End-to-end browser tests against the running stack |
 | eslint 9 + eslint-config-next | Linting (ESLint 10 is not yet supported by Next's plugins) |
 
-Deferred until needed: Playwright (CP6, pinned to the browser build available in CI).
 
 Regenerating the Python lock:
 

@@ -4,8 +4,9 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 1, Checkpoint 5 of 6.** Accounts, projects, sharing, the PCB pipeline
-> and an interactive board viewer work end to end. The AI foundation is in place but
+> **Status: Stage 1 complete (Checkpoint 6 of 6, pending review).** Accounts, projects,
+> sharing, the PCB pipeline and an interactive board viewer work end to end, covered by
+> unit, integration, security and browser tests. The AI foundation is in place but
 > disabled by default; no feature calls a model yet.
 > See [docs/ROADMAP.md](docs/ROADMAP.md). This README only describes what works today.
 
@@ -151,9 +152,37 @@ Frontend lint, types, tests and production build:
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
+End-to-end browser tests (Playwright, Chromium) run against the full Compose stack, so
+start it first (`docker compose up -d --build`):
+
+```bash
+pnpm --filter @via/web exec playwright install chromium
+```
+
+```bash
+pnpm --filter @via/web e2e
+```
+
+Set `E2E_BASE_URL` to test another deployment. Each run registers a few users; the
+registration limit is 10 per IP per hour, so for many local reruns clear the limits with
+`docker compose exec redis redis-cli FLUSHALL` (development only).
+
 CI (`.github/workflows/ci.yml`) runs all of the above with real services, with
-`CI=true` so missing services fail the build instead of skipping tests, and also
-builds the Docker images.
+`CI=true` so missing services fail the build instead of skipping tests, builds the
+Docker images, starts the stack and runs the end-to-end suite against it.
+
+## Before exposing VIA to the internet
+
+Stage 1 is built to run locally. A public deployment additionally needs, at minimum:
+
+- **A reverse proxy in front of the web app that overwrites `X-Forwarded-For`** with the
+  real client address (Caddy does by default; with nginx use
+  `proxy_set_header X-Forwarded-For $remote_addr`). Never expose port 3000 directly:
+  Next.js forwards a client-supplied `X-Forwarded-For` unchanged, and the API uses it for
+  per-IP rate limits (see docs/SECURITY.md). HTTPS terminates at that proxy.
+- `VIA_ENV=production` (enforces a strong secret key, no wildcard CORS, no bucket auto-creation).
+- An email provider for password resets (Stage 1 has none).
+- Backups of the Postgres and MinIO volumes.
 
 ## Parse a board from the command line
 

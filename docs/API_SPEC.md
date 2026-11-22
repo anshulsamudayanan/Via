@@ -136,7 +136,6 @@ No endpoint calls a model in Stage 1.
 | PUT | `/consent/{project_id}` | owner | Grant (idempotent, audited) |
 | DELETE | `/consent/{project_id}` | owner | Revoke → `204`; takes effect immediately |
 
-### Planned
-| Checkpoint | Endpoints |
-|---|---|
-| CP6 | No new endpoints; end-to-end and security test suites |
+### Test coverage
+Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
+CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.
