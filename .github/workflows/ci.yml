@@ -99,7 +99,14 @@ jobs:
           sed -i "s/^MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)/" .env
           docker compose config --quiet
       - name: Build images and start the stack
-        run: docker compose up -d --build --wait --wait-timeout 300
+        # Not `--wait`: it fails when any container has exited, and `migrate` is a one-shot job.
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/api/v1/health/ready && exit 0
+            sleep 5
+          done
+          echo "stack not ready after 5 minutes"; exit 1
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium for Playwright
         run: pnpm --filter @via/web exec playwright install --with-deps chromium

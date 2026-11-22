@@ -53,7 +53,7 @@ no secrets are committed.
 | 12 | Access the project again after logging out and in | e2e `core-flow.spec.ts`; `test_access_survives_logout_and_login` |
 | 13 | Understandable upload and parse errors | e2e `uploads.spec.ts` (wrong type, spoofed content, duplicate, parse failure); `test_invalid_uploads_are_rejected_and_recorded` |
 | — | Migrations work | `test_migrations.py` (upgrade/downgrade/upgrade, model parity); Compose `migrate` service |
-| — | Docker Compose starts the services | CI `e2e` job (`docker compose up --wait`, then the browser suite) |
+| — | Docker Compose starts the services | CI `e2e` job (stack started, readiness checked through the web app, then the browser suite) |
 | — | Private-project isolation | `test_security_regression.py` (every route), `test_access_control.py`, `test_pcb_access.py`, e2e `isolation.spec.ts` |
 | — | README and `.env.example` complete; no secrets committed | README; `.env.example` placeholders only; `.env` git-ignored |
 
