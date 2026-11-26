@@ -14,6 +14,7 @@ from tests.conftest import require_env
 from via_api.config import Settings, StorageBackendName, get_settings
 from via_api.db import alembic_config, get_db
 from via_api.deps import get_email_sender, get_job_queue
+from via_api.eda import kicad_drc_input
 from via_api.emails import MemoryEmailSender
 from via_api.main import create_app
 from via_api.parsing.importer import process_revision
@@ -87,9 +88,10 @@ def mailer() -> MemoryEmailSender:
 class InlineQueue:
     """Runs import jobs synchronously in the request (tests only), with the real sandbox."""
 
-    def __init__(self, db: Session, storage_root: Path) -> None:
+    def __init__(self, db: Session, storage_root: Path, settings: Settings | None = None) -> None:
         self.db = db
         self.storage_root = storage_root
+        self.settings = settings
         self.enqueued: list[uuid.UUID] = []
         self.attempts: list[int] = []
         self.analyses: list[tuple[uuid.UUID, int]] = []
@@ -124,6 +126,19 @@ class InlineQueue:
                 reimport=lambda rid: process_revision(
                     self.db, storage, rid, SandboxLimits(timeout_seconds=30, memory_bytes=1024**3)
                 ),
+                drc=(
+                    (
+                        lambda rev: kicad_drc_input(
+                            self.db,
+                            storage,
+                            rev,
+                            self.settings,
+                            SandboxLimits(timeout_seconds=30, memory_bytes=1024**3),
+                        )
+                    )
+                    if self.settings is not None and self.settings.eda_url
+                    else None
+                ),
                 attempt=attempt,
             )
 
@@ -133,7 +148,7 @@ class InlineQueue:
 
 @pytest.fixture
 def job_queue(db: Session, settings: Settings) -> InlineQueue:
-    return InlineQueue(db, settings.local_storage_path)
+    return InlineQueue(db, settings.local_storage_path, settings)
 
 
 @pytest.fixture

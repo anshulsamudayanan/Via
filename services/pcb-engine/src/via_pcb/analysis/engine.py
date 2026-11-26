@@ -38,6 +38,7 @@ class CheckRun(BaseModel):
     finding_count: int = 0
     duration_ms: float = 0.0
     message: str | None = Field(default=None, description="Skip reason or error type")
+    details: dict = Field(default_factory=dict, description="Facts the check recorded, e.g. tool version")
 
 
 class AnalysisResult(BaseModel):
@@ -97,8 +98,16 @@ class AnalysisEngine:
                     status=CheckStatus.OK,
                     finding_count=len(produced),
                     duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                    details=ctx.notes.get(check.id, {}),
                 )
             )
+        # Fingerprints must be unique within a run (they key comparisons and review carry-over).
+        seen: dict[str, int] = {}
+        for f in findings:
+            n = seen.get(f.fingerprint, 0)
+            seen[f.fingerprint] = n + 1
+            if n:
+                f.fingerprint = f"{f.fingerprint[:28]}~{n:03d}"
         findings.sort(key=lambda f: (f.severity.rank, f.category, f.title))
         return AnalysisResult(
             design_schema_version=design.schema_version,

@@ -53,11 +53,11 @@ jobs:
         run: |
           uv venv .venv
           uv pip install --python .venv/bin/python -r apps/api/requirements.lock
-          uv pip install --python .venv/bin/python -e services/pcb-engine -e "services/ai-engine[anthropic]" -e "apps/api[dev]"
+          uv pip install --python .venv/bin/python -e services/pcb-engine -e "services/ai-engine[anthropic]" -e services/eda-runner -e "apps/api[dev]"
       - name: Lint and format
         run: .venv/bin/ruff check . && .venv/bin/ruff format --check .
       - name: Type check
-        run: .venv/bin/mypy services/pcb-engine/src services/ai-engine/src apps/api/src
+        run: .venv/bin/mypy services/pcb-engine/src services/ai-engine/src services/eda-runner/src apps/api/src
       - name: Fetch real KiCad boards (CC BY-SA, internal testing only)
         run: .venv/bin/python scripts/fetch_real_fixtures.py
       - name: Tests

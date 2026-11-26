@@ -128,3 +128,28 @@ def test_crash_details_are_not_exposed():
     outcome = run_parser(b"", None, LIMITS, command=py("raise RuntimeError('/secret/path leaked')"))
     assert outcome.error_code == PARSER_CRASHED
     assert "secret" not in outcome.error_message
+
+
+def test_bundler_repacks_boards_and_projects_with_fixed_names():
+    import io
+    import zipfile
+
+    from via_api.parsing.sandbox import run_bundler
+
+    board = b"(kicad_pcb (version 20240108))"
+    out = run_bundler(board, "x.kicad_pcb", LIMITS)
+    assert out.bundle is not None
+    assert zipfile.ZipFile(io.BytesIO(out.bundle)).namelist() == ["board.kicad_pcb"]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("p/p.kicad_pcb", board)
+        zf.writestr("p/p.kicad_pro", "{}")
+        zf.writestr("p/p.kicad_dru", "(version 1)")
+        zf.writestr("p/README.md", "dropped")
+    out = run_bundler(buf.getvalue(), "p.zip", LIMITS)
+    names = sorted(zipfile.ZipFile(io.BytesIO(out.bundle)).namelist())
+    assert names == ["board.kicad_dru", "board.kicad_pcb", "board.kicad_pro"]
+    bad = run_bundler(b"PK\x03\x04 broken", "p.zip", LIMITS)
+    assert bad.bundle is None and bad.error_code == "invalid_archive"
+    not_kicad = run_bundler(b"hello", "x.kicad_pcb", LIMITS)
+    assert not_kicad.bundle is None and not_kicad.error_code == "invalid_archive"

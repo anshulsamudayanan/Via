@@ -15,7 +15,7 @@ checkpoints; do not build features from later checkpoints or stages early.
 ```bash
 .venv/bin/pytest -ra                               # Python tests; integration tests need VIA_TEST_* (see tests/conftest.py)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-.venv/bin/mypy services/pcb-engine/src services/ai-engine/src apps/api/src
+.venv/bin/mypy services/pcb-engine/src services/ai-engine/src services/eda-runner/src apps/api/src
 .venv/bin/python scripts/fetch_real_fixtures.py    # real KiCad boards (CC BY-SA, never commit them)
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm --filter @via/web e2e                        # Playwright; needs the Compose stack running

@@ -10,6 +10,7 @@
 # web container can reach only the API (`frontend`). Host ports are bound to
 # 127.0.0.1 for local tooling (tests, psql). `backend` is not marked
 # `internal: true` because Docker does not publish ports from internal networks.
+# The KiCad tool service (`eda`) is only on the internal `eda` network with the worker.
 
 name: via
 
@@ -31,6 +32,8 @@ x-api-env: &api-env
   VIA_PARSER_MEMORY_LIMIT_MB: ${VIA_PARSER_MEMORY_LIMIT_MB:-3072}
   VIA_JOB_MAX_ATTEMPTS: ${VIA_JOB_MAX_ATTEMPTS:-3}
   VIA_JOB_STALE_AFTER_SECONDS: ${VIA_JOB_STALE_AFTER_SECONDS:-90}
+  # Internal KiCad tool service (DRC). Unset to run analyses without KiCad DRC.
+  VIA_EDA_URL: ${VIA_EDA_URL-http://eda:8100}
   VIA_PUBLIC_WEB_URL: ${VIA_PUBLIC_WEB_URL:-http://localhost:3000}
   VIA_SESSION_TTL_HOURS: ${VIA_SESSION_TTL_HOURS:-336}
   VIA_PASSWORD_RESET_TTL_MINUTES: ${VIA_PASSWORD_RESET_TTL_MINUTES:-60}
@@ -121,7 +124,25 @@ services:
       redis: { condition: service_healthy }
     healthcheck:
       disable: true  # the image's HTTP healthcheck is for the API
-    networks: [backend]
+    networks: [backend, eda]
+    restart: unless-stopped
+
+  eda:
+    # KiCad 9 (official image) running DRC for analyses. No credentials, no published ports,
+    # reachable only from the worker on the internal `eda` network; read-only root filesystem.
+    build:
+      context: .
+      dockerfile: infrastructure/docker/eda.Dockerfile
+    image: via/eda:dev
+    environment:
+      VIA_EDA_CONCURRENCY: ${VIA_EDA_CONCURRENCY:-2}
+      VIA_EDA_TIMEOUT_SECONDS: ${VIA_EDA_TIMEOUT_SECONDS:-120}
+      VIA_EDA_MEMORY_LIMIT_MB: ${VIA_EDA_MEMORY_LIMIT_MB:-4096}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [eda]
     restart: unless-stopped
 
   web:
@@ -142,6 +163,9 @@ services:
 networks:
   backend: {}
   frontend: {}
+  # No route outside Docker: only the worker and the KiCad service are on it.
+  eda:
+    internal: true
 
 secrets:
   # Optional extra CA bundle for image builds behind a TLS-intercepting proxy.

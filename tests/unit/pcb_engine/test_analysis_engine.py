@@ -139,7 +139,7 @@ def test_default_checks_have_unique_ids_and_metadata():
     assert len({c.id for c in checks}) == len(checks) >= 4
     for c in checks:
         assert c.version and c.title and c.description and isinstance(c.category, Category)
-        assert c.source == Source.VIA_DETERMINISTIC
+        assert c.source == (Source.KICAD_DRC if c.id == "kicad_drc" else Source.VIA_DETERMINISTIC)
 
 
 def test_confidence_is_bounded():

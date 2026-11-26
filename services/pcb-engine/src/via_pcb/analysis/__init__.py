@@ -31,9 +31,16 @@ def default_registry() -> CheckRegistry:
     from via_pcb.analysis.checks.connectivity import PadsWithoutNetCheck
     from via_pcb.analysis.checks.design_rules import DesignRulesSourceCheck
     from via_pcb.analysis.checks.import_warnings import ImportWarningsCheck
+    from via_pcb.analysis.checks.kicad_drc import KiCadDrcCheck
 
     registry = CheckRegistry()
-    for check in (BoardOutlineCheck(), DesignRulesSourceCheck(), PadsWithoutNetCheck(), ImportWarningsCheck()):
+    for check in (
+        KiCadDrcCheck(),
+        BoardOutlineCheck(),
+        DesignRulesSourceCheck(),
+        PadsWithoutNetCheck(),
+        ImportWarningsCheck(),
+    ):
         registry.register(check)
     return registry
 

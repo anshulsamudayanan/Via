@@ -22,7 +22,7 @@ import json
 import sys
 
 from via_pcb.adapters import AdapterNotFoundError, UnsupportedFormatError, parse_pcb
-from via_pcb.project import ArchiveLimits, ProjectArchiveError, is_project_archive, parse_project
+from via_pcb.project import ArchiveLimits, ProjectArchiveError, is_project_archive, make_bundle, parse_project
 
 #: Hard ceiling on input read from stdin (the API enforces its own, lower limit).
 MAX_INPUT_BYTES = 512 * 1024 * 1024
@@ -40,11 +40,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--max-board-bytes", type=int, default=None, help="largest board allowed inside a project archive"
     )
+    parser.add_argument(
+        "--emit-bundle",
+        action="store_true",
+        help="write a zip of the board and its project rule files (fixed names) to stdout instead of parsing",
+    )
     args = parser.parse_args(argv)
 
     data = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
     if len(data) > MAX_INPUT_BYTES:
         _emit({"ok": False, "error": {"code": "file_too_large", "message": "Input exceeds the parser limit."}})
+        return 0
+    if args.emit_bundle:
+        try:
+            limits = ArchiveLimits(max_board_bytes=args.max_board_bytes) if args.max_board_bytes else None
+            bundle = make_bundle(data, filename=args.filename, limits=limits)
+        except UnsupportedFormatError as exc:
+            _emit({"ok": False, "error": {"code": "invalid_archive", "message": str(exc)}})
+            return 0
+        sys.stdout.buffer.write(bundle)
+        sys.stdout.flush()
         return 0
     try:
         if is_project_archive(args.filename, data[:8]):

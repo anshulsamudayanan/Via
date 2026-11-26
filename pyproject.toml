@@ -21,7 +21,7 @@ ignore = ["S101", "RUF012"]
 known-first-party = ["via_pcb", "via_api", "via_ai"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "S108"]
+"tests/**" = ["S105", "S106", "S108", "S310"]  # S310: tests open local http://127.0.0.1 URLs
 
 [tool.mypy]
 python_version = "3.12"

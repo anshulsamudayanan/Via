@@ -38,7 +38,7 @@ DESIGN_PARSED = "design.parsed"
 DESIGN_PARSE_FAILED = "design.parse_failed"
 
 
-def _source_file(db: Session, revision: DesignRevision) -> DesignFile | None:
+def source_file(db: Session, revision: DesignRevision) -> DesignFile | None:
     return db.scalar(
         select(DesignFile).where(DesignFile.revision_id == revision.id, DesignFile.kind == DesignFileKind.SOURCE)
     )
@@ -191,7 +191,7 @@ def process_revision(
     run.finished_at = None
     db.commit()
 
-    source = _source_file(db, revision)
+    source = source_file(db, revision)
     try:
         if source is None:
             raise ObjectNotFoundError("source file row missing")

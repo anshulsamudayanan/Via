@@ -88,8 +88,12 @@ def _safe_filename(filename: str | None) -> str | None:
     return re.sub(r"[^\w.\- ]", "_", base)[:200] or None
 
 
-def parser_command(filename: str | None, max_archive_board_bytes: int | None = None) -> list[str]:
+def parser_command(
+    filename: str | None, max_archive_board_bytes: int | None = None, *, bundle: bool = False
+) -> list[str]:
     cmd = [sys.executable, "-I", "-B", "-m", "via_pcb.cli"]
+    if bundle:
+        cmd.append("--emit-bundle")
     safe = _safe_filename(filename)
     if safe:
         cmd += ["--filename", safe]
@@ -152,3 +156,44 @@ def run_parser(
         return ParseOutcome(
             None, PARSER_INVALID_OUTPUT, "The parser produced an invalid result for this file.", duration
         )
+
+
+@dataclass(frozen=True)
+class BundleOutcome:
+    bundle: bytes | None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+def run_bundler(data: bytes, filename: str | None, limits: SandboxLimits) -> BundleOutcome:
+    """Re-pack an upload as a KiCad tool bundle, in the same sandbox as the parser.
+
+    Untrusted archives are only ever opened inside the sandbox, never in the worker itself.
+    """
+    cmd = parser_command(filename, limits.max_archive_board_bytes, bundle=True)
+    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONHASHSEED": "0"}
+    with tempfile.TemporaryDirectory(prefix="via-bundle-") as workdir:
+        try:
+            proc = subprocess.run(  # noqa: S603 - fixed argv, untrusted data only on stdin
+                cmd,
+                input=data,
+                capture_output=True,
+                timeout=limits.timeout_seconds,
+                env=env,
+                cwd=workdir,
+                preexec_fn=_apply_limits(limits),
+                start_new_session=True,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return BundleOutcome(None, PARSER_TIMEOUT, "Preparing the design for KiCad took too long.")
+    if proc.returncode != 0:
+        logger.error("Bundler failed (rc=%s): %s", proc.returncode, proc.stderr.decode("utf-8", "replace")[-2000:])
+        return BundleOutcome(None, PARSER_CRASHED, "The design couldn't be prepared for KiCad.")
+    if proc.stdout.startswith(b"PK"):
+        return BundleOutcome(proc.stdout)
+    try:
+        error = json.loads(proc.stdout)["error"]
+        return BundleOutcome(None, str(error["code"])[:64], str(error["message"])[:2000])
+    except (ValueError, KeyError, TypeError):
+        return BundleOutcome(None, PARSER_INVALID_OUTPUT, "The design couldn't be prepared for KiCad.")

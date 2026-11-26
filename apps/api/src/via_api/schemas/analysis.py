@@ -35,6 +35,7 @@ class CheckRunOut(BaseModel):
     finding_count: int = 0
     duration_ms: float = 0.0
     message: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class AnalysisRunOut(BaseModel):

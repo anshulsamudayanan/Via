@@ -158,10 +158,15 @@ def process_analysis(
     run_id: uuid.UUID,
     *,
     reimport: Any,
+    drc: Any = None,
     attempt: int = 1,
     job_id: str | None = None,
 ) -> AnalysisRun | None:
-    """Execute one analysis run. Commits. ``reimport(revision_id)`` re-parses an outdated revision."""
+    """Execute one analysis run. Commits.
+
+    ``reimport(revision_id)`` re-parses an outdated revision; ``drc(revision)`` returns the input
+    for the ``kicad_drc`` check (KiCad's report or an error), or is None when not available.
+    """
     run = db.get(AnalysisRun, run_id)
     if run is None or run.kind != AnalysisKind.PCB_ANALYSIS:
         return None
@@ -201,7 +206,10 @@ def process_analysis(
         return run
 
     only = set(run.config.get("checks", [])) or None
-    result = default_engine().run(design, options=run.config.get("options"), only=only)
+    options = dict(run.config.get("options") or {})
+    if drc is not None and (only is None or "kicad_drc" in only):
+        options["kicad_drc"] = drc(revision)
+    result = default_engine().run(design, options=options, only=only)
     persist_result(db, run, revision, result)
     run.design_parser_version = design.engine_version
     run.design_schema_version = design.schema_version

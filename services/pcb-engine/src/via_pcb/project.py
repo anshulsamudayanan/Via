@@ -359,3 +359,33 @@ def parse_project(data: bytes, filename: str | None = None, limits: ArchiveLimit
         warnings += w
     design.warnings = warnings + design.warnings
     return design
+
+
+# --- Bundles for KiCad's own tools ------------------------------------------------------------
+
+#: Fixed member names of a tool bundle (KiCad finds board.kicad_pro next to board.kicad_pcb).
+BUNDLE_BOARD, BUNDLE_PROJECT, BUNDLE_RULES = "board.kicad_pcb", "board.kicad_pro", "board.kicad_dru"
+
+
+def make_bundle(data: bytes, filename: str | None = None, limits: ArchiveLimits | None = None) -> bytes:
+    """Re-pack a board file or project archive as a minimal zip with fixed names, for KiCad tools.
+
+    Only the selected board and its .kicad_pro/.kicad_dru are kept; names are fixed, so nothing
+    from the upload becomes a path elsewhere.
+    """
+    if is_project_archive(filename, data[:8]):
+        files = read_project(data, limits)
+        members = {BUNDLE_BOARD: files.board}
+        if files.project is not None:
+            members[BUNDLE_PROJECT] = files.project
+        if files.rules is not None:
+            members[BUNDLE_RULES] = files.rules
+    else:
+        if not data.lstrip()[:32].startswith(b"(kicad_pcb"):
+            raise ProjectArchiveError("Only KiCad boards can be checked by KiCad.")
+        members = {BUNDLE_BOARD: data}
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, content in members.items():
+            zf.writestr(name, content)
+    return buf.getvalue()

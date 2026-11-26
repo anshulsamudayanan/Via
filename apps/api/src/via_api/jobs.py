@@ -40,6 +40,7 @@ from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.orm import Session
 
 from via_api.config import Settings, get_settings
+from via_api.eda import kicad_drc_input
 from via_api.models import AnalysisRun, DesignRevision
 from via_api.models.base import utcnow
 from via_api.models.enums import AnalysisKind, AnalysisStatus, RevisionStatus
@@ -239,6 +240,9 @@ def analyze_run(run_id: str, attempt: int = 1) -> str:
     def reimport(revision_id: uuid.UUID) -> None:
         process_revision(db, storage, revision_id, sandbox_limits(settings))
 
+    def drc(revision: DesignRevision) -> dict[str, Any]:
+        return kicad_drc_input(db, storage, revision, settings, sandbox_limits(settings))
+
     try:
         with Heartbeat(settings, run_id=uuid.UUID(run_id)):
             run = process_analysis(
@@ -246,6 +250,7 @@ def analyze_run(run_id: str, attempt: int = 1) -> str:
                 storage,
                 uuid.UUID(run_id),
                 reimport=reimport,
+                drc=drc,
                 attempt=attempt,
                 job_id=current.id if current else analysis_job_id(run_id, attempt),
             )

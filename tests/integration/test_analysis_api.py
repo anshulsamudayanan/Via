@@ -81,6 +81,7 @@ def test_run_analysis_end_to_end(client, broken):
     assert run["design_schema_version"] == "1.1.0" and run["design_parser_version"]
     assert {c["check_id"]: c["status"] for c in run["checks"]} == {
         "board_outline": "ok", "design_rules_source": "ok", "pads_without_net": "ok", "import_warnings": "ok",
+        "kicad_drc": "skipped",  # no KiCad service in this test (see test_kicad_drc_pipeline.py)
     }  # fmt: skip
     assert all(c["version"] for c in run["checks"])
     assert run["summary"]["finding_count"] == 3
@@ -264,7 +265,9 @@ def test_compare_rejects_runs_of_other_designs(client, broken):
 def test_checks_catalog(client, broken):
     checks = client.get("/api/v1/analysis/checks").json()
     assert {c["id"] for c in checks} >= {"board_outline", "design_rules_source", "pads_without_net", "import_warnings"}
-    assert all(c["source"] == "via_deterministic" and c["version"] for c in checks)
+    assert all(c["version"] for c in checks)
+    assert {c["id"]: c["source"] for c in checks}["kicad_drc"] == "kicad_drc"
+    assert {c["source"] for c in checks if c["id"] != "kicad_drc"} == {"via_deterministic"}
 
 
 # --- Recovery -------------------------------------------------------------------------------

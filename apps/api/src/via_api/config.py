@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     job_reaper_interval_seconds: int = Field(default=30, ge=1)
     #: Time budget for running the analysis checks on one revision (the RQ job adds parse time).
     analysis_timeout_seconds: int = Field(default=300, ge=10)
+    #: Internal KiCad tool service (services/eda-runner), e.g. http://eda:8100. Unset = no KiCad DRC.
+    eda_url: str | None = None
+    eda_timeout_seconds: int = Field(default=180, ge=5)
     enable_docs: bool = True
 
     # --- Sessions & auth ---------------------------------------------------
