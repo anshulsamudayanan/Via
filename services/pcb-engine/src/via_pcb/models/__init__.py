@@ -12,6 +12,11 @@ Conventions
   consumers can flip if needed.
 * All positions are *absolute* (footprint-local coordinates are resolved by the
   adapter).
+* Object identity (schema 1.1+): components, pads, tracks, vias and zones carry
+  ``uuid`` (exactly as in the source, ``None`` when the source has none) and ``id``
+  (a stable reference within the design: the source UUID when present, otherwise
+  derived deterministically from the object's content, so re-parsing the same file
+  gives the same ids). Designs stored with schema 1.0 have ``id = None``.
 * ``SCHEMA_VERSION`` follows semver: bump the minor version for additive changes
   and the major version for breaking ones. Persisted designs carry the version
   they were produced with.
@@ -23,8 +28,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-SCHEMA_VERSION = "1.0.0"
-ENGINE_VERSION = "0.1.0"
+SCHEMA_VERSION = "1.1.0"
+ENGINE_VERSION = "0.2.0"
 
 
 class _Model(BaseModel):
@@ -109,6 +114,14 @@ class Pad(_Model):
     layers: list[str]
     net: str | None = None
     drill: Drill | None = None
+    id: str | None = Field(default=None, description="Stable reference (schema 1.1+)")
+    uuid: str | None = None
+    roundrect_ratio: float | None = Field(default=None, description="Corner radius / smaller side (roundrect pads)")
+    clearance: float | None = Field(default=None, description="Pad-local copper clearance override")
+    solder_mask_margin: float | None = None
+    solder_paste_margin: float | None = None
+    solder_paste_ratio: float | None = None
+    zone_connection: str | None = Field(default=None, description="inherited | none | thermal | solid | thru_hole_only")
 
 
 class Graphic(_Model):
@@ -139,6 +152,8 @@ class Component(_Model):
     pads: list[Pad] = Field(default_factory=list)
     graphics: list[Graphic] = Field(default_factory=list)
     uuid: str | None = None
+    id: str | None = Field(default=None, description="Stable reference (schema 1.1+)")
+    locked: bool = Field(default=False, description="Locked in the source tool (schema 1.1+)")
 
 
 class Track(_Model):
@@ -150,6 +165,9 @@ class Track(_Model):
     layer: str
     net: str | None = None
     length: float
+    id: str | None = Field(default=None, description="Stable reference (schema 1.1+)")
+    uuid: str | None = None
+    locked: bool = False
 
 
 class Via(_Model):
@@ -159,6 +177,19 @@ class Via(_Model):
     layers: list[str]
     net: str | None = None
     via_type: str = Field(default="through", description="through | blind | micro")
+    id: str | None = Field(default=None, description="Stable reference (schema 1.1+)")
+    uuid: str | None = None
+    locked: bool = False
+
+
+class KeepoutRules(_Model):
+    """What a keep-out zone forbids. ``True`` = allowed, ``False`` = not allowed, ``None`` = not stated."""
+
+    tracks: bool | None = None
+    vias: bool | None = None
+    pads: bool | None = None
+    copper_pour: bool | None = None
+    footprints: bool | None = None
 
 
 class Zone(_Model):
@@ -169,6 +200,12 @@ class Zone(_Model):
     filled: bool = False
     keepout: bool = False
     name: str | None = None
+    id: str | None = Field(default=None, description="Stable reference (schema 1.1+)")
+    uuid: str | None = None
+    keepout_rules: KeepoutRules | None = None
+    priority: int | None = None
+    clearance: float | None = Field(default=None, description="Zone-to-other-copper clearance")
+    min_thickness: float | None = None
 
 
 class BoardOutline(_Model):
@@ -187,6 +224,26 @@ class SourceInfo(_Model):
     sha256: str = Field(description="SHA-256 of the exact source bytes")
     size_bytes: int
     y_axis: str = "down"
+
+
+class StackupLayer(_Model):
+    name: str
+    type: str = Field(description="As in the source, e.g. 'copper', 'core', 'prepreg', 'Top Solder Mask'")
+    thickness: float | None = None
+    material: str | None = None
+    epsilon_r: float | None = None
+    loss_tangent: float | None = None
+
+
+class Stackup(_Model):
+    """The board's physical layer stack, top to bottom, exactly as declared in the source.
+
+    Absent (``None`` on the design) when the source doesn't declare one; VIA never assumes one.
+    """
+
+    layers: list[StackupLayer]
+    copper_finish: str | None = None
+    dielectric_constraints: bool | None = None
 
 
 class NetClass(_Model):
@@ -266,6 +323,7 @@ class PCBDesign(_Model):
     graphics: list[Graphic] = Field(description="Board-level drawings, excluding the outline")
     outline: BoardOutline
     constraints: DesignConstraints = Field(default_factory=DesignConstraints)
+    stackup: Stackup | None = None
     bbox: BoundingBox | None = None
     stats: DesignStats
     net_stats: list[NetStat] = Field(default_factory=list)
@@ -282,6 +340,7 @@ __all__ = [
     "DesignStats",
     "Drill",
     "Graphic",
+    "KeepoutRules",
     "Layer",
     "LayerKind",
     "Net",
@@ -294,6 +353,8 @@ __all__ = [
     "Point",
     "Side",
     "SourceInfo",
+    "Stackup",
+    "StackupLayer",
     "Track",
     "Via",
     "Zone",

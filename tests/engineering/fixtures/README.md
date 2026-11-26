@@ -7,8 +7,9 @@ repository. Record provenance here **before** adding a file.
 |---|---|---|---|
 | `via_reference_v8.kicad_pcb` | Hand-authored for VIA (KiCad 8 syntax, file version 20240108) | Same as this repository | Rectangular outline, SMD + THT + NPTH pads, rotated bottom-side footprint, segment + arc tracks, via, filled zone, footprint graphics, setup rule |
 | `via_legacy_v5.kicad_pcb` | Hand-authored for VIA (KiCad 5 syntax, file version 20171130) | Same as this repository | `module`/`fp_text`, unquoted tokens, legacy centre/angle arc in the outline, oval drill, in-file net class, unsupported bezier curve |
+| `via_features_v9.kicad_pcb` | Hand-authored for VIA (KiCad 9 syntax, file version 20241229) | Same as this repository | Schema 1.1 fields: both `locked` syntaxes (footprints and tracks), `tstamp` vs `uuid`, duplicate UUID and identical uuid-less tracks (id derivation), pad margins/roundrect/zone connection, 4-layer stackup incl. a dielectric with sub-layers, keep-out rules, zone priority/clearance/min thickness. Not electrically meaningful. |
 
-Expected values in `../test_kicad_fixtures.py` were derived by hand from these
+Expected values in `../test_kicad_fixtures.py` and `../test_model_v1_1.py` were derived by hand from these
 files (see comments in the tests), not copied from parser output.
 
 ## Third-party real boards (not committed)

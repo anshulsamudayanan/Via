@@ -31,6 +31,7 @@ from via_pcb.models import (
     DesignStats,
     Drill,
     Graphic,
+    KeepoutRules,
     Layer,
     LayerKind,
     Net,
@@ -43,6 +44,8 @@ from via_pcb.models import (
     Point,
     Side,
     SourceInfo,
+    Stackup,
+    StackupLayer,
     Track,
     Via,
     Zone,
@@ -282,6 +285,8 @@ class KiCadAdapter(PCBAdapter):
         outline = self._outline(outline_graphics, ctx)
 
         constraints = self._constraints(root)
+        stackup = self._stackup(root, ctx)
+        assign_ids(components, tracks, vias, zones)
         bbox = outline.bbox or self._content_bbox(components, tracks, vias, other_graphics)
         stats, net_stats = self._stats(ctx, nets, components, tracks, vias, zones, outline, constraints)
         ctx.finish_warnings()
@@ -298,6 +303,7 @@ class KiCadAdapter(PCBAdapter):
             zones=zones,
             graphics=other_graphics,
             outline=outline,
+            stackup=stackup,
             constraints=constraints,
             bbox=bbox,
             stats=stats,
@@ -434,7 +440,8 @@ class KiCadAdapter(PCBAdapter):
             properties={k: v for k, v in properties.items() if k not in {"Reference", "Value"}},
             pads=pads,
             graphics=graphics,
-            uuid=node.atom("uuid") or node.atom("tstamp"),
+            uuid=_uuid(node),
+            locked=_locked(node),
         )
 
     def _pad(self, node: SExpr, origin: geo.Vec, fp_rot: float, ctx: _Context) -> Pad:
@@ -477,6 +484,13 @@ class KiCadAdapter(PCBAdapter):
             layers=layers,
             net=ctx.resolve_net(node),
             drill=drill,
+            uuid=_uuid(node),
+            roundrect_ratio=node.number("roundrect_rratio"),
+            clearance=node.number("clearance"),
+            solder_mask_margin=node.number("solder_mask_margin"),
+            solder_paste_margin=node.number("solder_paste_margin"),
+            solder_paste_ratio=node.number("solder_paste_margin_ratio", default=node.number("solder_paste_ratio")),
+            zone_connection=_ZONE_CONNECT.get(str(zc)) if (zc := node.atom("zone_connect")) is not None else None,
         )
 
     def _graphic(
@@ -558,6 +572,8 @@ class KiCadAdapter(PCBAdapter):
                     layer=node.atom("layer") or "",
                     net=ctx.resolve_net(node),
                     length=round(length, 6),
+                    uuid=_uuid(node),
+                    locked=_locked(node),
                 )
             )
         return tracks
@@ -578,6 +594,8 @@ class KiCadAdapter(PCBAdapter):
             layers=layers,
             net=ctx.resolve_net(node),
             via_type=via_type,
+            uuid=_uuid(node),
+            locked=_locked(node),
         )
 
     def _zone(self, node: SExpr, ctx: _Context) -> Zone | None:
@@ -593,14 +611,36 @@ class KiCadAdapter(PCBAdapter):
             layer = node.atom("layer")
             layers = [layer] if layer else []
         net_name = node.atom("net_name") or None
+        keepout_node = node.child("keepout")
+        keepout_rules = None
+        if keepout_node is not None:
+            keepout_rules = KeepoutRules(
+                **{
+                    field: _allowed(keepout_node.atom(token))
+                    for field, token in (
+                        ("tracks", "tracks"),
+                        ("vias", "vias"),
+                        ("pads", "pads"),
+                        ("copper_pour", "copperpour"),
+                        ("footprints", "footprints"),
+                    )
+                }
+            )
+        connect = node.child("connect_pads")
+        priority = node.number("priority")
         return Zone(
             net=net_name or ctx.resolve_net(node),
             layers=layers,
             outline=[_pt(p) for p in outline],
             area=round(geo.polygon_area(outline), 6),
             filled=node.child("filled_polygon") is not None,
-            keepout=node.child("keepout") is not None,
+            keepout=keepout_node is not None,
             name=node.atom("name"),
+            uuid=_uuid(node),
+            keepout_rules=keepout_rules,
+            priority=int(priority) if priority is not None else None,
+            clearance=connect.number("clearance") if connect is not None else None,
+            min_thickness=node.number("min_thickness"),
         )
 
     def _outline(self, graphics: list[Graphic], ctx: _Context) -> BoardOutline:
@@ -636,6 +676,38 @@ class KiCadAdapter(PCBAdapter):
             closed=result.closed,
             bbox=_bbox(bbox),
             area=round(area, 6) if area is not None else None,
+        )
+
+    def _stackup(self, root: SExpr, ctx: _Context) -> Stackup | None:
+        setup = root.child("setup")
+        node = setup.child("stackup") if setup is not None else None
+        if node is None:
+            return None
+        layers: list[StackupLayer] = []
+        for entry in node.children("layer"):
+            atoms = entry.atoms()
+            if not atoms:
+                continue
+            if entry.has_atom("addsublayer"):
+                ctx.warn(
+                    "stackup_sublayers",
+                    f"Stackup layer '{atoms[0]}' has dielectric sub-layers; only the first is recorded",
+                )
+            layers.append(
+                StackupLayer(
+                    name=atoms[0],
+                    type=entry.atom("type") or "",
+                    thickness=entry.number("thickness"),
+                    material=entry.atom("material"),
+                    epsilon_r=entry.number("epsilon_r"),
+                    loss_tangent=entry.number("loss_tangent"),
+                )
+            )
+        constraints = node.atom("dielectric_constraints")
+        return Stackup(
+            layers=layers,
+            copper_finish=node.atom("copper_finish"),
+            dielectric_constraints=None if constraints is None else constraints == "yes",
         )
 
     def _constraints(self, root: SExpr) -> DesignConstraints:
@@ -734,6 +806,68 @@ class KiCadAdapter(PCBAdapter):
             unconnected_pad_count=unconnected,
         )
         return stats, sorted(per_net.values(), key=lambda s: s.name)
+
+
+_ZONE_CONNECT = {"0": "none", "1": "thermal", "2": "solid", "3": "thru_hole_only"}
+
+
+def _uuid(node: SExpr) -> str | None:
+    return node.atom("uuid") or node.atom("tstamp")
+
+
+def _locked(node: SExpr) -> bool:
+    """KiCad <= 7: a bare ``locked`` token; KiCad 8+: ``(locked yes)``."""
+    if node.has_atom("locked"):
+        return True
+    child = node.child("locked")
+    return child is not None and (not child.atoms() or child.atoms()[0] == "yes")
+
+
+def _allowed(rule: str | None) -> bool | None:
+    if rule is None:
+        return None
+    return rule == "allowed"
+
+
+def _fmt(v: float | None) -> str:
+    return "-" if v is None else f"{v:.6f}"
+
+
+def _derived(prefix: str, *parts: object) -> str:
+    raw = "|".join(_fmt(p) if isinstance(p, float) or p is None else str(p) for p in parts)
+    return f"{prefix}:{hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:16]}"
+
+
+def assign_ids(components: list[Component], tracks: list[Track], vias: list[Via], zones: list[Zone]) -> None:
+    """Give every object a stable ``id``: its source UUID when present and unique, otherwise one
+    derived from its content (so re-parsing the same file yields the same ids). Duplicates get
+    a ``~n`` suffix in file order."""
+    used: set[str] = set()
+
+    def claim(candidate: str) -> str:
+        out, n = candidate, 1
+        while out in used:
+            n += 1
+            out = f"{candidate}~{n}"
+        used.add(out)
+        return out
+
+    def pick(uuid: str | None, derived: str) -> str:
+        return claim(uuid) if uuid and uuid not in used else claim(derived)
+
+    for c in components:
+        c.id = pick(c.uuid, _derived("fp", c.reference, c.footprint, c.position.x, c.position.y, c.side))
+        for p in c.pads:
+            p.id = pick(p.uuid, f"{c.id}/pad:{p.number}")
+    for t in tracks:
+        mid = (t.mid.x, t.mid.y) if t.mid else (None, None)
+        t.id = pick(
+            t.uuid, _derived("trk", t.kind, t.layer, t.start.x, t.start.y, t.end.x, t.end.y, *mid, t.width, t.net)
+        )
+    for v in vias:
+        v.id = pick(v.uuid, _derived("via", v.position.x, v.position.y, v.diameter, v.drill, ",".join(v.layers), v.net))
+    for z in zones:
+        z.id = pick(z.uuid, _derived("zone", ",".join(z.layers), z.net, *[f"{p.x:.6f},{p.y:.6f}" for p in z.outline]))
 
 
 def _angle(deg: float) -> float:

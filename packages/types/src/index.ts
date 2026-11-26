@@ -350,6 +350,15 @@ export interface Pad {
   layers: string[];
   net: string | null;
   drill: { diameter: number; slot_length: number | null; offset: Point | null } | null;
+  /** Schema 1.1+ (absent on designs stored with 1.0). */
+  id?: string | null;
+  uuid?: string | null;
+  roundrect_ratio?: number | null;
+  clearance?: number | null;
+  solder_mask_margin?: number | null;
+  solder_paste_margin?: number | null;
+  solder_paste_ratio?: number | null;
+  zone_connection?: string | null;
 }
 
 export interface Footprint {
@@ -365,6 +374,9 @@ export interface Footprint {
   pads: Pad[];
   graphics: Graphic[];
   uuid: string | null;
+  /** Schema 1.1+. */
+  id?: string | null;
+  locked?: boolean;
 }
 
 export interface Track {
@@ -376,6 +388,10 @@ export interface Track {
   layer: string;
   net: string | null;
   length: number;
+  /** Schema 1.1+. */
+  id?: string | null;
+  uuid?: string | null;
+  locked?: boolean;
 }
 
 export interface ViaDef {
@@ -385,6 +401,10 @@ export interface ViaDef {
   layers: string[];
   net: string | null;
   via_type: string;
+  /** Schema 1.1+. */
+  id?: string | null;
+  uuid?: string | null;
+  locked?: boolean;
 }
 
 export interface Zone {
@@ -395,6 +415,22 @@ export interface Zone {
   filled: boolean;
   keepout: boolean;
   name: string | null;
+  /** Schema 1.1+. */
+  id?: string | null;
+  uuid?: string | null;
+  keepout_rules?: { tracks: boolean | null; vias: boolean | null; pads: boolean | null; copper_pour: boolean | null; footprints: boolean | null } | null;
+  priority?: number | null;
+  clearance?: number | null;
+  min_thickness?: number | null;
+}
+
+export interface StackupLayer {
+  name: string;
+  type: string;
+  thickness: number | null;
+  material: string | null;
+  epsilon_r: number | null;
+  loss_tangent: number | null;
 }
 
 /** GET /api/v1/pcb/{design_id}/normalized */
@@ -414,4 +450,6 @@ export interface PCBDesign {
   bbox: BoundingBox | null;
   stats: DesignStats;
   warnings: ParseWarning[];
+  /** Schema 1.1+: null when the source declares no stackup. */
+  stackup?: { layers: StackupLayer[]; copper_finish: string | null; dielectric_constraints: boolean | null } | null;
 }
