@@ -60,6 +60,15 @@ class Settings(BaseSettings):
     parser_memory_limit_mb: int = 3072
     #: Redis queue used for PCB import jobs.
     import_queue_name: str = "via-pcb-import"
+    #: Background-job lifecycle (see via_api.jobs): running jobs refresh a heartbeat every
+    #: `job_heartbeat_seconds`; the worker's reaper re-queues work whose heartbeat is older than
+    #: `job_stale_after_seconds`, or whose queued job vanished (e.g. Redis restarted) for longer
+    #: than `job_lost_after_seconds`, up to `job_max_attempts` tries in total.
+    job_heartbeat_seconds: int = Field(default=10, ge=1)
+    job_stale_after_seconds: int = Field(default=90, ge=5)
+    job_lost_after_seconds: int = Field(default=300, ge=5)
+    job_max_attempts: int = Field(default=3, ge=1, le=10)
+    job_reaper_interval_seconds: int = Field(default=30, ge=1)
     enable_docs: bool = True
 
     # --- Sessions & auth ---------------------------------------------------
@@ -89,6 +98,12 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _job_timing(self) -> Settings:
+        if self.job_stale_after_seconds < 3 * self.job_heartbeat_seconds:
+            raise ValueError("VIA_JOB_STALE_AFTER_SECONDS must be at least 3x VIA_JOB_HEARTBEAT_SECONDS")
+        return self
 
     @model_validator(mode="after")
     def _production_safety(self) -> Settings:

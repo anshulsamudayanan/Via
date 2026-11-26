@@ -90,20 +90,27 @@ class InlineQueue:
         self.db = db
         self.storage_root = storage_root
         self.enqueued: list[uuid.UUID] = []
+        self.attempts: list[int] = []
+        self.alive: set[str] = set()  # job ids reported as still queued/running
         self.run = True
         self.fail = False
 
-    def enqueue_import(self, revision_id: uuid.UUID) -> None:
+    def enqueue_import(self, revision_id: uuid.UUID, attempt: int = 1) -> None:
         if self.fail:
             raise ConnectionError("queue down")
         self.enqueued.append(revision_id)
+        self.attempts.append(attempt)
         if self.run:
             process_revision(
                 self.db,
                 LocalStorage(self.storage_root),
                 revision_id,
                 SandboxLimits(timeout_seconds=30, memory_bytes=1024**3),
+                attempt=attempt,
             )
+
+    def job_alive(self, job_id: str) -> bool:
+        return job_id in self.alive
 
 
 @pytest.fixture

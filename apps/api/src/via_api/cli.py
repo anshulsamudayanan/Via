@@ -74,16 +74,13 @@ def _worker(burst: bool) -> int:
     """Run an RQ worker for the import queue (forks one work-horse process per job)."""
     import logging
 
-    from rq import Queue, Worker
-
     from via_api.config import get_settings
+    from via_api.jobs import make_worker
     from via_api.redis_client import get_redis
 
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    redis = get_redis()
-    worker = Worker([Queue(settings.import_queue_name, connection=redis)], connection=redis)
-    worker.work(burst=burst, with_scheduler=False)
+    make_worker(settings, get_redis()).work(burst=burst, with_scheduler=False)
     return 0
 
 

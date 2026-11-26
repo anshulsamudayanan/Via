@@ -65,8 +65,8 @@ def test_rq_queue_enqueues_with_timeout_and_callback(settings, test_redis):
     queue = jobs.RQJobQueue(test_redis, settings)
     rid = uuid.uuid4()
     queue.enqueue_import(rid)
-    job = queue.queue.fetch_job(f"import-{rid}")
+    job = queue.queue.fetch_job(f"import-{rid}-a1")
     assert job.func_name == "via_api.jobs.import_revision"
-    assert list(job.args) == [str(rid)]
+    assert list(job.args) == [str(rid), 1]
     assert job.timeout == settings.parser_timeout_seconds + 120
     assert job.failure_callback is jobs.on_import_failure  # resolved from the stored dotted path

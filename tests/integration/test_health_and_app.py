@@ -21,7 +21,13 @@ def test_readiness_checks_database_migrations_redis_and_storage(client):
     body = resp.json()
     assert body["status"] == "ok"
     assert set(body["checks"]) == {"database", "redis", "storage"}
-    assert body["checks"]["database"]["detail"] == "migrations at 0002"
+    from alembic.script import ScriptDirectory
+
+    from via_api.db import alembic_config
+
+    head = ScriptDirectory.from_config(alembic_config("postgresql://unused")).get_current_head()
+    assert body["checks"]["database"]["detail"] == f"migrations at {head}"
+    assert head == "0003"  # update when adding a migration (keeps this test honest)
     assert all(c["status"] == "ok" for c in body["checks"].values())
 
 

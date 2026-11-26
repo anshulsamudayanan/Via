@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,7 +15,12 @@ from via_api.models.enums import AnalysisKind, AnalysisStatus, ConsentScope
 
 
 class AnalysisRun(UUIDPk, Timestamps, Base):
-    """A unit of processing on a revision. Stage 1 only records ``pcb_import`` runs."""
+    """A unit of processing on a revision. Stage 1 only records ``pcb_import`` runs.
+
+    ``attempt``, ``job_id`` and ``heartbeat_at`` let the worker's reaper detect work
+    whose worker died (stale heartbeat) or whose queued job was lost, and retry it a
+    bounded number of times (see ``via_api.jobs``).
+    """
 
     __tablename__ = "analysis_runs"
 
@@ -36,6 +41,12 @@ class AnalysisRun(UUIDPk, Timestamps, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     result_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     triggered_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    #: 1 for the first try; incremented each time the reaper re-queues the work.
+    attempt: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    #: Queue job id of the current attempt; callbacks from superseded attempts are ignored.
+    job_id: Mapped[str | None] = mapped_column(String(128))
+    #: Last sign of life from the process doing the work (updated every few seconds).
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ActivityLog(UUIDPk, CreatedAt, Base):
@@ -80,4 +91,5 @@ class DataConsent(UUIDPk, CreatedAt, Base):
 Index("ix_activity_logs_project_created", ActivityLog.project_id, ActivityLog.created_at.desc())
 Index("ix_activity_logs_actor_created", ActivityLog.actor_id, ActivityLog.created_at.desc())
 Index("ix_analysis_runs_project_created", AnalysisRun.project_id, AnalysisRun.created_at.desc())
+Index("ix_analysis_runs_kind_status", AnalysisRun.kind, AnalysisRun.status)
 Index("ix_data_consents_user_scope", DataConsent.user_id, DataConsent.scope)

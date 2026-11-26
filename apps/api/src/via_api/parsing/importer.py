@@ -44,14 +44,16 @@ def _source_file(db: Session, revision: DesignRevision) -> DesignFile | None:
     )
 
 
-def _import_run(db: Session, revision: DesignRevision) -> AnalysisRun:
+def import_run(db: Session, revision: DesignRevision) -> AnalysisRun:
     run = db.scalar(
         select(AnalysisRun)
         .where(AnalysisRun.revision_id == revision.id, AnalysisRun.kind == AnalysisKind.PCB_IMPORT)
         .order_by(AnalysisRun.created_at.desc())
     )
     if run is None:
-        run = AnalysisRun(project_id=revision.project_id, revision_id=revision.id, kind=AnalysisKind.PCB_IMPORT)
+        run = AnalysisRun(
+            project_id=revision.project_id, revision_id=revision.id, kind=AnalysisKind.PCB_IMPORT, attempt=0
+        )
         db.add(run)
     return run
 
@@ -62,7 +64,7 @@ def mark_failed(db: Session, revision: DesignRevision, code: str, message: str) 
     revision.error_code = code
     revision.error_message = message
     revision.imported_at = None
-    run = _import_run(db, revision)
+    run = import_run(db, revision)
     run.status = AnalysisStatus.FAILED
     run.error_code = code
     run.error_message = message
@@ -166,18 +168,27 @@ def process_revision(
     limits: SandboxLimits,
     *,
     parse: Any = run_parser,
+    attempt: int = 1,
+    job_id: str | None = None,
 ) -> DesignRevision | None:
-    """Parse and persist one revision. Commits. Returns the revision (or None if it vanished)."""
+    """Parse and persist one revision. Commits. Returns the revision (or None if it vanished).
+
+    ``attempt`` and ``job_id`` identify this try for the job reaper (see ``via_api.jobs``).
+    """
     revision = db.get(DesignRevision, revision_id)
     if revision is None:  # deleted before the job ran
         logger.info("Revision %s no longer exists; skipping", revision_id)
         return None
-    run = _import_run(db, revision)
+    run = import_run(db, revision)
     revision.status = RevisionStatus.PROCESSING
     revision.error_code = revision.error_message = None
     run.status = AnalysisStatus.RUNNING
-    run.started_at = utcnow()
+    run.started_at = run.heartbeat_at = utcnow()
     run.engine_version = ENGINE_VERSION
+    run.attempt = attempt
+    run.job_id = job_id
+    run.error_code = run.error_message = None
+    run.finished_at = None
     db.commit()
 
     source = _source_file(db, revision)
