@@ -36,8 +36,8 @@ be fixed first, and the milestone plan. Nothing in this document has been implem
 **Reproduced:** uploaded the 47 MB stress board, killed the worker container (`SIGKILL`) while
 the revision was `processing`, restarted it. Almost 4 minutes later, well past the job's
 180-second timeout, the revision was still `processing`: no error, no retry, and the UI polling
-indefinitely. Whether RQ's periodic registry cleanup eventually marks the job failed is checked
-in M1, but even then the revision row would stay `processing`.
+indefinitely. Whether RQ's periodic registry cleanup eventually fails the job and runs the
+callback is checked in M1; either way, minutes of silent limbo with no retry is not acceptable.
 
 **Cause:** the RQ `on_failure` callback runs only when the work-horse fails in a way the parent
 worker observes; if the whole worker process dies, nothing marks the revision failed or requeues
