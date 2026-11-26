@@ -260,11 +260,34 @@ export interface BoardSummary {
     generator_version?: string | null;
     filename?: string | null;
     size_bytes?: number;
+    /** Schema 1.1+: the board inside a project archive, and the other project files used. */
+    board_file?: string | null;
+    project_files?: string[];
   };
-  constraints: Record<string, unknown>;
+  constraints: DesignConstraintsSummary;
   geometry: BoardGeometry | null;
   stats: DesignStats;
   warnings: ParseWarning[];
+}
+
+export interface NetClassInfo {
+  name: string;
+  clearance: number | null;
+  track_width: number | null;
+  via_diameter: number | null;
+  via_drill: number | null;
+  nets: string[];
+  patterns?: string[];
+}
+
+export interface DesignConstraintsSummary {
+  board_thickness?: number | null;
+  net_classes?: NetClassInfo[];
+  /** Schema 1.1+: "project_file" when the .kicad_pro was imported, else "board_file". */
+  rules_source?: "board_file" | "project_file";
+  rules?: Record<string, number | boolean | null> | null;
+  custom_rules?: { name: string; condition: string | null }[];
+  [k: string]: unknown;
 }
 
 export interface PcbComponent {

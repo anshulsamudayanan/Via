@@ -203,7 +203,9 @@ function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail;
           <dl className="divide-y divide-border text-sm">
             {[
               ["File", s.source.filename ?? rev.source_file?.original_filename ?? "-"],
+              ...(s.source.board_file ? [["Board file", s.source.board_file]] : []),
               ["Size", rev.source_file ? formatBytes(rev.source_file.size_bytes) : "-"],
+              ["Design rules", designRulesLabel(s)],
               ["Format", `KiCad ${s.source.format_version ?? ""}`.trim()],
               ["Generator", [s.source.generator, s.source.generator_version].filter(Boolean).join(" ") || "-"],
               ["Revision", `${rev.revision_number}`],
@@ -254,6 +256,17 @@ function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail;
       {tab === "revisions" ? <Revisions design={design} viewing={revisionId} /> : null}
     </div>
   );
+}
+
+/** Where the design rules came from; KiCad 6+ keeps them in the .kicad_pro, not the board file. */
+export function designRulesLabel(s: BoardSummary): string {
+  const c = s.constraints;
+  if (c.rules_source === "project_file") {
+    const classes = c.net_classes?.length ?? 0;
+    const custom = c.custom_rules?.length ?? 0;
+    return `Project file · ${classes} net class${classes === 1 ? "" : "es"}${custom ? ` · ${custom} custom rule${custom === 1 ? "" : "s"}` : ""}`;
+  }
+  return "Board file only (upload the project .zip for its rules)";
 }
 
 function Warnings({ summary }: { summary: BoardSummary }) {

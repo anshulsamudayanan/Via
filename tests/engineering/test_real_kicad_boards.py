@@ -26,7 +26,7 @@ from via_pcb import PCBDesign, parse_pcb
 HERE = Path(__file__).parent
 MANIFEST = json.loads((HERE / "real_fixtures.json").read_text())
 REAL = HERE / "real"
-FIXTURES = list(MANIFEST["fixtures"])
+FIXTURES = [fx for fx in MANIFEST["fixtures"] if fx.get("source_ext", ".kicad_pcb") == ".kicad_pcb"]
 
 
 def _load(fx: dict) -> tuple[PCBDesign, str]:

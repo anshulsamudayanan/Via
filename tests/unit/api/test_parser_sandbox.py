@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -41,8 +42,26 @@ def test_invalid_files_return_the_engine_error():
 
 
 def test_unrecognized_files_are_reported():
-    outcome = run_parser(b"PK\x03\x04", "board.zip", LIMITS)
+    outcome = run_parser(b"\xd0\xcf\x11\xe0", "board.PcbDoc", LIMITS)
     assert outcome.error_code == "unsupported_format"
+
+
+def test_corrupt_project_archives_are_reported():
+    outcome = run_parser(b"PK\x03\x04 truncated", "project.zip", LIMITS)
+    assert outcome.error_code == "invalid_archive"
+    assert "zip" in outcome.error_message
+
+
+def test_archive_board_size_limit_is_passed_to_the_parser():
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr("big.kicad_pcb", b"(kicad_pcb (version 20240108))" + b" " * 4096)
+    outcome = run_parser(buf.getvalue(), "p.zip", dataclasses.replace(LIMITS, max_archive_board_bytes=1024))
+    assert outcome.error_code == "invalid_archive"
+    assert "larger than" in outcome.error_message
 
 
 def test_filename_is_reduced_to_a_safe_basename():

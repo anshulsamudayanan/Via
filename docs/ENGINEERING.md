@@ -24,8 +24,9 @@ design.model_dump_json()  # persisted form
 
 - Millimetres, mm², degrees. Absolute board coordinates (footprint-local coordinates are resolved). KiCad's +Y-down axis is kept and recorded as `source.y_axis = "down"`.
 - Rotations (components, pads) are normalized to `[0, 360)`; positive is counter-clockwise on screen.
-- `schema_version` (semver) and `engine_version` are embedded in every design.
-- `source.sha256` and `source.size_bytes` identify the exact input bytes.
+- `schema_version` (semver) and `engine_version` are embedded in every design. Current: schema **1.1.0**, engine 0.2.0. Designs stored with 1.0.0 still load (all 1.1 fields are optional).
+- `source.sha256` and `source.size_bytes` identify the exact input bytes (for a project archive: the `.zip` as uploaded; `source.board_file` and `source.project_files` name the members used).
+- **Object identity (1.1):** components, pads, tracks, vias and zones carry `uuid` (exactly as in the source, `null` when absent: KiCad 5 tracks and vias, pads before KiCad 8) and `id`, a stable reference within the design: the source UUID when present and unique, otherwise a content-derived id (`trk:…`, `via:…`, `fp:…`, `zone:…`; pads `<component id>/pad:<number>`), with `~n` for duplicates. Re-parsing the same file gives the same ids. KiCad's DRC reports objects by UUID, so its findings map onto these ids.
 - Fields that a source does not contain are `null`/empty, never zero-filled or guessed.
 - `warnings[]` lists everything skipped or suspicious (codes below). Repeated warnings are capped at 5 per code plus a summary line.
 
@@ -49,14 +50,15 @@ Accepted file versions: anything that parses. Outside `20171130`…`20250324` a
 | Thickness | ✅ | `(general (thickness))`. |
 | Layers | ✅ | Index, name, kind (copper, silkscreen, mask, paste, adhesive, fab, courtyard, edge, margin, documentation, user), side, raw type, user name. Classification is by **name** (KiCad 9 renumbered layers), plus the layer **type**: KiCad 5 allowed renaming copper layers (e.g. `top_layer`), so any `signal`/`power`/`mixed`/`jumper` layer is copper; renamed legacy copper layers get their side from the fixed KiCad 5 ordinals (0 front, 31 back). |
 | Nets | ✅ | Net table; when absent (expected in KiCad 10), net names are collected from pads. |
-| Footprints | ✅ | `footprint` (6+) and `module` (5). Library id, reference, value, other non-empty properties, layer/side, position, rotation, attributes (`smd`, `through_hole`, `dnp`, `exclude_from_bom` …), uuid/tstamp. |
-| Pads | ✅ | Number, type (smd, through_hole, npth, connect), shape, absolute position, rotation, size, layers (wildcards like `*.Cu` expanded), net, drill (round / oval slot, offset). |
+| Footprints | ✅ | `footprint` (6+) and `module` (5). Library id, reference, value, other non-empty properties, layer/side, position, rotation, attributes (`smd`, `through_hole`, `dnp`, `exclude_from_bom` …), uuid/tstamp, `locked` (bare token in KiCad ≤ 7, `(locked yes)` in 8+). |
+| Pads | ✅ | Number, type (smd, through_hole, npth, connect), shape, absolute position, rotation, size, layers (wildcards like `*.Cu` expanded), net, drill (round / oval slot, offset), uuid, roundrect ratio, local clearance, solder mask/paste margins and paste ratio, zone connection. Custom pad primitives and chamfer settings are not modelled. |
 | Footprint graphics | ✅ | `fp_line/arc/circle/rect/poly` transformed to board space; rotated rects become polygons. |
-| Tracks | ✅ | Segments and arcs: start, end, mid, width, layer, net, length (true arc length). |
-| Vias | ✅ | Position, diameter, drill, layers, net, type (through/blind/micro). |
-| Zones | ✅ | Net, layers, outline polygon, outline area, filled flag, keep-out flag, name. Filled polygons are **not** stored (only the flag). |
+| Tracks | ✅ | Segments and arcs: start, end, mid, width, layer, net, length (true arc length), uuid, `locked` (KiCad 6+; KiCad 5's status-bit lock isn't read). |
+| Vias | ✅ | Position, diameter, drill, layers, net, type (through/blind/micro), uuid, `locked`. |
+| Zones | ✅ | Net, layers, outline polygon, outline area, filled flag, keep-out flag and rules (tracks, vias, pads, copper pour, footprints: allowed / not allowed), name, uuid, priority, clearance, minimum thickness. Filled polygons are **not** stored (only the flag); KiCad's DRC refills zones itself. |
+| Stackup | ✅ | `(setup (stackup ...))`: each layer's name, type, thickness, material, εr, loss tangent; copper finish; dielectric constraints. Only the first sub-layer of a multi-material dielectric is recorded (`stackup_sublayers` warning). No stackup in the file → `null`, never assumed. |
 | Board graphics | ✅ | `gr_line/arc/circle/rect/poly` on non-Edge layers. |
-| Design constraints | ⚠️ partial | Only what the `.kicad_pcb` itself contains: thickness, `pad_to_mask_clearance`, `solder_mask_min_width`, `pad_to_paste_clearance`, legacy in-file net classes (KiCad 5). KiCad 6+ keeps rules in `.kicad_pro`, which Stage 1 does not ingest. |
+| Design constraints | ✅ with a project archive; ⚠️ board file alone | From the board file: thickness, `pad_to_mask_clearance`, `solder_mask_min_width`, `pad_to_paste_clearance`, legacy in-file net classes (KiCad 5). From a project `.zip` (see below): board-wide minimums, net classes with resolved nets, custom rules. `constraints.rules_source` says which (`board_file` or `project_file`). |
 | Text, dimensions, groups, images, 3D models | ❌ | Silently skipped (no electrical meaning for Stage 1). |
 | Bezier curves (`gr_curve`, `fp_curve`) | ❌ | Skipped with `unsupported_curve` warning. |
 | Unknown top-level objects | ❌ | Skipped with `unsupported_object` warning. |
@@ -130,9 +132,23 @@ git-ignored `tests/engineering/real/` folder and are never committed; see
 | Renamed KiCad 5 copper layers (`top_layer`, `bottom_layer`) classified as `user` | `copper_layer_count = 0`; bottom components reported as top; `*.Cu` expanded to nothing | Copper by layer type; side via the layer table |
 | Missing pad angle fell back to footprint angle | Wrong pad orientation for pads whose absolute angle is 0 | Missing angle = 0° |
 
+## KiCad project archives (Stage 2, Milestone 1)
+
+KiCad 6+ stores design rules and net classes in `<name>.kicad_pro` and custom rules in
+`<name>.kicad_dru`. Without them, rule checks use KiCad's defaults: on the KiCad 9 `video` demo,
+KiCad's own DRC reported 54 false violations without the project file and none with it
+(docs/STAGE_2_AUDIT.md §5). So VIA accepts a `.zip` of the project (`via_pcb/project.py`):
+
+- **Board selection:** the only `.kicad_pcb`; with several, the one with a matching `.kicad_pro`; otherwise refused (ambiguous). KiCad's `*-backups/` folders, hidden files and `__MACOSX` are ignored.
+- **`.kicad_pro`:** `board.design_settings.rules` → `constraints.rules` (only known keys with the right JSON type; nothing is coerced). `net_settings.classes` → net classes (clearance, track width, via size/drill, microvia size/drill, diff-pair width/gap). Nets are resolved per class from KiCad 6's per-class `nets` lists, KiCad 8's `netclass_assignments`, or KiCad 7+'s `netclass_patterns` (wildcards `*` and `?`, case-sensitive). Unmatched nets go to `Default`.
+- **`.kicad_dru`:** each rule's name, condition, layer, severity and constraints. Values are converted to mm only when a unit is written (`mm`, `mil`, `in`, `um`). The raw text is always kept. VIA records custom rules and doesn't evaluate them; KiCad's DRC does (Milestone 3).
+- **KiCad 5 `.pro`** (INI) isn't read (`legacy_project_file` warning); a board with no project file gets `missing_project_file`.
+- **Safety:** never extracted to disk; at most 5,000 entries; members over 1 MiB with a compression ratio above 200 are refused (zip bombs); encrypted entries, absolute paths, drive letters and `..` are refused; the board may be at most `VIA_MAX_UPLOAD_BYTES` uncompressed (checked from the central directory at upload and again while reading in the sandbox, in case the declared size lies); project/rule files at most 16 MiB.
+- **Validation:** real KiCad 6.0–9.0 projects for both demos. KiCad 6 (explicit lists) and 7+ (patterns) resolve to the same classes on each board. (The 8.0 demo re-imported BUS1, after which `+12V` became `unconnected-(BUS1-+12V-PadA2)`, so the boards really differ: `tests/engineering/test_kicad_project.py`.)
+
 ## Warning codes
 
-`missing_version`, `old_version`, `new_version`, `missing_layers`, `missing_outline`, `open_outline`, `unknown_net`, `unknown_pad_type`, `missing_reference`, `invalid_track`, `invalid_zone`, `unsupported_curve`, `unsupported_object`, `footprint_side`.
+`missing_version`, `old_version`, `new_version`, `missing_layers`, `missing_outline`, `open_outline`, `unknown_net`, `unknown_pad_type`, `missing_reference`, `invalid_track`, `invalid_zone`, `unsupported_curve`, `unsupported_object`, `footprint_side`, `stackup_sublayers`; for project archives `missing_project_file`, `legacy_project_file`, `invalid_project_file`, `invalid_rules_file`.
 
 ## Errors
 

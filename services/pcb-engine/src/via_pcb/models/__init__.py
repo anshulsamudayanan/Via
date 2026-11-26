@@ -224,6 +224,10 @@ class SourceInfo(_Model):
     sha256: str = Field(description="SHA-256 of the exact source bytes")
     size_bytes: int
     y_axis: str = "down"
+    board_file: str | None = Field(default=None, description="Board file inside a project archive (schema 1.1+)")
+    project_files: list[str] = Field(
+        default_factory=list, description="Other project files used, e.g. the .kicad_pro (schema 1.1+)"
+    )
 
 
 class StackupLayer(_Model):
@@ -247,22 +251,69 @@ class Stackup(_Model):
 
 
 class NetClass(_Model):
-    """A net class as stored in the board file (legacy KiCad stores them there)."""
+    """A net class from the board file (KiCad 5) or the project file (KiCad 6+)."""
 
     name: str
     clearance: float | None = None
     track_width: float | None = None
     via_diameter: float | None = None
     via_drill: float | None = None
-    nets: list[str] = Field(default_factory=list)
+    nets: list[str] = Field(default_factory=list, description="Design nets in this class (resolved)")
+    microvia_diameter: float | None = None
+    microvia_drill: float | None = None
+    diff_pair_width: float | None = None
+    diff_pair_gap: float | None = None
+    patterns: list[str] = Field(default_factory=list, description="Net name patterns assigned to this class")
+
+
+class DesignRules(_Model):
+    """Board-wide minimums from the KiCad project file (``board.design_settings.rules``), in mm."""
+
+    min_clearance: float | None = None
+    min_track_width: float | None = None
+    min_connection: float | None = None
+    min_via_diameter: float | None = None
+    min_via_annular_width: float | None = None
+    min_through_hole_diameter: float | None = None
+    min_hole_to_hole: float | None = None
+    min_hole_clearance: float | None = None
+    min_copper_edge_clearance: float | None = None
+    min_silk_clearance: float | None = None
+    min_microvia_diameter: float | None = None
+    min_microvia_drill: float | None = None
+    min_text_height: float | None = None
+    min_text_thickness: float | None = None
+    solder_mask_to_copper_clearance: float | None = None
+    allow_blind_buried_vias: bool | None = None
+    allow_microvias: bool | None = None
+
+
+class RuleConstraint(_Model):
+    kind: str = Field(description="e.g. clearance, track_width, hole_size")
+    min: float | None = Field(default=None, description="mm; set only when the source states a unit")
+    opt: float | None = None
+    max: float | None = None
+    raw: str = Field(description="The constraint exactly as written")
+
+
+class CustomRule(_Model):
+    """A custom design rule from ``.kicad_dru``. VIA records it; KiCad's DRC evaluates it."""
+
+    name: str
+    condition: str | None = None
+    layer: str | None = None
+    severity: str | None = None
+    constraints: list[RuleConstraint] = Field(default_factory=list)
 
 
 class DesignConstraints(_Model):
-    """Design rules present *in the board file itself*.
+    """Design rules found in the source.
 
-    Only fields the adapter actually found are set; ``None`` means "not present
-    in this source", never "zero". KiCad 6+ keeps most rules in the separate
-    ``.kicad_pro`` project file, which Stage 1 does not ingest.
+    Only fields actually found are set; ``None`` means "not present in this source",
+    never "zero". KiCad 6+ keeps most rules in the ``.kicad_pro`` project file (and custom
+    rules in ``.kicad_dru``); those are only available when a project archive is imported.
+    ``rules_source`` says where the rules came from: ``board_file`` (board file only, so
+    KiCad's defaults apply to anything else) or ``project_file``.
     """
 
     board_thickness: float | None = None
@@ -270,6 +321,9 @@ class DesignConstraints(_Model):
     solder_mask_min_width: float | None = None
     pad_to_paste_clearance: float | None = None
     net_classes: list[NetClass] = Field(default_factory=list)
+    rules_source: str = Field(default="board_file", description="board_file | project_file (schema 1.1+)")
+    rules: DesignRules | None = None
+    custom_rules: list[CustomRule] = Field(default_factory=list)
 
 
 class NetStat(_Model):
@@ -336,7 +390,9 @@ __all__ = [
     "BoardOutline",
     "BoundingBox",
     "Component",
+    "CustomRule",
     "DesignConstraints",
+    "DesignRules",
     "DesignStats",
     "Drill",
     "Graphic",
@@ -351,6 +407,7 @@ __all__ = [
     "PadType",
     "ParseWarning",
     "Point",
+    "RuleConstraint",
     "Side",
     "SourceInfo",
     "Stackup",

@@ -19,15 +19,33 @@ from via_pcb.adapters import (
     parse_pcb,
 )
 from via_pcb.models import ENGINE_VERSION, SCHEMA_VERSION, PCBDesign
+from via_pcb.project import (
+    ARCHIVE_EXTENSIONS,
+    ArchiveLimits,
+    ProjectArchiveError,
+    ProjectPlan,
+    inspect_project,
+    is_project_archive,
+    parse_project,
+    read_project,
+)
 
 __all__ = [
+    "ARCHIVE_EXTENSIONS",
     "ENGINE_VERSION",
     "SCHEMA_VERSION",
     "AdapterNotFoundError",
+    "ArchiveLimits",
     "PCBAdapter",
     "PCBDesign",
+    "ProjectArchiveError",
+    "ProjectPlan",
     "UnsupportedFormatError",
     "detect_adapter",
     "get_registry",
+    "inspect_project",
+    "is_project_archive",
     "parse_pcb",
+    "parse_project",
+    "read_project",
 ]

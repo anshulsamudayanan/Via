@@ -44,11 +44,13 @@ def _escape_like(term: str) -> str:
 @router.get("/limits", response_model=UploadLimits, responses=error_responses(401))
 def upload_limits(settings: AppSettings, ctx: CurrentAuth) -> UploadLimits:
     """Accepted formats and the maximum upload size (for client-side validation)."""
-    from via_pcb import get_registry
+    from via_pcb import ARCHIVE_EXTENSIONS, get_registry
 
     formats = [
         FormatInfo(id=a.format_id, name=a.display_name, extensions=list(a.extensions)) for a in get_registry().all()
     ]
+    # A .zip of a KiCad project: the board plus its .kicad_pro/.kicad_dru design rules.
+    formats.append(FormatInfo(id="kicad_project", name="KiCad project (.zip)", extensions=list(ARCHIVE_EXTENSIONS)))
     return UploadLimits(max_upload_bytes=settings.max_upload_bytes, formats=formats)
 
 

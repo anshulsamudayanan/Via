@@ -1,16 +1,122 @@
 {
-  "description": "Real KiCad-generated boards used for internal validation. Downloaded by scripts/fetch_real_fixtures.py into tests/engineering/real/ (git-ignored). Not redistributed with VIA.",
+  "description": "Real KiCad-generated boards and project files (.kicad_pro, from KiCad 6 on) used for internal validation. Downloaded by scripts/fetch_real_fixtures.py into tests/engineering/real/ (git-ignored). Not redistributed with VIA.",
   "fixtures": [
-    {"file": "pic_programmer_5.1.12.kicad_pcb", "project": "pic_programmer", "kicad_tag": "5.1.12", "sha256": "4a2eaa7a70ab0fc034cfc9f0e5f593d45de3523db5abfcc76a7937fd514da37e"},
-    {"file": "pic_programmer_6.0.11.kicad_pcb", "project": "pic_programmer", "kicad_tag": "6.0.11", "sha256": "bf3c800bae856020de099d3ddc94535a127af4edef4e4c22d41d8c8eb7f1eb31"},
-    {"file": "pic_programmer_7.0.11.kicad_pcb", "project": "pic_programmer", "kicad_tag": "7.0.11", "sha256": "df9784c2958d417065223538a00376eac69893e6058f580a0d22de0a467b0ef0"},
-    {"file": "pic_programmer_8.0.8.kicad_pcb", "project": "pic_programmer", "kicad_tag": "8.0.8", "sha256": "b9d90e6184a1e4873d50be65da1faefaf7d003638ed16cef8e0212f247e64da7"},
-    {"file": "pic_programmer_9.0.0.kicad_pcb", "project": "pic_programmer", "kicad_tag": "9.0.0", "sha256": "470e9b32954f3c92e1c74c5b4c29934adf28b6fd60f504803942466163da99d9"},
-    {"file": "video_5.1.12.kicad_pcb", "project": "video", "kicad_tag": "5.1.12", "sha256": "029cd0a367b1338dbca474af94fc897f0f7bfe3b4b8d10bcb42c76e14258919d"},
-    {"file": "video_6.0.11.kicad_pcb", "project": "video", "kicad_tag": "6.0.11", "sha256": "a15a9cd10cbff83f635f8ea99db4359a868885effcab71d36b2ae2da6afbb04d"},
-    {"file": "video_7.0.11.kicad_pcb", "project": "video", "kicad_tag": "7.0.11", "sha256": "920dae9959c93f2844fd4cd81944037a46c663b0adab8d65160f22951f1e023e"},
-    {"file": "video_8.0.8.kicad_pcb", "project": "video", "kicad_tag": "8.0.8", "sha256": "d03173570b7209fff80629193bedc85c034dda9c4dcf4eee5616ca43ddbd4c69"},
-    {"file": "video_9.0.0.kicad_pcb", "project": "video", "kicad_tag": "9.0.0", "sha256": "f620675158ddd5c61e5ce9e15f4c92b230ae1df1cbcec6c502b8ce266e4007ea"}
+    {
+      "file": "pic_programmer_5.1.12.kicad_pcb",
+      "project": "pic_programmer",
+      "kicad_tag": "5.1.12",
+      "sha256": "4a2eaa7a70ab0fc034cfc9f0e5f593d45de3523db5abfcc76a7937fd514da37e"
+    },
+    {
+      "file": "pic_programmer_6.0.11.kicad_pcb",
+      "project": "pic_programmer",
+      "kicad_tag": "6.0.11",
+      "sha256": "bf3c800bae856020de099d3ddc94535a127af4edef4e4c22d41d8c8eb7f1eb31"
+    },
+    {
+      "file": "pic_programmer_7.0.11.kicad_pcb",
+      "project": "pic_programmer",
+      "kicad_tag": "7.0.11",
+      "sha256": "df9784c2958d417065223538a00376eac69893e6058f580a0d22de0a467b0ef0"
+    },
+    {
+      "file": "pic_programmer_8.0.8.kicad_pcb",
+      "project": "pic_programmer",
+      "kicad_tag": "8.0.8",
+      "sha256": "b9d90e6184a1e4873d50be65da1faefaf7d003638ed16cef8e0212f247e64da7"
+    },
+    {
+      "file": "pic_programmer_9.0.0.kicad_pcb",
+      "project": "pic_programmer",
+      "kicad_tag": "9.0.0",
+      "sha256": "470e9b32954f3c92e1c74c5b4c29934adf28b6fd60f504803942466163da99d9"
+    },
+    {
+      "file": "video_5.1.12.kicad_pcb",
+      "project": "video",
+      "kicad_tag": "5.1.12",
+      "sha256": "029cd0a367b1338dbca474af94fc897f0f7bfe3b4b8d10bcb42c76e14258919d"
+    },
+    {
+      "file": "video_6.0.11.kicad_pcb",
+      "project": "video",
+      "kicad_tag": "6.0.11",
+      "sha256": "a15a9cd10cbff83f635f8ea99db4359a868885effcab71d36b2ae2da6afbb04d"
+    },
+    {
+      "file": "video_7.0.11.kicad_pcb",
+      "project": "video",
+      "kicad_tag": "7.0.11",
+      "sha256": "920dae9959c93f2844fd4cd81944037a46c663b0adab8d65160f22951f1e023e"
+    },
+    {
+      "file": "video_8.0.8.kicad_pcb",
+      "project": "video",
+      "kicad_tag": "8.0.8",
+      "sha256": "d03173570b7209fff80629193bedc85c034dda9c4dcf4eee5616ca43ddbd4c69"
+    },
+    {
+      "file": "video_9.0.0.kicad_pcb",
+      "project": "video",
+      "kicad_tag": "9.0.0",
+      "sha256": "f620675158ddd5c61e5ce9e15f4c92b230ae1df1cbcec6c502b8ce266e4007ea"
+    },
+    {
+      "file": "pic_programmer_6.0.11.kicad_pro",
+      "project": "pic_programmer",
+      "kicad_tag": "6.0.11",
+      "source_ext": ".kicad_pro",
+      "sha256": "ba4c915eb607b3dd294d0fc330b1b18d336967c6dfafcc92c9d76705557f57b6"
+    },
+    {
+      "file": "pic_programmer_7.0.11.kicad_pro",
+      "project": "pic_programmer",
+      "kicad_tag": "7.0.11",
+      "source_ext": ".kicad_pro",
+      "sha256": "680ec6ccd3795496b1fc3956132b94e6bb6e3de1fe031971cacb6afe3063a599"
+    },
+    {
+      "file": "pic_programmer_8.0.8.kicad_pro",
+      "project": "pic_programmer",
+      "kicad_tag": "8.0.8",
+      "source_ext": ".kicad_pro",
+      "sha256": "37376c8d32af16c2f2af06e40af6695bccc67c139a1e82c316446370c9c2709b"
+    },
+    {
+      "file": "pic_programmer_9.0.0.kicad_pro",
+      "project": "pic_programmer",
+      "kicad_tag": "9.0.0",
+      "source_ext": ".kicad_pro",
+      "sha256": "f7cd36e256cedfc0b63cce200783f241c19aa2cbbcbeb1b6b3286c89e11138a1"
+    },
+    {
+      "file": "video_6.0.11.kicad_pro",
+      "project": "video",
+      "kicad_tag": "6.0.11",
+      "source_ext": ".kicad_pro",
+      "sha256": "a3996bc13976bd0df39348681029b01e2d461a4cca3a27297cbe248261c3dba6"
+    },
+    {
+      "file": "video_7.0.11.kicad_pro",
+      "project": "video",
+      "kicad_tag": "7.0.11",
+      "source_ext": ".kicad_pro",
+      "sha256": "81e917f49d6b43cb96c5f3abaa5c75e891622f7288efe2c611aee50f4c00829c"
+    },
+    {
+      "file": "video_8.0.8.kicad_pro",
+      "project": "video",
+      "kicad_tag": "8.0.8",
+      "source_ext": ".kicad_pro",
+      "sha256": "6c1758216f9006d17faba5a046ba56a5c20ecfe3b6d29a48b736a231f36e5ecf"
+    },
+    {
+      "file": "video_9.0.0.kicad_pro",
+      "project": "video",
+      "kicad_tag": "9.0.0",
+      "source_ext": ".kicad_pro",
+      "sha256": "bf1334e9a914a6f633f7e546394eb3134e3e4d38756f4fa8cce70ab912e7f15a"
+    }
   ],
   "source": "https://gitlab.com/kicad/code/kicad (demos/<project>/<project>.kicad_pcb at the given tag)",
   "license": "CC BY-SA 4.0 (KiCad LICENSE.README: 'All the demo files provided in demos/*')"

@@ -2,14 +2,20 @@
 
 import pytest
 
-from via_pcb import AdapterNotFoundError, UnsupportedFormatError, parse_pcb
+from via_pcb import AdapterNotFoundError, ProjectArchiveError, UnsupportedFormatError, parse_pcb
 from via_pcb.adapters import KiCadAdapter, get_registry
 
 MINIMAL = b'(kicad_pcb (version 20240108) (generator "pcbnew") (layers (0 "F.Cu" signal) (31 "B.Cu" signal)))'
 
 
 def test_unknown_format_is_rejected_with_supported_list():
+    # (.zip was the example here until Stage 2 made KiCad project archives a supported input.)
     with pytest.raises(AdapterNotFoundError, match=r"\.kicad_pcb"):
+        parse_pcb(b"\xd0\xcf\x11\xe0 an Altium binary", filename="board.PcbDoc")
+
+
+def test_corrupt_project_archive_is_rejected():
+    with pytest.raises(ProjectArchiveError, match="valid"):
         parse_pcb(b"PK\x03\x04 not a board", filename="board.zip")
 
 

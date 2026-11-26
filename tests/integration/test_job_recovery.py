@@ -317,3 +317,25 @@ def _redis(settings: Settings):
     from redis import Redis
 
     return Redis.from_url(settings.redis_url)
+
+
+def test_abandoned_job_reported_by_rq_is_retried_then_failed(client, db, uploaded, job_queue, settings, monkeypatch):
+    """RQ's registry cleanup reports a job whose worker died as AbandonedJobError (seen in the audit)."""
+    from rq.exceptions import AbandonedJobError
+
+    monkeypatch.setattr(jobs, "_session", lambda _s: (db, SimpleNamespace(dispose=lambda: None)))
+    monkeypatch.setattr(jobs, "get_settings", lambda: settings)
+    monkeypatch.setattr(jobs, "RQJobQueue", lambda _conn, _settings: job_queue)
+    monkeypatch.setattr(db, "close", lambda: None)
+    for attempt in range(1, settings.job_max_attempts):
+        crash_mid_job(db, uploaded, attempt=attempt, seconds_ago=1)
+        job = SimpleNamespace(id=jobs.import_job_id(uploaded, attempt), args=[str(uploaded), attempt])
+        jobs.on_import_failure(job, None, AbandonedJobError, AbandonedJobError(), None)
+        assert status(client, uploaded)["status"] == "pending"
+        assert job_queue.attempts[-1] == attempt + 1
+    last = settings.job_max_attempts
+    crash_mid_job(db, uploaded, attempt=last, seconds_ago=1)
+    job = SimpleNamespace(id=jobs.import_job_id(uploaded, last), args=[str(uploaded), last])
+    jobs.on_import_failure(job, None, AbandonedJobError, AbandonedJobError(), None)
+    rev = status(client, uploaded)
+    assert (rev["status"], rev["error_code"]) == ("failed", "worker_lost")

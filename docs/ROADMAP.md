@@ -54,7 +54,55 @@ and tests passing before it's marked done.
 - Docs: PRD acceptance criteria mapped to the tests that verify them; README, ARCHITECTURE, SECURITY, API_SPEC updated.
 - *Found:* `X-Forwarded-For` sent by a browser passes through Next.js unchanged (Next only sets it when absent), so with the API trusting the web container a client could choose the IP used for per-IP rate limits. Safe only behind a reverse proxy that overwrites the header; documented as a deployment requirement in SECURITY.md and README. Per-account and per-user limits are unaffected.
 
-## Later stages (not in Stage 1)
+## Stage 2: PCB Intelligence & Optimization (current)
+
+Audit and plan: [STAGE_2_AUDIT.md](STAGE_2_AUDIT.md). Each milestone is a checkpoint approved by the project owner.
+
+Decisions (owner, 2026-11-26):
+- KiCad 9 (official image, GPL-3, separate optional service) is approved for DRC and validation.
+- Export patches the original file in place.
+- Projects are imported as `.zip`.
+- No named manufacturer profiles: VIA defaults plus user-defined profiles.
+- No AI key: the provider stays disabled, and tests use a fake provider.
+- Optimization scope as proposed in the audit (§8.6), pending explicit confirmation.
+
+| M | Deliverable | Status |
+|---|---|---|
+| 1 | Audit fixes and PCB model 1.1 | ✅ done (pending review) |
+| 2 | Findings and analysis framework | ⏳ next, after M1 review |
+| 3 | Deterministic analysis and KiCad DRC | — |
+| 4 | Engineering intelligence and component context | — |
+| 5 | Optimization framework | — |
+| 6 | Change management, comparison and export | — |
+| 7 | Viewer and workspace UI | — |
+| 8 | Testing, performance and documentation | — |
+
+### M1: Audit fixes and PCB model 1.1 ✅
+- **Job recovery (audit D1, a real Stage 1 bug):**
+  - heartbeats on running imports;
+  - a reaper in the worker's maintenance loop that re-queues stale or lost work as a new attempt, up to 3 attempts, then fails it with `worker_lost`;
+  - RQ abandoned-job reports handled the same way, with superseded callbacks ignored;
+  - migration `0003`;
+  - tested by SIGKILLing a real worker process tree mid-parse.
+  - It also recovered (failed visibly) the revision stranded during the audit.
+- **PCB model 1.1.0 (additive):**
+  - stable `id` and source `uuid` on components, pads, tracks, vias and zones;
+  - `locked` on footprints, tracks and vias;
+  - stackup;
+  - keep-out rules;
+  - zone priority, clearance and minimum thickness;
+  - pad margins, roundrect ratio and zone connection.
+  - Verified on a new hand-authored KiCad 9 fixture and against independent counts on the ten real boards.
+- **KiCad project `.zip` import:**
+  - safe archive handling;
+  - `.kicad_pro` rules and net classes (KiCad 6 lists, 7+ patterns, 8 assignments);
+  - `.kicad_dru` custom rules (recorded, not evaluated);
+  - `constraints.rules_source`.
+  - Real KiCad 6–9 projects are pinned in the fixture manifest.
+  - Web: the upload accepts `.zip`, and the design page shows where its rules came from.
+- *Tests changed because behaviour changed:* two tests used `.zip` as their example of an unsupported format, and now use Altium `.PcbDoc`; hard-coded engine and schema versions now come from the constants.
+
+## Later stages
 - **VIA Intelligence** — AI review grounded in parsed design data.
 - **VIA Optimize** — DRC-style checks, routing/placement suggestions.
 - **VIA Learn** — opt-in, privacy-first collective knowledge (consent records already modelled in Stage 1).

@@ -31,7 +31,7 @@ def detect_adapter(filename: str | None, head: bytes) -> PCBAdapter:
 
 
 def parse_pcb(source: bytes | str | Path, filename: str | None = None) -> PCBDesign:
-    """Detect the format of ``source`` and parse it.
+    """Detect the format of ``source`` and parse it (a board file, or a KiCad project ``.zip``).
 
     ``source`` may be raw bytes or a filesystem path.
     """
@@ -41,6 +41,10 @@ def parse_pcb(source: bytes | str | Path, filename: str | None = None) -> PCBDes
         filename = filename or path.name
     else:
         data = source
+    from via_pcb.project import is_project_archive, parse_project  # local: project imports adapters
+
+    if is_project_archive(filename, data[:8]):
+        return parse_project(data, filename=filename)
     adapter = detect_adapter(filename, data)
     return adapter.parse(data, filename=filename)
 

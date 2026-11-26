@@ -16,6 +16,9 @@ queued jobs (it runs without persistence in Compose), the database would say
   marks the revision failed with ``worker_lost``;
 * each attempt has its own job id, and callbacks from superseded attempts are ignored.
 
+RQ's own registry cleanup reports jobs whose worker died as ``AbandonedJobError``;
+the failure callback treats that like a stale heartbeat (retry, then ``worker_lost``).
+
 Imports are idempotent (``process_revision`` replaces earlier rows), so a retry after a
 partially completed attempt is safe.
 """
@@ -31,7 +34,7 @@ from typing import Any, Protocol
 
 from redis import Redis
 from rq import Callback, Queue, Worker
-from rq.exceptions import NoSuchJobError
+from rq.exceptions import AbandonedJobError, NoSuchJobError
 from rq.job import Job, JobStatus
 from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.orm import Session
@@ -96,6 +99,8 @@ def sandbox_limits(settings: Settings) -> SandboxLimits:
     return SandboxLimits(
         timeout_seconds=settings.parser_timeout_seconds,
         memory_bytes=settings.parser_memory_limit_mb * 1024 * 1024,
+        # A board inside a project archive may be as large as a directly uploaded one.
+        max_archive_board_bytes=settings.max_upload_bytes,
     )
 
 
@@ -182,6 +187,11 @@ def on_import_failure(job: Any, connection: Any, type: Any, value: Any, tracebac
         job_id = getattr(job, "id", None)
         if run.job_id and job_id and run.job_id != job_id:
             logger.info("Ignoring failure of superseded job %s (current: %s)", job_id, run.job_id)
+            return
+        if type is AbandonedJobError:
+            # RQ found the job's worker dead (its registry cleanup): same as a stale heartbeat.
+            logger.warning("Import job %s for %s was abandoned by its worker", job_id, revision.id)
+            _retry_or_fail(db, RQJobQueue(connection, settings), revision, run, settings, ReapReport())
             return
         logger.error("Import job for %s failed: %s", revision.id, type.__name__ if type else "unknown")
         mark_failed(db, revision, "processing_failed", "Processing stopped unexpectedly. Try uploading the file again.")

@@ -28,7 +28,17 @@ from via_api.services import access, activity
 from via_api.services.activity import ClientInfo
 from via_api.services.auth import AuthContext
 from via_api.storage import StorageBackend, StorageError, revision_object_key
-from via_pcb import AdapterNotFoundError, detect_adapter, get_registry
+from via_pcb import (
+    ARCHIVE_EXTENSIONS,
+    AdapterNotFoundError,
+    ArchiveLimits,
+    ProjectArchiveError,
+    detect_adapter,
+    get_registry,
+    inspect_project,
+    is_project_archive,
+)
+from via_pcb.adapters import KiCadAdapter
 
 logger = logging.getLogger("via_api.designs")
 
@@ -271,10 +281,34 @@ def import_upload(
             reason="empty",
             error=APIError(422, "empty_file", "The file is empty."),
         )
-    try:
-        adapter = detect_adapter(fname, head)
-    except AdapterNotFoundError:
-        exts = ", ".join(sorted(get_registry().extensions))
+    source_format: str
+    if is_project_archive(fname, head):
+        # A KiCad project archive: validate it and choose its board from the central directory
+        # (nothing is decompressed here); the sandboxed parser reads it again in full.
+        try:
+            stream.seek(0)
+            inspect_project(stream, ArchiveLimits(max_board_bytes=max_bytes))
+        except ProjectArchiveError as exc:
+            raise _reject(
+                db,
+                ctx,
+                project,
+                client,
+                filename=fname,
+                size=size,
+                sha256=sha256,
+                outcome=UploadOutcome.REJECTED,
+                reason="invalid_archive",
+                error=APIError(422, "invalid_project_archive", str(exc)),
+            ) from None
+        source_format = KiCadAdapter.format_id
+    else:
+        try:
+            source_format = detect_adapter(fname, head).format_id
+        except AdapterNotFoundError:
+            source_format = ""
+    if not source_format:
+        exts = ", ".join(sorted(get_registry().extensions | set(ARCHIVE_EXTENSIONS)))
         raise _reject(
             db,
             ctx,
@@ -288,7 +322,7 @@ def import_upload(
             error=APIError(
                 415, "unsupported_file_type", f"This isn't a supported PCB file. Supported formats: {exts}."
             ),
-        ) from None
+        )
 
     existing = db.execute(
         select(DesignRevision, Design)
@@ -339,7 +373,7 @@ def import_upload(
         project_id=project.id,
         revision_number=number,
         status=RevisionStatus.PENDING,
-        source_format=adapter.format_id,
+        source_format=source_format,
         source_sha256=sha256,
         created_by_id=ctx.user.id,
     )

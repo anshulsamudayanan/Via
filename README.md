@@ -4,11 +4,11 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 1 complete (Checkpoint 6 of 6, pending review).** Accounts, projects,
-> sharing, the PCB pipeline and an interactive board viewer work end to end, covered by
-> unit, integration, security and browser tests. The AI foundation is in place but
-> disabled by default; no feature calls a model yet.
-> See [docs/ROADMAP.md](docs/ROADMAP.md). This README only describes what works today.
+> **Status: Stage 2 in progress (Milestone 1 of 8, pending review).** Stage 1 is complete:
+> accounts, projects, sharing, the PCB pipeline and an interactive board viewer, covered by unit,
+> integration, security and browser tests. Stage 2 so far adds KiCad project (`.zip`) import with
+> design rules, schema 1.1 (stable object ids, stackup, locks) and job recovery after worker crashes.
+> See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md).
 
 ## What works today
 
@@ -21,7 +21,7 @@ model, then exploring them in a secure, project-based workspace.
   rate limits, audit log.
 - **Projects:** create, rename, describe, archive/restore, delete, search and filter;
   private by default; share with other users as editor or viewer.
-- **PCB upload:** drag and drop a `.kicad_pcb` file (up to 50 MB). It's validated
+- **PCB upload:** drag and drop a KiCad project `.zip` (board + `.kicad_pro`/`.kicad_dru`, so its design rules and net classes come along) or a bare `.kicad_pcb` file (up to 50 MB). It's validated
   (type, size, duplicate by SHA-256), stored in object storage and parsed in the
   background by a worker in a credential-free, resource-limited sandbox.
 - **Design pages:** board dimensions, layers, counts, source metadata, parser warnings,

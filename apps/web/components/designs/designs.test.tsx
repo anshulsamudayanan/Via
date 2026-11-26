@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { design, mockClient, navigation, page, project, renderWith, revision } from "@/test/helpers";
 
-import { DesignView } from "./design-view";
+import { DesignView, designRulesLabel } from "./design-view";
 import { DesignsSection } from "./project-sections";
 import { UploadPanel, validateFile } from "./upload-panel";
 
@@ -20,6 +20,23 @@ describe("validateFile", () => {
     expect(validateFile(file("board.brd", 10), limits)).toMatch(/Unsupported file type/);
     expect(validateFile(file("board.kicad_pcb", 0), limits)).toBe("The file is empty.");
     expect(validateFile(file("board.kicad_pcb", 2048), limits)).toMatch(/limit is 1.0 KB/);
+  });
+});
+
+describe("project archives", () => {
+  it("accepts a .zip when the API lists KiCad projects", () => {
+    const withZip = { ...limits, formats: [...limits.formats, { id: "kicad_project", name: "KiCad project (.zip)", extensions: [".zip"] }] };
+    expect(validateFile(file("video.zip", 10), withZip)).toBeNull();
+    expect(validateFile(file("video.zip", 10), limits)).toMatch(/Unsupported file type/);
+  });
+
+  it("labels where the design rules came from", () => {
+    const base = { constraints: {} } as unknown as BoardSummary;
+    expect(designRulesLabel(base)).toBe("Board file only (upload the project .zip for its rules)");
+    const fromProject = {
+      constraints: { rules_source: "project_file", net_classes: [{ name: "Default" }, { name: "pwr" }], custom_rules: [{ name: "hv" }] },
+    } as unknown as BoardSummary;
+    expect(designRulesLabel(fromProject)).toBe("Project file · 2 net classes · 1 custom rule");
   });
 });
 

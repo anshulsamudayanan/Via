@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from tests.integration.conftest import register
 from via_api.models import ActivityLog, DesignFile, PCBComponent, UploadRecord
-from via_pcb import PCBDesign
+from via_pcb import ENGINE_VERSION, SCHEMA_VERSION, PCBDesign
 
 FIXTURES = Path(__file__).resolve().parents[1] / "engineering" / "fixtures"
 REF = (FIXTURES / "via_reference_v8.kicad_pcb").read_bytes()
@@ -51,7 +51,7 @@ def test_upload_parses_and_exposes_board_data(client, project, db, settings):
 
     rev = client.get(f"/api/v1/revisions/{revision['id']}").json()
     assert rev["status"] == "ready"
-    assert rev["parser_version"] == "0.1.0" and rev["schema_version"] == "1.0.0"
+    assert rev["parser_version"] == ENGINE_VERSION and rev["schema_version"] == SCHEMA_VERSION == "1.1.0"
     assert rev["imported_at"] is not None
     assert rev["warnings"] == []
     assert rev["object_counts"]["component_count"] == 4
@@ -268,7 +268,10 @@ def test_project_design_count_and_activity(client, project):
 def test_upload_limits_endpoint(client, project, settings):
     limits = client.get("/api/v1/pcb/limits").json()
     assert limits["max_upload_bytes"] == settings.max_upload_bytes
-    assert limits["formats"] == [{"id": "kicad", "name": "KiCad PCB", "extensions": [".kicad_pcb"]}]
+    assert limits["formats"] == [
+        {"id": "kicad", "name": "KiCad PCB", "extensions": [".kicad_pcb"]},
+        {"id": "kicad_project", "name": "KiCad project (.zip)", "extensions": [".zip"]},
+    ]
 
 
 def test_integrity_check_rejects_tampered_storage(client, project, settings, job_queue):

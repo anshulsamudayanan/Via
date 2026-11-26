@@ -136,7 +136,7 @@ export function UploadPanel({ projectId, designId, onUploaded, onSettled }: Prop
         >
           <UploadCloud className="size-6 text-subtle" aria-hidden="true" />
           <p className="text-sm">
-            {designId ? "Drop a new revision here" : "Drop a KiCad board file here"}, or{" "}
+            {designId ? "Drop a new revision here" : "Drop a KiCad project (.zip) or board file here"}, or{" "}
             <button
               type="button"
               className="text-accent hover:underline disabled:opacity-50"

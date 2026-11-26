@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download the pinned real KiCad boards listed in tests/engineering/real_fixtures.json.
+"""Download the pinned real KiCad boards (and their project files) listed in tests/engineering/real_fixtures.json.
 
 The files are CC BY-SA 4.0 (KiCad demo projects). They are used only for internal
 validation, stored in the git-ignored tests/engineering/real/ folder and never committed.
@@ -32,7 +32,8 @@ def main() -> int:
         if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == fx["sha256"]:
             print(f"ok      {fx['file']}")
             continue
-        path = urllib.parse.quote(f"demos/{fx['project']}/{fx['project']}.kicad_pcb", safe="")
+        ext = fx.get("source_ext", ".kicad_pcb")
+        path = urllib.parse.quote(f"demos/{fx['project']}/{fx['project']}{ext}", safe="")
         url = API.format(path=path, ref=urllib.parse.quote(fx["kicad_tag"]))
         with urllib.request.urlopen(url, timeout=60) as resp:  # noqa: S310 - fixed https URL
             data = resp.read()

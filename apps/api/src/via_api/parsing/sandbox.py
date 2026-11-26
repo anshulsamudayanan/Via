@@ -51,6 +51,8 @@ class SandboxLimits:
     timeout_seconds: int = 60
     memory_bytes: int = 1024 * 1024 * 1024
     max_open_files: int = 64
+    #: Largest board accepted inside a project archive (uncompressed); None = engine default.
+    max_archive_board_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -86,11 +88,13 @@ def _safe_filename(filename: str | None) -> str | None:
     return re.sub(r"[^\w.\- ]", "_", base)[:200] or None
 
 
-def parser_command(filename: str | None) -> list[str]:
+def parser_command(filename: str | None, max_archive_board_bytes: int | None = None) -> list[str]:
     cmd = [sys.executable, "-I", "-B", "-m", "via_pcb.cli"]
     safe = _safe_filename(filename)
     if safe:
         cmd += ["--filename", safe]
+    if max_archive_board_bytes:
+        cmd += ["--max-board-bytes", str(int(max_archive_board_bytes))]
     return cmd
 
 
@@ -102,7 +106,7 @@ def run_parser(
     command: Sequence[str] | None = None,
 ) -> ParseOutcome:
     """Parse ``data`` in the sandbox. ``command`` is overridable for tests only."""
-    cmd = list(command) if command is not None else parser_command(filename)
+    cmd = list(command) if command is not None else parser_command(filename, limits.max_archive_board_bytes)
     env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONHASHSEED": "0"}
     start = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="via-parse-") as workdir:

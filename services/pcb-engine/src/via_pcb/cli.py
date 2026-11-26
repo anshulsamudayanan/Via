@@ -22,6 +22,7 @@ import json
 import sys
 
 from via_pcb.adapters import AdapterNotFoundError, UnsupportedFormatError, parse_pcb
+from via_pcb.project import ArchiveLimits, ProjectArchiveError, is_project_archive, parse_project
 
 #: Hard ceiling on input read from stdin (the API enforces its own, lower limit).
 MAX_INPUT_BYTES = 512 * 1024 * 1024
@@ -36,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="via_pcb.cli", description=__doc__.splitlines()[0])
     parser.add_argument("--filename", default=None, help="original file name (used for format detection)")
     parser.add_argument("--summary", action="store_true", help="print only source info, stats and warnings")
+    parser.add_argument(
+        "--max-board-bytes", type=int, default=None, help="largest board allowed inside a project archive"
+    )
     args = parser.parse_args(argv)
 
     data = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
@@ -43,7 +47,14 @@ def main(argv: list[str] | None = None) -> int:
         _emit({"ok": False, "error": {"code": "file_too_large", "message": "Input exceeds the parser limit."}})
         return 0
     try:
-        design = parse_pcb(data, filename=args.filename)
+        if is_project_archive(args.filename, data[:8]):
+            limits = ArchiveLimits(max_board_bytes=args.max_board_bytes) if args.max_board_bytes else None
+            design = parse_project(data, filename=args.filename, limits=limits)
+        else:
+            design = parse_pcb(data, filename=args.filename)
+    except ProjectArchiveError as exc:
+        _emit({"ok": False, "error": {"code": "invalid_archive", "message": str(exc)}})
+        return 0
     except AdapterNotFoundError as exc:
         _emit({"ok": False, "error": {"code": "unsupported_format", "message": str(exc)}})
         return 0
