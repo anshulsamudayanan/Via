@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from via_pcb.adapters.kicad import KiCadAdapter
+from via_pcb.models import PCBDesign
 from via_pcb.parser import SExpr, SpannedSExpr, parse_sexpr
 from via_pcb.project import is_project_archive, read_project, select_project
 
@@ -54,9 +55,9 @@ class _Index:
     version: int | None
 
 
-def _index(text: str, root: SExpr) -> _Index:
+def _index(text: str, root: SExpr, design: PCBDesign | None = None) -> _Index:
     """Map VIA's stable ids to source nodes (the adapter assigns ids in file order)."""
-    design = KiCadAdapter().parse(text.encode(), filename="board.kicad_pcb")
+    design = design or KiCadAdapter().parse(text.encode(), filename="board.kicad_pcb")
     fps = [n for n in root.children() if n.name in {"footprint", "module"}]
     trk = [
         n
@@ -233,10 +234,23 @@ def _sub_points(
     return out
 
 
-def patch_board(data: bytes, changes: list[dict[str, Any]]) -> PatchResult:
+def parse_with_spans(data: bytes) -> tuple[str, SExpr, PCBDesign]:
+    """One parse of ``data`` giving the text, the spanned tree and VIA's design built from that tree."""
     text = data.decode("utf-8")
     root = parse_sexpr(text, spans=True)
-    idx = _index(text, root)
+    return text, root, KiCadAdapter().from_tree(root, data, "board.kicad_pcb")
+
+
+def patch_board(
+    data: bytes,
+    changes: list[dict[str, Any]],
+    design: PCBDesign | None = None,
+    parsed: tuple[str, SExpr] | None = None,
+) -> PatchResult:
+    """``design`` and ``parsed`` (text, spanned tree) are VIA's parse of exactly ``data`` when the
+    caller already has them; passing them avoids parsing a large board again."""
+    text, root = parsed if parsed is not None else (data.decode("utf-8"), parse_sexpr(data.decode("utf-8"), spans=True))
+    idx = _index(text, root, design)
     edits: list[tuple[int, int, str]] = []
     result = PatchResult(data=b"")
     for i, change in enumerate(changes):

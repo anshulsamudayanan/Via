@@ -133,6 +133,8 @@ def start_analysis(
     # Snapshot the exact profile values: later edits to the profile don't change this run's meaning.
     run_options["manufacturing_profile"] = resolve_profile(db, project.id, (options or {}).get("profile"))
     config = normalize_config(checks, run_options)
+    # Serialize starts on this revision so identical concurrent requests share one run.
+    db.execute(select(DesignRevision.id).where(DesignRevision.id == revision.id).with_for_update())
     existing = db.scalar(
         select(AnalysisRun)
         .where(

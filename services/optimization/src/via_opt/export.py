@@ -8,13 +8,14 @@ out a file it hasn't verified.
 
 from __future__ import annotations
 
+import gc
 import math
 from dataclasses import dataclass, field
 
 from via_opt.changes import Change, apply
 from via_pcb.adapters.kicad import KiCadAdapter
 from via_pcb.models import PCBDesign
-from via_pcb.patch import board_of, patch_board, replace_board_member
+from via_pcb.patch import board_of, parse_with_spans, patch_board, replace_board_member
 
 TOL = 1e-4  # mm: patched numbers are written with 6 decimals
 
@@ -95,11 +96,15 @@ def compare(expected: PCBDesign, actual: PCBDesign) -> list[str]:
 def export_changes(data: bytes, filename: str | None, changes: list[Change]) -> ExportResult:
     """Patch ``data`` (a board or project archive) with ``changes`` and verify the result."""
     board, member = board_of(data, filename)
-    adapter = KiCadAdapter()
-    original = adapter.parse(board, filename="board.kicad_pcb")
-    patched = patch_board(board, [c.model_dump(mode="json") for c in changes])
-    expected = apply(original, [changes[i] for i in patched.applied])
-    actual = adapter.parse(patched.data, filename="board.kicad_pcb")
+    # Large boards: parse once (tree shared by the patcher and the adapter), apply the expected
+    # changes in place, and drop the tree before re-parsing the result, so at most one tree and
+    # two designs are alive at a time.
+    text, root, original = parse_with_spans(board)
+    patched = patch_board(board, [c.model_dump(mode="json") for c in changes], design=original, parsed=(text, root))
+    del text, root
+    gc.collect()
+    expected = apply(original, [changes[i] for i in patched.applied], copy=False)
+    actual = KiCadAdapter().parse(patched.data, filename="board.kicad_pcb")
     problems = compare(expected, actual)
     if problems:
         raise ExportVerificationError(problems)

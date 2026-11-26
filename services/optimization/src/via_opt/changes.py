@@ -62,9 +62,12 @@ class UnsupportedChange(ValueError):
     """The change can't be applied to the normalized model automatically."""
 
 
-def apply(design: PCBDesign, changes: list[Change]) -> PCBDesign:
-    """A copy of ``design`` with ``changes`` applied (moves carry pads and graphics along)."""
-    out = design.model_copy(deep=True)
+def apply(design: PCBDesign, changes: list[Change], *, copy: bool = True) -> PCBDesign:
+    """A copy of ``design`` with ``changes`` applied (moves carry pads and graphics along).
+
+    ``copy=False`` changes ``design`` itself (for callers that no longer need the original, e.g.
+    export verification on very large boards)."""
+    out = design.model_copy(deep=True) if copy else design
     comps = {c.id: c for c in out.components if c.id}
     tracks = {t.id: t for t in out.tracks if t.id}
     vias = {v.id: v for v in out.vias if v.id}

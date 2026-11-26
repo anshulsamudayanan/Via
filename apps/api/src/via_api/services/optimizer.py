@@ -58,6 +58,8 @@ def start(
         "constraints": constraints.model_dump(),
         "options": run_options,
     }
+    # Serialize starts on this revision so identical concurrent requests share one run.
+    db.execute(select(DesignRevision.id).where(DesignRevision.id == revision.id).with_for_update())
     existing = db.scalar(select(AnalysisRun).where(AnalysisRun.revision_id == revision.id, AnalysisRun.kind == AnalysisKind.PCB_OPTIMIZATION,
                                                    AnalysisRun.status.in_(_ACTIVE)).order_by(AnalysisRun.created_at.desc()))  # fmt: skip
     if existing is not None and existing.config == config:

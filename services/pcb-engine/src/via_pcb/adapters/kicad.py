@@ -257,6 +257,10 @@ class KiCadAdapter(PCBAdapter):
             root = parse_sexpr(text)
         except SExprParseError as exc:
             raise UnsupportedFormatError(f"Malformed KiCad file: {exc}") from exc
+        return self.from_tree(root, data, filename)
+
+    def from_tree(self, root: SExpr, data: bytes, filename: str | None = None) -> PCBDesign:
+        """Build the design from an already parsed tree of ``data`` (lets the patcher parse only once)."""
         if root.name != "kicad_pcb":
             raise UnsupportedFormatError("Not a KiCad PCB file: top-level node is not 'kicad_pcb'")
 

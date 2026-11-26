@@ -203,3 +203,20 @@ def test_export_refuses_a_base_that_stopped_being_current(live, settings):
                                   SandboxLimits(timeout_seconds=60, memory_bytes=1024**3), import_revision=lambda rid: None)  # fmt: skip
     got = live.client.get(f"/api/v1/change-sets/{cs['id']}").json()
     assert got["status"] == "failed" and got["error_code"] == "base_not_current"
+
+
+def test_identical_concurrent_analysis_requests_share_one_run(live):
+    from via_api.services.analysis import start_analysis
+
+    def start(i: int):
+        with live.factory() as s:
+            ctx = AuthContext(user=s.get(User, live.user_id), session=None)
+            run, created = start_analysis(s, ctx, live.design_id, None, ["board_outline"], ClientInfo())
+            time.sleep(0.2)
+            s.commit()
+            return run.id, created
+
+    results = race(4, start)
+    assert not [r for r in results if isinstance(r, Exception)], results
+    assert len({r[0] for r in results}) == 1, results  # one run
+    assert sum(1 for r in results if r[1]) == 1  # created once, reused three times
