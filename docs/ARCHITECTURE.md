@@ -183,7 +183,14 @@ How a DRC request flows:
 3. The service returns KiCad's JSON report.
 4. The `kicad_drc` check maps the report to findings.
 
-The service is optional: without it, KiCad DRC is skipped with the reason. Milestone 6 reuses it to validate exported changes.
+The service is optional: without it, KiCad DRC is skipped with the reason. Milestone 6 reuses it through the follow-up analysis on an exported revision. That analysis repeats the base revision's configuration, including KiCad DRC when it ran, so DRC results can be compared before and after.
+
+## 5d. Request flow: applying a change set (Stage 2, Milestone 6)
+
+1. `POST /change-sets/{id}/apply` creates a `pcb_export` run, a row in `analysis_runs` that shares the heartbeat, reaper and retries. The worker then picks it up.
+2. The worker sends the original upload and the changes to `python -I -m via_opt.cli`, which runs in the parser sandbox. The sandbox patches only the target nodes' text, re-parses the result and compares it with `apply()`.
+3. The verified file is stored as a new revision (`parent_revision_id` = base) and imported through the normal pipeline. That revision becomes current, and the base's last analysis is queued again on it.
+4. Rollback only moves `designs.current_revision_id` back to the base. See docs/CHANGE_MANAGEMENT.md.
 
 ## 6. Technical risks
 

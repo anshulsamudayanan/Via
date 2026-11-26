@@ -46,6 +46,22 @@ class AnalysisKind(StrEnum):
     PCB_ANALYSIS = "pcb_analysis"
     #: Stage 2: generate and validate optimization candidates.
     PCB_OPTIMIZATION = "pcb_optimization"
+    #: Stage 2: patch the original file with a change set and import the result as a new revision.
+    PCB_EXPORT = "pcb_export"
+
+
+class ChangeSetStatus(StrEnum):
+    DRAFT = "draft"
+    APPLYING = "applying"
+    APPLIED = "applied"
+    FAILED = "failed"
+    ROLLED_BACK = "rolled_back"
+
+
+class ChangeStatus(StrEnum):
+    PROPOSED = "proposed"
+    APPLIED = "applied"
+    REFUSED = "refused"
 
 
 class FindingStatus(StrEnum):

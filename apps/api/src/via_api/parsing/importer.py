@@ -180,6 +180,9 @@ def process_revision(
         logger.info("Revision %s no longer exists; skipping", revision_id)
         return None
     run = import_run(db, revision)
+    # Re-importing an already parsed revision (e.g. after a parser upgrade) must not change which
+    # revision is current: that is the user's choice (uploads, change sets, rollbacks).
+    first_import = revision.imported_at is None
     revision.status = RevisionStatus.PROCESSING
     revision.error_code = revision.error_message = None
     run.status = AnalysisStatus.RUNNING
@@ -262,7 +265,7 @@ def process_revision(
     parent = db.get(Design, revision.design_id)
     if parent is not None:
         current = db.get(DesignRevision, parent.current_revision_id) if parent.current_revision_id else None
-        if current is None or current.revision_number <= revision.revision_number:
+        if current is None or (first_import and current.revision_number <= revision.revision_number):
             parent.current_revision_id = revision.id
         parent.updated_at = now
     activity.record(

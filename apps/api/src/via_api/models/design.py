@@ -68,6 +68,8 @@ class DesignRevision(UUIDPk, Timestamps, Base):
     #: constraints, geometry summary) so summaries don't need the full JSON.
     summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    #: Lineage: the revision this one was derived from by applying a change set (None for uploads).
+    parent_revision_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("design_revisions.id", ondelete="SET NULL"))
 
     design: Mapped[Design] = relationship(back_populates="revisions", foreign_keys=[design_id])
     files: Mapped[list[DesignFile]] = relationship(back_populates="revision", cascade="all, delete-orphan")

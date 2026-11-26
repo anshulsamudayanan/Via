@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -27,7 +28,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from via_api.models.base import Base, CreatedAt, Timestamps, UUIDPk, str_enum
-from via_api.models.enums import FindingStatus
+from via_api.models.enums import ChangeSetStatus, ChangeStatus, FindingStatus
 from via_pcb.analysis import Category, Severity, Source, Verification
 
 
@@ -220,15 +221,67 @@ class OptimizationCandidate(UUIDPk, Timestamps, Base):
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
 
 
+class ChangeSet(UUIDPk, Timestamps, Base):
+    """Changes the user chose to apply to one base revision, and what happened when they did.
+
+    Applying patches the original file (``via_pcb.patch``), verifies it and imports it as a new
+    revision whose ``parent_revision_id`` is the base. Rolling back makes the base current again;
+    nothing is deleted, so the history stays complete.
+    """
+
+    __tablename__ = "change_sets"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"), index=True)
+    base_revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))
+    result_revision_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("design_revisions.id", ondelete="SET NULL"))
+    export_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("analysis_runs.id", ondelete="SET NULL"))
+    title: Mapped[str] = mapped_column(String(200))
+    status: Mapped[ChangeSetStatus] = mapped_column(
+        str_enum(ChangeSetStatus, "change_set_status"),
+        default=ChangeSetStatus.DRAFT,
+        server_default=ChangeSetStatus.DRAFT.value,
+    )
+    #: {applied: [...], refused: [{change_id, reason}], board_member, sha256, size_bytes}
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    applied_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rolled_back_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class DesignChange(UUIDPk, Timestamps, Base):
-    """One explicit change (move, rotate, width, via, outline...). Milestone 6 adds history and export."""
+    """One explicit change (move, rotate, width, via, outline...).
+
+    Belongs either to an optimization candidate (a proposal) or to a change set (a copy the user
+    chose to apply, with ``origin_candidate_id`` pointing back at the proposal when there was one).
+    """
 
     __tablename__ = "design_changes"
-    __table_args__ = (UniqueConstraint("candidate_id", "ordinal"),)
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "ordinal"),
+        UniqueConstraint("change_set_id", "ordinal"),
+        CheckConstraint("(candidate_id IS NULL) <> (change_set_id IS NULL)", name="one_owner"),
+    )
 
     candidate_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("optimization_candidates.id", ondelete="CASCADE"), index=True
     )
+    change_set_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("change_sets.id", ondelete="CASCADE"), index=True
+    )
+    origin_candidate_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("optimization_candidates.id", ondelete="SET NULL")
+    )
+    status: Mapped[ChangeStatus] = mapped_column(
+        str_enum(ChangeStatus, "change_status"),
+        default=ChangeStatus.PROPOSED,
+        server_default=ChangeStatus.PROPOSED.value,
+    )
+    status_reason: Mapped[str | None] = mapped_column(Text)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"), index=True)
     revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))

@@ -2,7 +2,7 @@
 
 A change names its target by stable id (and source UUID when known), records the value before and
 after, why, and where it came from. ``apply`` produces a *new* design; the original is never mutated.
-Milestone 6 exports supported changes by patching the original file.
+``via_opt.export`` writes supported changes into the original file (see docs/CHANGE_MANAGEMENT.md).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class ChangeKind(StrEnum):
     SET_COPPER_LAYER_COUNT = "set_copper_layer_count"  # after: {count}; not applicable automatically
 
 
-#: Kinds Milestone 6 can write back into a KiCad file. Others need manual work in the EDA tool.
+#: Kinds ``via_pcb.patch`` can write back into a KiCad file. Others need manual work in the EDA tool.
 EXPORTABLE = {
     ChangeKind.MOVE_COMPONENT, ChangeKind.ROTATE_COMPONENT, ChangeKind.SET_TRACK_WIDTH, ChangeKind.MOVE_VIA,
     ChangeKind.SET_VIA_SIZE, ChangeKind.SET_OUTLINE_RECT,

@@ -73,9 +73,25 @@ Decisions (owner, 2026-11-26):
 | 3 | Deterministic analysis and KiCad DRC | ✅ done |
 | 4 | Engineering intelligence and component context | ✅ done |
 | 5 | Optimization framework | ✅ done |
-| 6 | Change management, comparison and export | ⏳ next |
-| 7 | Viewer and workspace UI | — |
+| 6 | Change management, comparison and export | ✅ done |
+| 7 | Viewer and workspace UI | ⏳ next |
 | 8 | Testing, performance and documentation | — |
+
+### M6: Change management, comparison and export ✅
+- **Export:**
+  - `via_pcb.patch` edits the original KiCad file in place by stable id, for move, rotate, track width, via move and size, and outline rectangle;
+  - `via_opt.export` verifies the result by re-parsing and comparing with `apply()`;
+  - project archives keep every other member untouched;
+  - byte-identical round trips on KiCad 5 to 9 boards.
+- **Data:** migration `0008` (`change_sets`, change status and origin, revision lineage, `pcb_export` runs).
+- **API:**
+  - change sets from accepted candidates or user changes, with conflict detection;
+  - simulated preview, undo and discard;
+  - apply as a background job in the sandbox, producing a new child revision;
+  - automatic follow-up analysis;
+  - revision comparison by finding fingerprint;
+  - download, rollback, history and lineage.
+- **Docs:** new CHANGE_MANAGEMENT.md.
 
 ### M5: Optimization framework ✅
 - **`services/optimization` (`via_opt`):**

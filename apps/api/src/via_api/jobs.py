@@ -46,7 +46,7 @@ from via_api.models.base import utcnow
 from via_api.models.enums import AnalysisKind, AnalysisStatus, RevisionStatus
 from via_api.parsing.importer import import_run, mark_failed, process_revision
 from via_api.parsing.sandbox import SandboxLimits
-from via_api.services import optimizer
+from via_api.services import changes, optimizer
 from via_api.services.analysis import analysis_job_id, fail_run, process_analysis
 from via_api.storage import get_storage
 
@@ -70,6 +70,8 @@ class JobQueue(Protocol):
     def enqueue_analysis(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
 
     def enqueue_optimization(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
+
+    def enqueue_export(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
 
     def job_alive(self, job_id: str) -> bool: ...
 
@@ -121,6 +123,18 @@ class RQJobQueue:
             failure_ttl=7 * 24 * 3600,
             on_failure=Callback("via_api.jobs.on_analysis_failure", timeout=60),
             job_id=optimizer.optimization_job_id(run_id, attempt),
+        )
+
+    def enqueue_export(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        self.queue.enqueue(
+            "via_api.jobs.export_run",
+            str(run_id),
+            attempt,
+            job_timeout=self.analysis_timeout,
+            result_ttl=3600,
+            failure_ttl=7 * 24 * 3600,
+            on_failure=Callback("via_api.jobs.on_analysis_failure", timeout=60),
+            job_id=changes.export_job_id(run_id, attempt),
         )
 
     def job_alive(self, job_id: str) -> bool:
@@ -296,6 +310,56 @@ def optimize_run(run_id: str, attempt: int = 1) -> str:
         engine.dispose()
 
 
+def export_run(run_id: str, attempt: int = 1) -> str:
+    """RQ job: apply one change set (patch, verify, store and import the new revision)."""
+    from rq import get_current_job
+
+    settings = get_settings()
+    current = get_current_job()
+    db, engine = _session(settings)
+    storage = get_storage()
+    limits = sandbox_limits(settings)
+    try:
+        with Heartbeat(settings, run_id=uuid.UUID(run_id)):
+            run = changes.process_export(
+                db, storage, uuid.UUID(run_id), limits,
+                import_revision=lambda rid: process_revision(db, storage, rid, limits),
+                attempt=attempt, job_id=current.id if current else changes.export_job_id(run_id, attempt),
+            )  # fmt: skip
+        follow_up = (run.result_summary or {}).get("follow_up_analysis_run_id") if run else None
+        if follow_up:
+            try:
+                RQJobQueue(
+                    current.connection if current else Redis.from_url(settings.redis_url), settings
+                ).enqueue_analysis(uuid.UUID(follow_up))
+            except Exception:  # the reaper re-queues lost runs
+                logger.warning("Could not queue follow-up analysis %s", follow_up, exc_info=True)
+        return run.status.value if run else "missing"
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def _job_id_for(run: AnalysisRun, attempt: int) -> str:
+    if run.kind == AnalysisKind.PCB_OPTIMIZATION:
+        return optimizer.optimization_job_id(run.id, attempt)
+    if run.kind == AnalysisKind.PCB_EXPORT:
+        return changes.export_job_id(run.id, attempt)
+    return analysis_job_id(run.id, attempt)
+
+
+def _fail_any(db: Session, run: AnalysisRun, code: str, message: str) -> None:
+    """Fail an analysis/optimization/export run (an export also fails its change set)."""
+    if run.kind == AnalysisKind.PCB_EXPORT:
+        from via_api.models import ChangeSet
+
+        cs = db.get(ChangeSet, uuid.UUID(run.config["change_set_id"])) if run.config.get("change_set_id") else None
+        if cs is not None:
+            changes.fail_change_set(db, cs, run, code, message)
+            return
+    fail_run(db, run, code, message)
+
+
 def on_analysis_failure(job: Any, connection: Any, type: Any, value: Any, traceback: Any) -> None:
     """RQ failure callback for analysis jobs (crash, timeout, abandoned)."""
     settings = get_settings()
@@ -312,7 +376,7 @@ def on_analysis_failure(job: Any, connection: Any, type: Any, value: Any, traceb
             return
         logger.error("Analysis job %s failed: %s", run.id, type.__name__ if type else "unknown")
         code = "timeout" if type is not None and "Timeout" in type.__name__ else "analysis_failed"
-        fail_run(db, run, code, "The analysis stopped unexpectedly. Try running it again.")
+        _fail_any(db, run, code, "The job stopped unexpectedly. Try running it again.")
         db.commit()
     finally:
         db.close()
@@ -325,20 +389,21 @@ def _retry_or_fail_analysis(
     tried = max(run.attempt, 1)
     if tried >= settings.job_max_attempts:
         logger.error("Analysis run %s lost after %d attempts; marking failed", run.id, tried)
-        fail_run(db, run, "worker_lost", WORKER_LOST_ANALYSIS_MESSAGE)
+        _fail_any(db, run, "worker_lost", WORKER_LOST_ANALYSIS_MESSAGE)
         db.commit()
         report.failed.append(run.id)
         return
     nxt = tried + 1
-    optimization = run.kind == AnalysisKind.PCB_OPTIMIZATION
     run.status = AnalysisStatus.QUEUED
     run.attempt = nxt
-    run.job_id = optimizer.optimization_job_id(run.id, nxt) if optimization else analysis_job_id(run.id, nxt)
+    run.job_id = _job_id_for(run, nxt)
     run.heartbeat_at = None
     db.commit()
     try:
-        if optimization:
+        if run.kind == AnalysisKind.PCB_OPTIMIZATION:
             queue.enqueue_optimization(run.id, attempt=nxt)
+        elif run.kind == AnalysisKind.PCB_EXPORT:
+            queue.enqueue_export(run.id, attempt=nxt)
         else:
             queue.enqueue_analysis(run.id, attempt=nxt)
     except Exception:
@@ -346,6 +411,9 @@ def _retry_or_fail_analysis(
         return
     logger.warning("Re-queued analysis run %s (attempt %d of %d)", run.id, nxt, settings.job_max_attempts)
     report.requeued.append(run.id)
+
+
+_JOB_KINDS = (AnalysisKind.PCB_ANALYSIS, AnalysisKind.PCB_OPTIMIZATION, AnalysisKind.PCB_EXPORT)
 
 
 def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetime | None = None) -> ReapReport:
@@ -356,7 +424,7 @@ def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetim
     stale = db.scalars(
         select(AnalysisRun)
         .where(
-            AnalysisRun.kind.in_((AnalysisKind.PCB_ANALYSIS, AnalysisKind.PCB_OPTIMIZATION)),
+            AnalysisRun.kind.in_(_JOB_KINDS),
             AnalysisRun.status == AnalysisStatus.RUNNING,
             func.coalesce(AnalysisRun.heartbeat_at, AnalysisRun.started_at) < stale_before,
         )
@@ -369,17 +437,14 @@ def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetim
     queued = db.scalars(
         select(AnalysisRun)
         .where(
-            AnalysisRun.kind.in_((AnalysisKind.PCB_ANALYSIS, AnalysisKind.PCB_OPTIMIZATION)),
+            AnalysisRun.kind.in_(_JOB_KINDS),
             AnalysisRun.status == AnalysisStatus.QUEUED,
             AnalysisRun.updated_at < lost_before,
         )
         .with_for_update(skip_locked=True)
     ).all()
     for run in queued:
-        default_id = (optimizer.optimization_job_id if run.kind == AnalysisKind.PCB_OPTIMIZATION else analysis_job_id)(
-            run.id, max(run.attempt, 1)
-        )
-        if queue.job_alive(run.job_id or default_id):
+        if queue.job_alive(run.job_id or _job_id_for(run, max(run.attempt, 1))):
             continue
         logger.warning("Queued analysis run %s is missing from the queue", run.id)
         _retry_or_fail_analysis(db, queue, run, settings, report)

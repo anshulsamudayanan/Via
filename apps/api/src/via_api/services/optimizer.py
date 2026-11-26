@@ -3,8 +3,8 @@
 
 Runs are ``analysis_runs`` rows with ``kind = pcb_optimization`` (so they share the job lifecycle:
 heartbeat, reaper, retries). Candidates and their explicit changes are stored; nothing touches the
-original design. Accepting a candidate records a decision; Milestone 6 turns accepted, exportable
-changes into a new revision and an exported file.
+original design. Accepting a candidate records a decision; a change set (services/changes.py) turns
+accepted, exportable changes into a new revision and an exported file.
 """
 
 from __future__ import annotations

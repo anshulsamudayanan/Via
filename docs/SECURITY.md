@@ -44,6 +44,16 @@ KiCad's C++ parser is a large attack surface, so it runs only in the `eda` conta
 - **Bundle handling:** bundles may contain only `board.kicad_pcb`, `board.kicad_pro` and `board.kicad_dru` (fixed names), with size limits. The worker builds them inside the parser sandbox, so untrusted archives are never opened in the worker ✅ (`tests/unit/eda`, `tests/integration/test_kicad_drc_pipeline.py`, e2e `analysis.spec.ts`).
 - **Concurrency:** limited to `VIA_EDA_CONCURRENCY`; when busy, the service answers 503 and the check is skipped with the reason.
 
+## Change sets and export (Stage 2)
+- Only project editors can create, apply, discard or roll back change sets. Viewers can read them and download exported files. Everyone else gets 404, enforced in `services/changes.py` and covered by the security regression suite.
+- The original upload is patched only inside the parser sandbox (`python -I -m via_opt.cli`):
+  - an empty environment and rlimits;
+  - input on stdin, nothing executed from the file;
+  - the result is accepted only after it was re-parsed and verified against the intended changes.
+- Change targets and `before` values come from the parsed design, never from the client. Values are range-checked. Kinds that can't be exported are refused.
+- Nothing is overwritten. Every export is a new revision with its own stored file, and rollback only changes which revision is current. Each step is in the activity log (`change_set.*`).
+- Applying shares the per-user analysis rate limit.
+
 ## Security tests
 - `tests/integration/test_security_regression.py` walks **every** API route: 401 without a session, CSRF header required on every unsafe route, 404 (and no change) for every project/design/revision/file/organization/session-scoped route to a signed-in user without access, every rate limit enforced on its endpoint, account lockout, client address never read from headers, upload filename sanitization. New routes are covered automatically; write routes with bodies need an entry in its `BODIES` table.
 - Endpoint-level suites: `test_access_control.py` (org/project independence, lists, search, activity), `test_pcb_access.py` (viewer/editor/outsider on designs and files), `test_auth.py` (sessions, tokens, CSRF, resets), `test_pcb_import.py` (size, type, sniff, integrity), `test_parser_sandbox.py` (sandbox limits).

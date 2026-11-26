@@ -4,13 +4,14 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 2 in progress (Milestone 5 of 8 done).** Stage 1 is complete:
+> **Status: Stage 2 in progress (Milestone 6 of 8 done).** Stage 1 is complete:
 > accounts, projects, sharing, the PCB pipeline and an interactive board viewer, covered by unit,
 > integration, security and browser tests. Stage 2 so far adds KiCad project (`.zip`) import with
 > design rules, schema 1.1 (stable object ids, stackup, locks), job recovery after worker crashes, and
 > the analysis/findings framework with KiCad 9's real DRC and VIA's geometry, manufacturing,
 > placement and routing checks, and grounded AI explanations and reviews (disabled until a provider
-> is configured), and validated optimization candidates (API only; the UI arrives in Milestone 7).
+> is configured), validated optimization candidates, and change sets that patch your original KiCad file in place, verify
+> it and import it as a new revision with rollback and comparison (API only; the UI arrives in Milestone 7).
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md).
 
 ## What works today
@@ -208,3 +209,4 @@ Stage 1 is built to run locally. A public deployment additionally needs, at mini
 - [docs/PCB_ANALYSIS.md](docs/PCB_ANALYSIS.md): analysis checks and what they do and don't cover
 - [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md): AI features, grounding verification, consent, audit
 - [docs/OPTIMIZATION_ENGINE.md](docs/OPTIMIZATION_ENGINE.md): objectives, constraints, candidates, validation, Pareto comparison
+- [docs/CHANGE_MANAGEMENT.md](docs/CHANGE_MANAGEMENT.md): change sets, in-place export and its verification, lineage, rollback, comparison

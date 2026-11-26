@@ -4,8 +4,8 @@ Status: Stage 2, Milestone 5. Package: `services/optimization` (`via_opt`); API:
 `apps/api/src/via_api/{services/optimizer.py,routes/optimization.py}`.
 
 VIA Optimize proposes **explicit, measured, validated change sets**. It never edits the original
-design. Accepting a candidate records a decision; Milestone 6 turns accepted, exportable changes into
-a new revision and an exported KiCad file.
+design. Accepting a candidate records a decision; a change set (docs/CHANGE_MANAGEMENT.md) turns
+accepted, exportable changes into a new revision and an exported KiCad file.
 
 ## Pipeline
 1. **Baseline metrics** for the parsed design.

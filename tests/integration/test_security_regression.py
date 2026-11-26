@@ -72,11 +72,13 @@ BODIES = {
     ("PATCH", "/api/v1/component-records/{record_id}"): {"verification": "verified"},
     ("POST", "/api/v1/designs/{design_id}/optimization-runs"): {"objectives": ["area"]},
     ("POST", "/api/v1/optimization-candidates/{candidate_id}/decision"): {"status": "rejected", "reason": "pwned"},
+    ("POST", "/api/v1/designs/{design_id}/change-sets"): {"title": "pwned"},
 }
 
 #: Required query parameters (other than project_id) for routes that take them.
 QUERY = {
     ("GET", "/api/v1/designs/{design_id}/analysis-compare"): "?base_run_id={run_id}&target_run_id={run_id}",
+    ("GET", "/api/v1/designs/{design_id}/compare"): "?base={revision_id}&head={revision_id}",
 }
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
@@ -95,6 +97,8 @@ ID_PARAMS = (
     "recommendation_id",
     "record_id",
     "candidate_id",
+    "change_set_id",
+    "change_id",
 )
 
 
@@ -157,6 +161,12 @@ def world(make_client, db):
     profile = owner.post(
         f"/api/v1/projects/{project['id']}/manufacturing-profiles", json={"name": "Shop", "values": PROFILE}
     ).json()
+    comp = owner.get(f"/api/v1/pcb/{imported['design']['id']}/normalized").json()["components"][0]
+    change_set = owner.post(
+        f"/api/v1/designs/{imported['design']['id']}/change-sets",
+        json={"changes": [{"kind": "move_component", "target": {"kind": "component", "id": comp["id"]},
+                           "after": {"x": comp["position"]["x"] + 1, "y": comp["position"]["y"]}}]},
+    ).json()  # fmt: skip
     ids = {
         "project_id": project["id"],
         "design_id": imported["design"]["id"],
@@ -171,6 +181,8 @@ def world(make_client, db):
         "record_id": record["id"],
         "recommendation_id": str(recommendation.id),
         "candidate_id": candidate["id"],
+        "change_set_id": change_set["id"],
+        "change_id": change_set["changes"][0]["id"],
         "stranger_email": "stranger@example.com",
     }
     return owner, stranger, ids
@@ -269,6 +281,9 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     assert [r["verification"] for r in records] == ["unverified"]
     cand = owner.get(f"/api/v1/optimization-candidates/{ids['candidate_id']}").json()
     assert cand["status"] == "awaiting_validation" and cand["status_reason"] is None  # untouched by the stranger
+    cs = owner.get(f"/api/v1/change-sets/{ids['change_set_id']}").json()
+    assert cs["status"] == "draft" and len(cs["changes"]) == 1  # not applied, discarded or edited by the stranger
+    assert owner.get(f"/api/v1/designs/{ids['design_id']}").json()["revision_count"] == 1
 
 
 @pytest.mark.parametrize(

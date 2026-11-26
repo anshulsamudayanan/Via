@@ -96,6 +96,7 @@ class InlineQueue:
         self.attempts: list[int] = []
         self.analyses: list[tuple[uuid.UUID, int]] = []
         self.optimizations: list[tuple[uuid.UUID, int]] = []
+        self.exports: list[tuple[uuid.UUID, int]] = []
         self.alive: set[str] = set()  # job ids reported as still queued/running
         self.run = True
         self.fail = False
@@ -160,6 +161,27 @@ class InlineQueue:
                 ),
                 attempt=attempt,
             )
+
+    def enqueue_export(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        if self.fail:
+            raise ConnectionError("queue down")
+        self.exports.append((run_id, attempt))
+        if self.run:
+            from via_api.services import changes
+
+            storage = LocalStorage(self.storage_root)
+            limits = SandboxLimits(timeout_seconds=60, memory_bytes=1024**3)
+            run = changes.process_export(
+                self.db,
+                storage,
+                run_id,
+                limits,
+                import_revision=lambda rid: process_revision(self.db, storage, rid, limits),
+                attempt=attempt,
+            )
+            follow_up = (run.result_summary or {}).get("follow_up_analysis_run_id") if run else None
+            if follow_up:
+                self.enqueue_analysis(uuid.UUID(follow_up))
 
     def job_alive(self, job_id: str) -> bool:
         return job_id in self.alive

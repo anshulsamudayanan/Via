@@ -94,7 +94,9 @@ schema, analysis and check versions. History is never overwritten: re-running cr
 | `component_records` (0006) | Part information per project | unique `(project_id, manufacturer, part_number)`, `description`, `package`, `specs` and `datasheets` (JSONB, each with a source), `source`, `verification` |
 
 | `optimization_candidates` (0007) | Candidates of `pcb_optimization` runs | `run_id` (CASCADE), project/design/revision, unique `(run_id, key)`, algorithm and version, objectives, title, summary, `metrics_before`/`metrics_after`, benefits, trade-offs, `validation` (JSONB), `pareto`, `status`, decision fields |
-| `design_changes` (0007) | Explicit changes | `candidate_id` (CASCADE), project/design/revision, `ordinal`, `kind`, `target` (stable id and UUID), `before`/`after`, `reason`, `source`, `finding_ids`, `exportable` |
+| `design_changes` (0007) | Explicit changes | `candidate_id` (CASCADE), project/design/revision, `ordinal`, `kind`, `target` (stable id and UUID), `before`/`after`, `reason`, `source`, `finding_ids`, `exportable`; 0008 adds `change_set_id` (CASCADE), `origin_candidate_id` (SET NULL), `status` proposed/applied/refused, `status_reason`, CHECK `one_owner` (exactly one of candidate/change set) |
+| `change_sets` (0008) | Changes chosen for one base revision | project/design (CASCADE), `base_revision_id` (CASCADE), `result_revision_id` and `export_run_id` (SET NULL), `title`, `status` draft/applying/applied/failed/rolled_back, `result` (JSONB), error, apply and rollback actor/time |
+| `design_revisions.parent_revision_id` (0008) | Lineage | SET NULL; set on revisions produced by a change set |
 
 ## Authorization model (enforced in the API service layer, CP3+)
 

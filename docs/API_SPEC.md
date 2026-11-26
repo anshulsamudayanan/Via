@@ -190,6 +190,23 @@ See docs/AI_INTELLIGENCE.md. AI is disabled by default (`503 ai_disabled`); 30 r
 ### VIA Optimize (Milestone 5)
 See docs/OPTIMIZATION_ENGINE.md for request and response shapes: `POST|GET /designs/{id}/optimization-runs`, `GET /optimization-runs/{id}`, `/candidates`, `/compare`, `GET /optimization-candidates/{id}`, `POST /optimization-candidates/{id}/decision`.
 
+### Change management (Milestone 6)
+See docs/CHANGE_MANAGEMENT.md.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/designs/{design_id}/change-sets` | editor | `{title?, candidate_ids[], changes[{kind, target{kind, id, label?}, after, reason?}]}` → 201; `409 conflicting_changes / candidate_not_accepted / candidate_outdated / not_exportable`, `422 invalid_change / empty_change_set` |
+| GET | `/designs/{design_id}/change-sets` | viewer | History, newest first |
+| GET | `/designs/{design_id}/lineage` | viewer | Revisions with `parent_revision_id` and producing `change_set_id` |
+| GET | `/designs/{design_id}/compare?base=&head=` | viewer | Object counts and findings diff (introduced/resolved/persisting) of two revisions |
+| GET | `/change-sets/{change_set_id}` | viewer | Set with its changes and their status |
+| GET | `/change-sets/{change_set_id}/preview` | viewer | Simulated metrics before/after |
+| DELETE | `/change-sets/{change_set_id}/changes/{change_id}` | editor | Undo one change (draft/failed only; `409 change_set_locked`) |
+| DELETE | `/change-sets/{change_set_id}` | editor | Discard a draft |
+| POST | `/change-sets/{change_set_id}/apply` | editor | 202; background export; `409 base_not_current`; rate limited with analyses |
+| POST | `/change-sets/{change_set_id}/rollback` | editor | Base becomes current again; `409 not_applied / not_current` |
+| GET | `/change-sets/{change_set_id}/download` | viewer | The patched file; `409 not_exported` |
+
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.

@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Validate a change set by re-running VIA's own checks on the modified design.
 
-KiCad DRC re-validation of exported files happens in Milestone 6 (export); here VIA compares its
+KiCad DRC runs on exported files in the follow-up analysis of a change set; here VIA compares its
 deterministic findings before and after: any new medium-or-worse problem fails the candidate.
 """
 

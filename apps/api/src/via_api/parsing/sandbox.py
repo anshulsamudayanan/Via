@@ -197,3 +197,55 @@ def run_bundler(data: bytes, filename: str | None, limits: SandboxLimits) -> Bun
         return BundleOutcome(None, str(error["code"])[:64], str(error["message"])[:2000])
     except (ValueError, KeyError, TypeError):
         return BundleOutcome(None, PARSER_INVALID_OUTPUT, "The design couldn't be prepared for KiCad.")
+
+
+@dataclass(frozen=True)
+class ExportOutcome:
+    data: bytes | None
+    applied: list[int]
+    refused: list[tuple[int, str]]
+    board_member: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+def run_exporter(
+    data: bytes, filename: str | None, changes: list[dict[str, object]], limits: SandboxLimits
+) -> ExportOutcome:
+    """Patch the original file with ``changes`` and verify it, in the same sandbox as the parser."""
+    cmd = [sys.executable, "-I", "-B", "-m", "via_opt.cli"]
+    header = json.dumps({"filename": _safe_filename(filename), "changes": changes}, separators=(",", ":"))
+    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONHASHSEED": "0"}
+    with tempfile.TemporaryDirectory(prefix="via-export-") as workdir:
+        try:
+            proc = subprocess.run(  # noqa: S603 - fixed argv, untrusted data only on stdin
+                cmd,
+                input=header.encode() + b"\n" + data,
+                capture_output=True,
+                timeout=limits.timeout_seconds,
+                env=env,
+                cwd=workdir,
+                preexec_fn=_apply_limits(limits),
+                start_new_session=True,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return ExportOutcome(None, [], [], None, PARSER_TIMEOUT, "Exporting took too long and was stopped.")
+    if proc.returncode != 0:
+        logger.error("Exporter failed (rc=%s): %s", proc.returncode, proc.stderr.decode("utf-8", "replace")[-2000:])
+        if proc.returncode in (-signal.SIGXCPU, -signal.SIGKILL):
+            return ExportOutcome(
+                None, [], [], None, PARSER_RESOURCE_LIMIT, "Exporting exceeded the CPU or memory limit."
+            )
+        return ExportOutcome(None, [], [], None, PARSER_CRASHED, "The exporter stopped unexpectedly.")
+    out = proc.stdout
+    try:
+        if out.startswith(b"VIAX"):
+            meta_line, _, body = out[4:].partition(b"\n")
+            meta = json.loads(meta_line)
+            refused = [(int(i), str(r)) for i, r in meta["refused"]]
+            return ExportOutcome(body, [int(i) for i in meta["applied"]], refused, meta.get("board_member"))
+        error = json.loads(out)["error"]
+        return ExportOutcome(None, [], [], None, str(error["code"])[:64], str(error["message"])[:2000])
+    except (ValueError, KeyError, TypeError):
+        return ExportOutcome(None, [], [], None, PARSER_INVALID_OUTPUT, "The exporter produced an invalid result.")

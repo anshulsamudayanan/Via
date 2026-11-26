@@ -16,6 +16,7 @@ from via_api.routes import (
     ai,
     analysis,
     auth,
+    changes,
     designs,
     files,
     health,
@@ -78,5 +79,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(analysis.router)
     v1.include_router(intelligence.router)
     v1.include_router(optimization.router)
+    v1.include_router(changes.router)
     app.include_router(v1)
     return app

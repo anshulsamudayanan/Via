@@ -4,6 +4,7 @@ from via_api.models.activity import ActivityLog, AnalysisRun, DataConsent
 from via_api.models.analysis import (
     AIOutput,
     AnalysisFinding,
+    ChangeSet,
     ComponentRecord,
     DesignChange,
     FindingEvidence,
@@ -30,6 +31,7 @@ __all__ = [
     "AnalysisFinding",
     "AnalysisRun",
     "Base",
+    "ChangeSet",
     "ComponentRecord",
     "DataConsent",
     "Design",
