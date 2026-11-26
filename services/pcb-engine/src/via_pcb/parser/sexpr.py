@@ -124,6 +124,17 @@ class SExpr(list):
         return out
 
 
+class SpannedSExpr(SExpr):
+    """An ``SExpr`` that knows where it sits in the source text (``text[start:end]`` is the node)."""
+
+    __slots__ = ("end", "start")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.start = 0
+        self.end = 0
+
+
 def _unescape(raw: str) -> str:
     body = raw[1:-1]
     if "\\" not in body:
@@ -142,8 +153,11 @@ def _unescape(raw: str) -> str:
     return "".join(out)
 
 
-def parse_sexpr(text: str) -> SExpr:
+def parse_sexpr(text: str, *, spans: bool = False) -> SExpr:
     """Parse ``text`` and return the single top-level expression.
+
+    With ``spans=True`` every list node is a :class:`SpannedSExpr` recording its character offsets,
+    which the patcher uses to edit the original text in place.
 
     Raises :class:`SExprParseError` on malformed input or when the document
     contains anything other than exactly one top-level list.
@@ -157,7 +171,9 @@ def parse_sexpr(text: str) -> SExpr:
         if kind == "open":
             if root is not None and not stack:
                 raise SExprParseError("Unexpected data after top-level expression", text, m.start())
-            node = SExpr()
+            node = SpannedSExpr() if spans else SExpr()
+            if spans:
+                node.start = m.start()  # type: ignore[attr-defined]
             if stack:
                 stack[-1].append(node)
             stack.append(node)
@@ -165,6 +181,8 @@ def parse_sexpr(text: str) -> SExpr:
             if not stack:
                 raise SExprParseError("Unbalanced ')'", text, m.start())
             node = stack.pop()
+            if spans:
+                node.end = m.end()  # type: ignore[attr-defined]
             if not stack:
                 root = node
         elif kind == "string" or kind == "atom":
