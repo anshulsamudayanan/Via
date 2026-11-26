@@ -22,7 +22,7 @@ test("analyse, optimize, apply a change set and roll it back", async ({ page }) 
   await expect(page.getByRole("img", { name: /Board view/ })).toBeVisible({ timeout: 30_000 });
 
   // Analysis: run, then open the narrow-track finding; it is labelled with its source and evidence.
-  await page.getByRole("link", { name: "Analysis", exact: true }).click();
+  await page.getByRole("navigation", { name: "Design data" }).getByRole("link", { name: "Analysis", exact: true }).click();
   await page.getByRole("button", { name: "Run analysis" }).click();
   const narrow = page.getByRole("button", { name: /narrower than 0\.150 mm/ });
   await expect(narrow).toBeVisible({ timeout: 90_000 });

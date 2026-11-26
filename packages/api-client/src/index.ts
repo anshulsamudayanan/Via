@@ -18,6 +18,7 @@ import type {
   ActivityItem,
   AnalysisComparison,
   AnalysisRun,
+  AnalysisStatus,
   BoardSummary,
   CheckInfo,
   FindingDetail,
@@ -27,6 +28,11 @@ import type {
   Design,
   DesignDetail,
   DesignListItem,
+  FindingListPage,
+  PartListPage,
+  PartSort,
+  RunListItem,
+  Severity,
   DesignSort,
   DesignStatusFilter,
   ImportResponse,
@@ -273,6 +279,13 @@ export function createViaClient(options: ClientOptions = {}) {
         request<DesignDetail>(`/api/v1/designs/${enc(id)}`, { method: "PATCH", body }),
       delete: (id: string) => request<void>(`/api/v1/designs/${enc(id)}`, { method: "DELETE" }),
     },
+    components: {
+      /** Parts in the current revision of every accessible design, grouped by value and footprint. */
+      parts: (
+        params: { q?: string; project_id?: string; include_archived?: boolean; sort?: PartSort; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<PartListPage>(`/api/v1/components/parts${q({ ...params, include_archived: params.include_archived || undefined })}`, { signal }),
+    },
     revisions: {
       get: (id: string, signal?: AbortSignal) => request<Revision>(`/api/v1/revisions/${enc(id)}`, { signal }),
     },
@@ -283,6 +296,25 @@ export function createViaClient(options: ClientOptions = {}) {
     },
     analysis: {
       checks: () => request<CheckInfo[]>("/api/v1/analysis/checks"),
+      /** Analysis runs across every accessible project, newest first. */
+      browseRuns: (
+        params: { status?: AnalysisStatus; project_id?: string; include_archived?: boolean; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<Page<RunListItem>>(`/api/v1/analysis/runs${q({ ...params, include_archived: params.include_archived || undefined })}`, { signal }),
+      /** Findings of each design's latest succeeded analysis, most severe first. */
+      browseFindings: (
+        params: {
+          severity?: Severity;
+          category?: string;
+          status?: FindingStatus | "all";
+          q?: string;
+          project_id?: string;
+          include_archived?: boolean;
+          limit?: number;
+          offset?: number;
+        } = {},
+        signal?: AbortSignal,
+      ) => request<FindingListPage>(`/api/v1/analysis/findings${q({ ...params, include_archived: params.include_archived || undefined })}`, { signal }),
       start: (designId: string, body: { revision_id?: string; checks?: string[] } = {}) =>
         request<AnalysisRun>(`/api/v1/designs/${enc(designId)}/analysis-runs`, { method: "POST", body }),
       runs: (designId: string, params: { limit?: number; offset?: number } = {}, signal?: AbortSignal) =>

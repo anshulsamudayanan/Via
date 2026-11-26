@@ -64,6 +64,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
     organizations: { list: vi.fn(), create: vi.fn() },
     projects: { list: vi.fn(), summary: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), unarchive: vi.fn(), delete: vi.fn(), members: vi.fn(), addMember: vi.fn(), updateMember: vi.fn(), removeMember: vi.fn() },
     activity: { list: vi.fn().mockResolvedValue(page([])) },
+    components: { parts: vi.fn().mockResolvedValue({ ...page([]), placements: 0, designs: 0 }) },
     designs: { list: vi.fn().mockResolvedValue([]), browse: vi.fn().mockResolvedValue(page([])), get: vi.fn(), update: vi.fn(), delete: vi.fn() },
     revisions: { get: vi.fn() },
     files: { list: vi.fn().mockResolvedValue([]), downloadUrl: (id: string) => `/api/v1/files/${id}/download` },
@@ -71,7 +72,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
       limits: vi.fn().mockResolvedValue({ max_upload_bytes: 1024, formats: [{ id: "kicad", name: "KiCad PCB", extensions: [".kicad_pcb"] }] }),
       summary: vi.fn(), components: vi.fn(), nets: vi.fn(), layers: vi.fn(), upload: vi.fn(), normalized: vi.fn().mockReturnValue(new Promise(() => {})),
     },
-    analysis: { checks: vi.fn(), start: vi.fn(), runs: vi.fn().mockResolvedValue(page([])), run: vi.fn(), findings: vi.fn(), finding: vi.fn(), review: vi.fn(), compare: vi.fn() },
+    analysis: { checks: vi.fn(), browseRuns: vi.fn().mockResolvedValue(page([])), browseFindings: vi.fn().mockResolvedValue({ ...page([]), by_severity: {}, designs_analysed: 0 }), start: vi.fn(), runs: vi.fn().mockResolvedValue(page([])), run: vi.fn(), findings: vi.fn(), finding: vi.fn(), review: vi.fn(), compare: vi.fn() },
     ai: {
       status: vi.fn().mockResolvedValue({ enabled: false, provider: "disabled", text: false, structured_output: false, embeddings: false, external: false, default_model: null }),
       consent: vi.fn(), grantConsent: vi.fn(), explain: vi.fn(), explainFinding: vi.fn(), review: vi.fn(),

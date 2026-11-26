@@ -4,6 +4,7 @@ import { ApiError } from "@via/api-client";
 import type { AIOutput, AIStatus, AnalysisRun, Finding, FindingDetail, FindingFilters, FindingStatus, Recommendation } from "@via/types";
 import { Badge, Button, Card, CardHeader, CardTitle, cn, EmptyState, ErrorState, Input, Select, Skeleton, Spinner, Textarea } from "@via/ui";
 import { Bot, CheckCircle2, Play, ShieldCheck, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
@@ -136,7 +137,9 @@ function Findings({ run, projectId, canEdit, ai, onHighlight }: { run: AnalysisR
   const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState("");
   const page = useAsync((s) => client.analysis.findings(run.id, { ...filters, limit: PAGE, offset }, s), [client, run.id, filters, offset]);
-  const [selected, setSelected] = useState<string | null>(null);
+  // A finding linked from elsewhere (the Analysis page): ?finding=<id>.
+  const linked = useSearchParams().get("finding");
+  const [selected, setSelected] = useState<string | null>(linked);
 
   const set = (k: keyof FindingFilters, v: string) => {
     setOffset(0);

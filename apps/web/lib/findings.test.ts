@@ -4,7 +4,7 @@ import { describeChange, findingHighlight, formatDelta, formatMetric, severityTo
 
 describe("finding helpers", () => {
   it("maps severities to tones", () => {
-    expect(["critical", "high", "medium", "low", "info"].map((s) => severityTone(s as never))).toEqual(["danger", "danger", "warning", "accent", "neutral"]);
+    expect(["critical", "high", "medium", "low", "info"].map((s) => severityTone(s as never))).toEqual(["danger", "danger", "warning", "neutral", "neutral"]);
   });
 
   it("builds a board highlight from a finding", () => {

@@ -21,8 +21,8 @@ export const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
     label: "Engineering",
     items: [
       { href: "/designs", label: "Designs", icon: CircuitBoard },
-      { label: "Analysis", icon: ScanSearch, soon: "A cross-project analysis view is coming soon. Each design has an Analysis tab." },
-      { label: "Components", icon: Boxes, soon: "A cross-project component library is coming soon. Each design lists its components." },
+      { href: "/analysis", label: "Analysis", icon: ScanSearch },
+      { href: "/components", label: "Components", icon: Boxes },
     ],
   },
   { label: "Platform", items: [{ href: "/settings", label: "Settings", icon: Settings }] },

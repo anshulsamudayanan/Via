@@ -3,6 +3,7 @@
 import type { PcbComponent } from "@via/types";
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, Table, TBody, TD, TH, THead, TR } from "@via/ui";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
@@ -51,7 +52,8 @@ function SearchBox({ label, value, onChange, children }: { label: string; value:
 
 export function ComponentsTable({ designId, revisionId, onSelect }: { designId: string; revisionId?: string; onSelect?: (c: PcbComponent) => void }) {
   const client = useApi();
-  const [q, setQ] = useState("");
+  // Prefilled when linked from the Components page (?q=).
+  const [q, setQ] = useState(useSearchParams().get("q") ?? "");
   const [side, setSide] = useState<"" | "top" | "bottom">("");
   const [offset, setOffset] = useState(0);
   const query = useDebounced(q);

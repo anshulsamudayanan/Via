@@ -89,16 +89,16 @@ describe("Dashboard", () => {
 });
 
 describe("AppShell", () => {
-  it("marks the current page, and shows unbuilt sections as disabled, not as links", () => {
+  it("marks the current page and links every section", () => {
     navigation.pathname = "/projects/p1";
     renderWith(<AppShell>content</AppShell>, mockClient());
     const nav = screen.getAllByRole("navigation", { name: "Main" })[0]!;
     expect(within(nav).getByRole("link", { name: "Projects" }).getAttribute("aria-current")).toBe("page");
     expect(within(nav).getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBeNull();
-    expect(within(nav).getByRole("link", { name: "Designs" }).getAttribute("href")).toBe("/designs");
-    const designs = within(nav).getByRole("link", { name: "Analysis (coming soon)" });
-    expect(designs.getAttribute("aria-disabled")).toBe("true");
-    expect(designs.getAttribute("href")).toBeNull();
+    for (const [name, href] of [["Designs", "/designs"], ["Analysis", "/analysis"], ["Components", "/components"]]) {
+      expect(within(nav).getByRole("link", { name }).getAttribute("href")).toBe(href);
+    }
+    expect(within(nav).queryByText("Soon")).toBeNull();
   });
 
   it("collapses the sidebar and remembers it", async () => {

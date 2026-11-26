@@ -392,3 +392,90 @@ def test_browse_designs_across_projects(client, make_client, broken):
     register(outsider, "browser-outsider@example.com", "Outsider")
     assert outsider.get("/api/v1/designs/browse?include_archived=true").json()["total"] == 0
     assert outsider.get(f"/api/v1/designs/browse?project_id={project['id']}").status_code == 404
+
+
+def test_cross_project_analysis_views(client, make_client, broken):
+    """GET /analysis/runs and /analysis/findings span projects, use each design's latest run, and stay scoped."""
+    project, design, _ = broken
+    first = start(client, design["id"]).json()["id"]
+    other = client.post("/api/v1/projects", json={"name": "Clean board"}).json()
+    clean = upload(client, other["id"], REF, name="clean.kicad_pcb")
+    start(client, clean["design"]["id"])
+
+    runs = client.get("/api/v1/analysis/runs").json()
+    assert runs["total"] == 2
+    item = next(r for r in runs["items"] if r["id"] == first)
+    assert item["design"] == {"id": design["id"], "name": design["name"]}
+    assert item["project"]["id"] == project["id"] and item["revision_number"] == 1
+    assert item["status"] == "succeeded" and item["finding_count"] == 3 and item["by_severity"]["high"] == 1
+    assert client.get("/api/v1/analysis/runs?status=failed").json()["total"] == 0
+    assert client.get(f"/api/v1/analysis/runs?project_id={other['id']}").json()["total"] == 1
+
+    findings = client.get("/api/v1/analysis/findings").json()
+    assert findings["designs_analysed"] == 2
+    broken_rules = {f["rule"] for f in findings["items"] if f["design"]["id"] == design["id"]}
+    assert {"outline_open", "copper_pad_no_net"} <= broken_rules
+    assert findings["items"][0]["severity"] == "high"  # most severe first
+    assert findings["by_severity"]["high"] == 1
+    high = client.get("/api/v1/analysis/findings?severity=high").json()
+    assert [f["rule"] for f in high["items"]] == ["outline_open"]
+    assert high["by_severity"] == findings["by_severity"]  # facets ignore the severity filter
+    assert client.get("/api/v1/analysis/findings?q=R1").json()["items"][0]["rule"] == "copper_pad_no_net"
+    assert client.get("/api/v1/analysis/findings?q=outline").json()["total"] == 1
+
+    # Dismissing a finding moves it out of the default (open) view.
+    target = high["items"][0]["id"]
+    assert (
+        client.post(f"/api/v1/findings/{target}/review", json={"status": "dismissed", "reason": "known"}).status_code
+        == 200
+    )
+    assert client.get("/api/v1/analysis/findings?severity=high").json()["total"] == 0
+    assert client.get("/api/v1/analysis/findings?severity=high&status=all").json()["total"] == 1
+
+    # A newer analysis replaces the older one in the findings view.
+    fixed = upload(client, project["id"], OUTLINE_FIXED, design_id=design["id"])
+    start(client, design["id"], revision_id=fixed["revision"]["id"])
+    current = client.get("/api/v1/analysis/findings?status=all").json()
+    assert {f["revision_number"] for f in current["items"] if f["design"]["id"] == design["id"]} == {2}
+    assert "outline_open" not in {f["rule"] for f in current["items"]}
+
+    outsider = make_client()
+    register(outsider, "analysis-outsider@example.com", "Outsider")
+    assert outsider.get("/api/v1/analysis/runs").json()["total"] == 0
+    assert outsider.get("/api/v1/analysis/findings").json() == {
+        "items": [], "total": 0, "limit": 25, "offset": 0, "by_severity": {}, "designs_analysed": 0,
+    }  # fmt: skip
+    assert outsider.get(f"/api/v1/analysis/findings?project_id={project['id']}").status_code == 404
+
+
+def test_cross_project_parts(client, make_client, broken):
+    """GET /components/parts groups the current revision's components by value and footprint, across projects."""
+    project, design, _ = broken
+    other = client.post("/api/v1/projects", json={"name": "Second"}).json()
+    upload(client, other["id"], REF, name="copy.kicad_pcb")
+
+    parts = client.get("/api/v1/components/parts").json()
+    assert parts["designs"] == 2 and parts["placements"] > 0
+    assert sum(p["placements"] for p in parts["items"]) == parts["placements"]
+    assert all(p["design_count"] == 2 for p in parts["items"])  # same board in both projects
+    r1 = next(p for p in parts["items"] if "R1" in p["references"])
+    assert {d["name"] for d in r1["designs"]} == {design["name"], "copy"}
+    assert client.get(f"/api/v1/components/parts?project_id={project['id']}").json()["designs"] == 1
+
+    found = client.get("/api/v1/components/parts?q=R1").json()
+    assert found["total"] >= 1 and all(any(r.startswith("R1") for r in p["references"]) for p in found["items"])
+    by_value = [p["value"] for p in client.get("/api/v1/components/parts?sort=value").json()["items"]]
+    assert by_value == sorted(by_value, key=lambda v: (v is None, (v or "").lower()))
+
+    # Only the current revision counts: a new revision that drops the net doesn't double the placements.
+    upload(client, project["id"], OUTLINE_FIXED, design_id=design["id"])
+    assert client.get("/api/v1/components/parts").json()["placements"] == parts["placements"]
+
+    client.post(f"/api/v1/projects/{other['id']}/archive")
+    assert client.get("/api/v1/components/parts").json()["designs"] == 1
+    assert client.get("/api/v1/components/parts?include_archived=true").json()["designs"] == 2
+
+    outsider = make_client()
+    register(outsider, "parts-outsider@example.com", "Outsider")
+    assert outsider.get("/api/v1/components/parts?include_archived=true").json()["total"] == 0
+    assert outsider.get(f"/api/v1/components/parts?project_id={project['id']}").status_code == 404

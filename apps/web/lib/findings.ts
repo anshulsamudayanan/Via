@@ -6,10 +6,10 @@ import type { Highlight } from "./pcb/overlay";
 
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
 
-export function severityTone(s: Severity): "danger" | "warning" | "accent" | "neutral" {
+/** Purple is reserved for interaction, so low and info share the neutral tone (the label tells them apart). */
+export function severityTone(s: Severity): "danger" | "warning" | "neutral" {
   if (s === "critical" || s === "high") return "danger";
   if (s === "medium") return "warning";
-  if (s === "low") return "accent";
   return "neutral";
 }
 

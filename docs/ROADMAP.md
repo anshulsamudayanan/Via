@@ -1,6 +1,6 @@
 # VIA Roadmap
 
-## Stage 1 — Foundation (current)
+## Stage 1 — Foundation ✅
 
 Each checkpoint is delivered separately, with formatting, linting, type checks
 and tests passing before it's marked done.
@@ -54,7 +54,7 @@ and tests passing before it's marked done.
 - Docs: PRD acceptance criteria mapped to the tests that verify them; README, ARCHITECTURE, SECURITY, API_SPEC updated.
 - *Found:* `X-Forwarded-For` sent by a browser passes through Next.js unchanged (Next only sets it when absent), so with the API trusting the web container a client could choose the IP used for per-IP rate limits. Safe only behind a reverse proxy that overwrites the header; documented as a deployment requirement in SECURITY.md and README. Per-account and per-user limits are unaffected.
 
-## Stage 2: PCB Intelligence & Optimization (current)
+## Stage 2: PCB Intelligence & Optimization ✅
 
 Audit and plan: [STAGE_2_AUDIT.md](STAGE_2_AUDIT.md). Each milestone is a checkpoint approved by the project owner.
 
@@ -224,9 +224,19 @@ Decisions (owner, 2026-11-26):
   - Web: the upload accepts `.zip`, and the design page shows where its rules came from.
 - *Tests changed because behaviour changed:* two tests used `.zip` as their example of an unsupported format, and now use Altium `.PcbDoc`; hard-coded engine and schema versions now come from the constants.
 
+## After Stage 2: interface
+
+- ✅ **Design system and dashboard** (docs/DESIGN_SYSTEM.md, docs/DASHBOARD_DESIGN.md): graphite and
+  purple tokens, IBM Plex, collapsible sidebar, ⌘K search, real-data dashboard.
+- ✅ **Cross-project pages** behind the sidebar: Designs (`GET /designs/browse`), Analysis (findings from
+  each design's latest analysis, and all runs: `GET /analysis/findings`, `GET /analysis/runs`) and
+  Components (parts grouped by value and footprint: `GET /components/parts`).
+- Open: redesign the inner design workspace screens to the new layout; an automated accessibility
+  audit; enable an AI provider (built, off by default).
+
 ## Later stages
-- **VIA Intelligence** — AI review grounded in parsed design data.
-- **VIA Optimize** — DRC-style checks, routing/placement suggestions.
-- **VIA Learn** — opt-in, privacy-first collective knowledge (consent records already modelled in Stage 1).
-- **VIA Studio** — native PCB editor.
-- **VIA Connect** — integrations with other EDA tools (more adapters: Altium, Eagle, ODB++, IPC-2581).
+- **VIA Learn**: opt-in, privacy-first collective knowledge (consent records already modelled in Stage 1).
+- **VIA Studio**: native PCB editor.
+- **VIA Connect**: integrations with other EDA tools (more adapters: Altium, Eagle, ODB++, IPC-2581).
+- **Production readiness**: transactional email, deployment (TLS, secrets, backups, monitoring), S3
+  validated against the chosen provider.

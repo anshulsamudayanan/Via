@@ -908,3 +908,73 @@ export interface RevisionComparison {
   findings: { introduced: FindingBrief[]; resolved: FindingBrief[]; persisting: number; base_total: number; head_total: number } | null;
   findings_note?: string;
 }
+
+// --- Cross-project views (sidebar Analysis and Components pages) ---------------------------
+
+export interface NamedRef {
+  id: string;
+  name: string;
+}
+
+export interface RunListItem {
+  id: string;
+  status: AnalysisStatus;
+  design: NamedRef;
+  project: NamedRef;
+  project_archived: boolean;
+  revision_id: string;
+  revision_number: number;
+  /** Only for succeeded runs. */
+  finding_count: number | null;
+  by_severity: Partial<Record<Severity, number>>;
+  error_code: string | null;
+  triggered_by: UserRef | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface FindingListItem {
+  id: string;
+  run_id: string;
+  design: NamedRef;
+  project: NamedRef;
+  revision_id: string;
+  revision_number: number;
+  check_id: string;
+  rule: string;
+  category: string;
+  severity: Severity;
+  source: FindingSource;
+  verification: FindingVerification;
+  title: string;
+  status: FindingStatus;
+  components: string[];
+  nets: string[];
+  created_at: string;
+}
+
+export interface FindingListPage extends Page<FindingListItem> {
+  /** Counts per severity over the same filters, ignoring the severity filter. */
+  by_severity: Partial<Record<Severity, number>>;
+  /** Designs with a succeeded analysis in scope. */
+  designs_analysed: number;
+}
+
+export type PartSort = "placements" | "value" | "footprint";
+
+export interface PartListItem {
+  value: string | null;
+  footprint: string;
+  placements: number;
+  design_count: number;
+  /** Up to 12, natural order. */
+  references: string[];
+  references_truncated: boolean;
+  /** Up to 5. */
+  designs: { id: string; name: string; project_id: string }[];
+}
+
+export interface PartListPage extends Page<PartListItem> {
+  placements: number;
+  designs: number;
+}

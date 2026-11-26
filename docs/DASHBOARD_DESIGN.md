@@ -347,6 +347,27 @@ The page lists every design you can access, across projects:
 - filters (kept in the URL): search, status, project, sort and archived;
 - while any row on the page is importing, it refreshes every 3 s.
 
-Analysis and Components remain "Soon". Tests: `test_browse_designs_across_projects`
+Tests: `test_browse_designs_across_projects`
 (integration), `designs-browser.test.tsx` (unit) and `e2e/designs.spec.ts`. Screenshots:
 `docs/design/after/designs-*.png`.
+
+### Follow-up: Analysis and Components pages
+
+The sidebar has no "Soon" entries left; the `soon` field on nav entries stays for future sections.
+
+- **Analysis (`/analysis`).**
+  - *Findings* (the default view) lists the findings of each design's latest succeeded analysis,
+    with a severity strip that doubles as a filter. Each finding opens in its design's Analysis tab
+    with that finding selected (`?finding=`, for the analysed revision).
+  - *Runs* lists every analysis run with its status, severities and failure code. It refreshes
+    while a run is active.
+- **Components (`/components`).** Parts on each design's current revision, grouped by value and
+  footprint. Each part shows its placement count, reference designators, and designs; each design
+  link opens that design's component list pre-filtered (`?q=`).
+- **Severity colours.** "Low" no longer uses the purple accent; it is neutral like "info", because
+  purple is reserved for interaction.
+- **Tests.** Integration tests `test_cross_project_analysis_views` and `test_cross_project_parts`;
+  unit tests `analysis-browser.test.tsx` and `parts-browser.test.tsx`. The e2e checks of the
+  dashboard, Designs, Analysis and Components now share one account in `e2e/sidebar.spec.ts`,
+  because sign-up is rate limited to 10 per hour per IP and the suite must stay under that limit
+  in CI.
