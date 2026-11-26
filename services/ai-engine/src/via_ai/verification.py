@@ -25,6 +25,8 @@ from via_ai.schemas import DesignReview, Explanation, NumberUsed, Recommendation
 #: Common reference designator prefixes; text mentions of these must exist in the design.
 _REFDES = re.compile(r"\b(?:R|C|L|U|J|P|Q|D|Y|X|K|F|T|SW|TP|FB|IC|CN|LED|BT|RV|JP)\d{1,4}[A-Z]?\b")
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE]-?\d+)?")
+#: Identifiers are not design data: hex like "127e-3" inside a UUID would otherwise read as 0.127.
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
 class VerificationReport(BaseModel):
@@ -63,7 +65,7 @@ def _known(context: ProjectContext) -> dict[str, set[str]]:
 
 
 def context_numbers(context: ProjectContext) -> list[float]:
-    return [float(m) for m in _NUMBER.findall(context.model_dump_json())]
+    return [float(m) for m in _NUMBER.findall(_UUID.sub(" ", context.model_dump_json()))]
 
 
 def _number_supported(n: NumberUsed, numbers: list[float]) -> bool:

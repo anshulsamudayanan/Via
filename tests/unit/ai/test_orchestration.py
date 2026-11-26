@@ -101,3 +101,11 @@ def test_evaluation_harness_reports_grounding():
     assert (report.total, report.accepted, report.rejected, report.errors) == (3, 1, 1, 1)
     assert report.acceptance_rate == pytest.approx(1 / 3)
     assert "net:VBUS" in report.problems["hallucinated"][0]
+
+
+def test_numbers_inside_identifiers_do_not_ground_an_answer():
+    """Regression: a UUID containing "127e-3" once let an invented 0.127 mm pass (flaky in CI)."""
+    from via_ai.verification import context_numbers
+
+    ctx = context().model_copy(update={"design_id": uuid.UUID("0000127e-3abc-4000-8000-000000000000")})
+    assert all(abs(n - 0.127) > 1e-9 for n in context_numbers(ctx))
