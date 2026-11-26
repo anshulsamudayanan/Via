@@ -198,3 +198,12 @@ library; no second framework. Changes are restyles plus a few new primitives.
   "avoid generic AI UI" rules above come from your brief. Installed locally, they can review the
   implementation in Phase 6.
 - **Motion:** already in `apps/web/package.json`. No install needed.
+
+## Landing page (marketing) exception
+
+The public landing page (`app/(public)/page.tsx`, `components/landing/*`, `app/(public)/landing.css`)
+may use what the product UI does not: soft accent glows, a 32 px grid and trace motif, film
+grain, a display serif (Instrument Serif, self-hosted) and entrance animations (motion, with
+`MotionConfig reducedMotion="user"`; the scan line and marching dashes stop under reduced
+motion). Every colour still derives from the theme tokens, so the light theme follows. The
+signed-in app stays flat and dense.
