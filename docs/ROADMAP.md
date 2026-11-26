@@ -68,14 +68,38 @@ Decisions (owner, 2026-11-26):
 
 | M | Deliverable | Status |
 |---|---|---|
-| 1 | Audit fixes and PCB model 1.1 | ✅ done (pending review) |
-| 2 | Findings and analysis framework | ⏳ next, after M1 review |
-| 3 | Deterministic analysis and KiCad DRC | — |
+| 1 | Audit fixes and PCB model 1.1 | ✅ done |
+| 2 | Findings and analysis framework | ✅ done (pending review) |
+| 3 | Deterministic analysis and KiCad DRC | ⏳ next, after M2 review |
 | 4 | Engineering intelligence and component context | — |
 | 5 | Optimization framework | — |
 | 6 | Change management, comparison and export | — |
 | 7 | Viewer and workspace UI | — |
 | 8 | Testing, performance and documentation | — |
+
+### M2: Findings and analysis framework ✅
+- **Engine (`via_pcb.analysis`):**
+  - the unified `Finding` (category, severity, source, verification, confidence, object references by stable id, components, nets, region, evidence, resolution, cross-revision fingerprint);
+  - the `Check` contract with skip reasons and versions;
+  - a registry;
+  - an engine that isolates failing checks and rejects findings attributed to the wrong check or source.
+- **Starter checks (exact):** board outline (missing, or open with unjoined endpoints marked), project rules availability, import warnings, copper pads without a net. Deliberately simple; Milestone 3 adds KiCad DRC and the real deterministic checks.
+- **Persistence (migration `0004`):**
+  - findings, evidence and append-only review history;
+  - run provenance: config, per-check outcome and version, analysis/parser/schema versions;
+  - immutable run history.
+- **Worker:** `analyze_run` with the same heartbeat and reaper recovery as imports; designs parsed before schema 1.1 are re-imported first.
+- **API:**
+  - checks catalog;
+  - start (idempotent, rate limited), run history and status;
+  - findings filter/sort/search with facets, and detail with evidence and history;
+  - review, dismiss (reason required) and reopen;
+  - compare two runs (new / resolved / persisting).
+  - Review decisions carry over to the same issue in later revisions.
+- **Security:** the route-wide suite now covers `run_id`/`finding_id`, a compare query parameter and the analysis rate limit.
+- **Clients:** typed API client methods and types.
+- **Docs:** new FINDINGS_SYSTEM.md and PCB_ANALYSIS.md.
+- *Changed from plan:* the analysis UI stays in Milestone 7 as planned; this milestone is engine, persistence and API (verified end to end with the real worker on the KiCad 9 `video` project).
 
 ### M1: Audit fixes and PCB model 1.1 ✅
 - **Job recovery (audit D1, a real Stage 1 bug):**

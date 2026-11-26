@@ -136,6 +136,20 @@ No endpoint calls a model in Stage 1.
 | PUT | `/consent/{project_id}` | owner | Grant (idempotent, audited) |
 | DELETE | `/consent/{project_id}` | owner | Revoke → `204`; takes effect immediately |
 
+### Analysis and findings (Stage 2, Milestone 2)
+See docs/FINDINGS_SYSTEM.md for the finding contract. Reading needs viewer access, starting and reviewing need editor access; anything inaccessible is `404`.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/analysis/checks` | any | Available checks: `{id, version, category, title, description, source}` |
+| POST | `/designs/{design_id}/analysis-runs` | editor (60/h) | Body `{revision_id?, checks?}` (default: current parsed revision, all checks). **`202`** with the queued run; if an identical analysis is already queued/running for that revision, **`200`** with it (no new run). Errors: `409 not_parsed`, `409 project_archived`, `422 unknown_check`, `503 queue_unavailable` (run marked failed) |
+| GET | `/designs/{design_id}/analysis-runs` | viewer | Paginated run history across revisions, newest first |
+| GET | `/analysis-runs/{run_id}` | viewer | Status (`queued`/`running`/`succeeded`/`failed`), attempt, config, per-check results `[{check_id, version, status, finding_count, duration_ms, message}]`, summary `{finding_count, by_severity, checks, duration_seconds}`, analysis/engine/parser/schema versions, safe error |
+| GET | `/analysis-runs/{run_id}/findings` | viewer | Filters (comma-separated lists): `severity`, `category`, `source`, `verification`, `status`; plus `check_id`, `component`, `net`, `q` (title, description, components, nets; LIKE metacharacters literal). `sort` = `severity` (default) \| `category` \| `title` \| `check` \| `status` \| `confidence`, `order`, `limit` ≤ 200, `offset`. Returns `{items, total, limit, offset, facets}` with counts per severity/status/category/source for the whole run. `422 invalid_filter` for unknown values |
+| GET | `/findings/{finding_id}` | viewer | Finding with `evidence[]` and review `history[]` |
+| POST | `/findings/{finding_id}/review` | editor | `{status: open\|reviewed\|dismissed, reason?}`; `422 reason_required` when dismissing without a reason. Appends to the history |
+| GET | `/designs/{design_id}/analysis-compare?base_run_id=&target_run_id=` | viewer | `{base_run, target_run, new, resolved, persisting}` by fingerprint. Both runs must be finished runs of this design (`404` otherwise; `409 run_not_finished`) |
+
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.

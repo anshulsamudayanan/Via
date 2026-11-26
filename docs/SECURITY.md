@@ -30,6 +30,12 @@ Now:
 
 The reaper runs in the worker's main loop, not a thread: forking a work-horse while another thread holds a lock deadlocked the child in testing. Tested with a real worker process tree SIGKILLed mid-parse (`tests/integration/test_job_recovery.py`) ✅
 
+## Analysis (Stage 2)
+- Every analysis route resolves the project through the authorization service: reading needs viewer access, starting and reviewing need editor access; inaccessible runs, findings and designs return `404` ✅ (route-wide suite covers `run_id`/`finding_id`).
+- Analysis runs only on VIA's own validated normalized model (never vendor files) in the worker; the parser sandbox still handles all file parsing ✅.
+- Findings never include file contents or storage keys; review reasons are user text, rendered escaped ✅.
+- Starts are rate limited (60/h per user) and deduplicated while one is queued or running ✅.
+
 ## Security tests
 - `tests/integration/test_security_regression.py` walks **every** API route: 401 without a session, CSRF header required on every unsafe route, 404 (and no change) for every project/design/revision/file/organization/session-scoped route to a signed-in user without access, every rate limit enforced on its endpoint, account lockout, client address never read from headers, upload filename sanitization. New routes are covered automatically; write routes with bodies need an entry in its `BODIES` table.
 - Endpoint-level suites: `test_access_control.py` (org/project independence, lists, search, activity), `test_pcb_access.py` (viewer/editor/outsider on designs and files), `test_auth.py` (sessions, tokens, CSRF, resets), `test_pcb_import.py` (size, type, sniff, integrity), `test_parser_sandbox.py` (sandbox limits).

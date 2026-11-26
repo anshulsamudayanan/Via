@@ -159,14 +159,14 @@ describe("pcb.upload", () => {
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(200, {})));
     const client = createViaClient({ fetch });
     await client.analysis.findings("run 1", { severity: "critical,high", component: "R1", q: "", sort: "severity" });
-    expect(fetch.mock.calls[0][0]).toBe("/api/v1/analysis-runs/run%201/findings?severity=critical%2Chigh&component=R1&sort=severity");
+    expect(fetch.mock.calls[0]?.[0]).toBe("/api/v1/analysis-runs/run%201/findings?severity=critical%2Chigh&component=R1&sort=severity");
     await client.analysis.review("f1", "dismissed", "Unused pin");
-    const [url, init] = fetch.mock.calls[1];
+    const [url, init] = fetch.mock.calls[1] ?? [];
     expect(url).toBe("/api/v1/findings/f1/review");
     expect(init.method).toBe("POST");
     expect(init.headers["X-VIA-Request"]).toBe("1");
     expect(JSON.parse(init.body)).toEqual({ status: "dismissed", reason: "Unused pin" });
     await client.analysis.compare("d1", "a", "b");
-    expect(fetch.mock.calls[2][0]).toBe("/api/v1/designs/d1/analysis-compare?base_run_id=a&target_run_id=b");
+    expect(fetch.mock.calls[2]?.[0]).toBe("/api/v1/designs/d1/analysis-compare?base_run_id=a&target_run_id=b");
   });
 });

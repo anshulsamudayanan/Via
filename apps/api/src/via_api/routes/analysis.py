@@ -205,7 +205,10 @@ def list_findings(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     key = _SORT[sort]
     stmt = stmt.order_by(
-        key.desc() if order == "desc" else key.asc(), AnalysisFinding.severity_rank, AnalysisFinding.id
+        key.desc() if order == "desc" else key.asc(),
+        AnalysisFinding.severity_rank,
+        AnalysisFinding.title,
+        AnalysisFinding.id,
     )
     rows = db.scalars(stmt.limit(limit).offset(offset)).all()
     facets: dict[str, dict[str, int]] = {}

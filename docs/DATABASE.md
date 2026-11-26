@@ -29,7 +29,7 @@ Note on `0001`: `designs.current_revision_id` ↔ `design_revisions.design_id` i
 circular reference. The FK on `designs` is added with `ALTER TABLE` after both
 tables exist (hand-edited after autogenerate).
 
-Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`.
+Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`, `0004` analysis findings.
 
 ## Tables (revision 0001, with later additions noted)
 
@@ -72,9 +72,20 @@ storage. These tables hold what the API paginates, searches and summarizes:
 ### Processing, audit, consent
 | Table | Purpose | Notes |
 |---|---|---|
-| `analysis_runs` | Processing runs | Stage 1 writes only `kind = pcb_import`; status queued/running/succeeded/failed, timings, safe error, `result_summary`. Since `0003`: `attempt` (1 = first try), `job_id` (queue job of the current attempt), `heartbeat_at` (refreshed every `VIA_JOB_HEARTBEAT_SECONDS` while running); index `(kind, status)` for the reaper |
+| `analysis_runs` | Processing runs | `kind = pcb_import` (Stage 1) or `pcb_analysis` (Stage 2); status queued/running/succeeded/failed, timings, safe error, `result_summary`. Since `0003`: `attempt` (1 = first try), `job_id` (queue job of the current attempt), `heartbeat_at` (refreshed every `VIA_JOB_HEARTBEAT_SECONDS` while running); index `(kind, status)` for the reaper |
 | `activity_logs` | Activity feed + security audit | append-only; `project_id`/`organization_id` are SET NULL on delete so entries outlive their subject; `target_id` has no FK; indexes `(project_id, created_at desc)`, `(actor_id, created_at desc)`, `(action)` |
 | `data_consents` | Explicit, revocable consent | `scope` ∈ via_learn_contribution / external_ai_processing, `policy_version`, `granted_at`, `revoked_at`. No row = no consent. Since CP5, project owners can grant/revoke `external_ai_processing` (`/api/v1/ai/consent/{project_id}`), and the AI context provider requires it; `via_learn_contribution` is still unused. |
+
+### Analysis (Stage 2, migration `0004`)
+| Table | Purpose | Notes |
+|---|---|---|
+| `analysis_runs` (extended) | `kind = pcb_analysis` runs | `config` (JSONB, e.g. selected checks), `checks` (JSONB per-check outcome and version), `analysis_version`, `design_parser_version`, `design_schema_version`; `analysis_kind` CHECK now allows `pcb_analysis` (hand-written migration step) |
+| `analysis_findings` | One finding of one run | `run_id`, `project_id`, `design_id`, `revision_id` (denormalized for authorization and cross-revision lookups; all CASCADE). `check_id`, `check_version`, `rule`, `category`, `severity` + `severity_rank` (sorting), `source`, `verification`, `confidence`, texts, `objects` (JSONB refs by stable id), `components`/`nets` (text arrays, GIN-indexed), `region` (JSONB), `fingerprint` (index with `design_id`), review `status`/`status_reason`/`status_changed_*`, `inherited_from_id` (SET NULL). Never updated by a later run |
+| `finding_evidence` | Evidence items | `(finding_id, ordinal)` unique; `kind`, `label`, `value`, `numeric_value`, `unit`, `expected` |
+| `finding_review_events` | Append-only review history | `from_status`, `to_status`, `reason`, `actor_id` (SET NULL), `carried_over` |
+
+Every finding is tied to the exact revision and run that produced it, and the run records the parser,
+schema, analysis and check versions. History is never overwritten: re-running creates new rows.
 
 ## Authorization model (enforced in the API service layer, CP3+)
 

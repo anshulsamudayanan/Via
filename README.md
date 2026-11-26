@@ -4,10 +4,11 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 2 in progress (Milestone 1 of 8, pending review).** Stage 1 is complete:
+> **Status: Stage 2 in progress (Milestone 2 of 8, pending review).** Stage 1 is complete:
 > accounts, projects, sharing, the PCB pipeline and an interactive board viewer, covered by unit,
 > integration, security and browser tests. Stage 2 so far adds KiCad project (`.zip`) import with
-> design rules, schema 1.1 (stable object ids, stackup, locks) and job recovery after worker crashes.
+> design rules, schema 1.1 (stable object ids, stackup, locks), job recovery after worker crashes, and
+> the analysis/findings framework (API; the analysis UI arrives in Milestone 7).
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md).
 
 ## What works today
@@ -199,3 +200,6 @@ Stage 1 is built to run locally. A public deployment additionally needs, at mini
 - [docs/SECURITY.md](docs/SECURITY.md): security and privacy design
 - [docs/ROADMAP.md](docs/ROADMAP.md): checkpoints and later stages
 - [docs/PRD.md](docs/PRD.md): product requirements
+- [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md): Stage 2 audit and plan
+- [docs/FINDINGS_SYSTEM.md](docs/FINDINGS_SYSTEM.md): analysis findings contract, provenance, review, comparison
+- [docs/PCB_ANALYSIS.md](docs/PCB_ANALYSIS.md): analysis checks and what they do and don't cover

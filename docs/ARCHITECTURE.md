@@ -58,11 +58,11 @@ via/
         storage/                  StorageBackend: S3-compatible (MinIO) and local
         security.py ratelimit.py  Argon2id + token hashing; Redis fixed-window limits
         deps.py                   current user (cookie/Bearer), client info, limiter, mailer
-        services/                 business logic: auth, access (authorization), projects, activity
+        services/                 business logic: auth, access (authorization), projects, activity, designs, analysis
         schemas/                  request/response models
-        routes/                   health, auth, users, organizations, projects, activity, pcb, designs, files
+        routes/                   health, auth, users, organizations, projects, activity, pcb, designs, files, ai, analysis
         parsing/                  sandbox.py (constrained parser subprocess), importer.py (persist results)
-        jobs.py                   RQ queue + job entry points + failure callback
+        jobs.py                   RQ queue, job entry points (import, analysis), failure callbacks, heartbeat + reaper
         cli.py                    via-api migrate | init-storage | serve | check
       requirements.lock           locked third-party deps for the Docker image
     web/                          ✅ Next.js (App Router)
@@ -157,6 +157,18 @@ All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC
 5. Create design/revision (`pending`), upload record, analysis run, activity entry; enqueue job → `202 Accepted`.
 6. Worker: download → run parser subprocess → on success write normalized JSON object and extracted rows, mark `ready`; on failure store a safe error message and mark `failed`.
 7. Web polls the revision status and then loads `/api/v1/pcb/{design_id}` and paginated components/nets/layers.
+
+## 5b. Request flow: PCB analysis (Stage 2, Milestone 2)
+
+1. `POST /api/v1/designs/{id}/analysis-runs`: auth, then `editor` on the project, then an active project and a parsed revision. An identical queued or running run is returned instead of a new one; otherwise the rate limit is applied and a `queued` run is created → `202`.
+2. Worker `analyze_run` (heartbeat, reaper-recoverable):
+   - loads the stored normalized design (schema 1.1+; older designs are re-imported first);
+   - runs `via_pcb.analysis` checks in-process; analysis reads only VIA's own validated model, never vendor files;
+   - persists findings, evidence and per-check provenance;
+   - carries human review decisions over by fingerprint.
+3. Clients poll the run, then page through findings, review them and compare runs.
+
+The analysis engine lives in `services/pcb-engine` (`via_pcb.analysis`) with no API or DB dependencies, so it can run in the worker, the CLI or future services. Findings contract: docs/FINDINGS_SYSTEM.md.
 
 ## 6. Technical risks
 

@@ -33,4 +33,5 @@ cd apps/api && alembic revision --autogenerate -m "..."   # review by hand; `ale
 ## Tests
 - Engineering fixtures need documented provenance and licence (`tests/engineering/fixtures/README.md`). Expected values are derived by hand, not copied from parser output.
 - A checkpoint is done only when lint, types and tests pass.
-- New API routes are picked up by `tests/integration/test_security_regression.py`: public routes go in `PUBLIC`, query-scoped ones in `QUERY_SCOPED`, write bodies in `BODIES`.
+- New API routes are picked up by `tests/integration/test_security_regression.py`: public routes go in `PUBLIC`, query-scoped ones in `QUERY_SCOPED`, write bodies in `BODIES`, other required query parameters in `QUERY`; new id path parameters go in `ID_PARAMS` (and the `world` fixture).
+- Analysis checks: follow docs/FINDINGS_SYSTEM.md "Adding a check". Honest `source`/`verification`, evidence measured not invented, hand-derived tests including a clean case, bump the check `version` on logic changes.
