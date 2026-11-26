@@ -187,6 +187,9 @@ See docs/AI_INTELLIGENCE.md. AI is disabled by default (`503 ai_disabled`); 30 r
 | PATCH/DELETE | `/component-records/{record_id}` | editor | Update description, package, specs, datasheets or verification; delete |
 | GET | `/designs/{design_id}/component-matches` | viewer | Each component's part number from footprint properties and the matching record id |
 
+### VIA Optimize (Milestone 5)
+See docs/OPTIMIZATION_ENGINE.md for request and response shapes: `POST|GET /designs/{id}/optimization-runs`, `GET /optimization-runs/{id}`, `/candidates`, `/compare`, `GET /optimization-candidates/{id}`, `POST /optimization-candidates/{id}/decision`.
+
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.

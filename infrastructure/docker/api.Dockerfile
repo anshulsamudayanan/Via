@@ -16,10 +16,11 @@ RUN --mount=type=secret,id=build_ca \
     pip install --require-virtualenv -r requirements.lock
 COPY services/pcb-engine ./services/pcb-engine
 COPY services/ai-engine ./services/ai-engine
+COPY services/optimization ./services/optimization
 COPY apps/api ./apps/api
 RUN --mount=type=secret,id=build_ca \
     if [ -s /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
-    pip install --require-virtualenv --no-deps ./services/pcb-engine ./services/ai-engine ./apps/api
+    pip install --require-virtualenv --no-deps ./services/pcb-engine ./services/ai-engine ./services/optimization ./apps/api
 
 FROM python:3.13.9-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \

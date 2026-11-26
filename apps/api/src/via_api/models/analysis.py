@@ -188,3 +188,56 @@ class ComponentRecord(UUIDPk, Timestamps, Base):
     source: Mapped[str] = mapped_column(String(200))
     verification: Mapped[str] = mapped_column(String(16), default="unverified", server_default="unverified")
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class OptimizationCandidate(UUIDPk, Timestamps, Base):
+    """A proposed change set from an optimization run, with its measured effect and validation."""
+
+    __tablename__ = "optimization_candidates"
+    __table_args__ = (UniqueConstraint("run_id", "key"),)
+
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_runs.id", ondelete="CASCADE"), index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"), index=True)
+    revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(String(64))
+    algorithm: Mapped[str] = mapped_column(String(64))
+    algorithm_version: Mapped[str] = mapped_column(String(32))
+    objectives: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
+    title: Mapped[str] = mapped_column(String(300))
+    summary: Mapped[str] = mapped_column(Text)
+    metrics_before: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    metrics_after: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    expected_benefits: Mapped[list[str]] = mapped_column(JSONB)
+    trade_offs: Mapped[list[str]] = mapped_column(JSONB)
+    validation: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    pareto: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: proposed | awaiting_validation | validated | rejected | accepted
+    status: Mapped[str] = mapped_column(String(32))
+    status_reason: Mapped[str | None] = mapped_column(Text)
+    decided_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+
+
+class DesignChange(UUIDPk, Timestamps, Base):
+    """One explicit change (move, rotate, width, via, outline...). Milestone 6 adds history and export."""
+
+    __tablename__ = "design_changes"
+    __table_args__ = (UniqueConstraint("candidate_id", "ordinal"),)
+
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("optimization_candidates.id", ondelete="CASCADE"), index=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"), index=True)
+    revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))
+    ordinal: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(32))
+    target: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    before: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    after: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    reason: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(32))
+    finding_ids: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list, server_default="{}")
+    exportable: Mapped[bool] = mapped_column(Boolean)

@@ -46,6 +46,7 @@ from via_api.models.base import utcnow
 from via_api.models.enums import AnalysisKind, AnalysisStatus, RevisionStatus
 from via_api.parsing.importer import import_run, mark_failed, process_revision
 from via_api.parsing.sandbox import SandboxLimits
+from via_api.services import optimizer
 from via_api.services.analysis import analysis_job_id, fail_run, process_analysis
 from via_api.storage import get_storage
 
@@ -67,6 +68,8 @@ class JobQueue(Protocol):
     def enqueue_import(self, revision_id: uuid.UUID, attempt: int = 1) -> None: ...
 
     def enqueue_analysis(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
+
+    def enqueue_optimization(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
 
     def job_alive(self, job_id: str) -> bool: ...
 
@@ -106,6 +109,18 @@ class RQJobQueue:
             failure_ttl=7 * 24 * 3600,
             on_failure=Callback("via_api.jobs.on_analysis_failure", timeout=60),
             job_id=analysis_job_id(run_id, attempt),
+        )
+
+    def enqueue_optimization(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        self.queue.enqueue(
+            "via_api.jobs.optimize_run",
+            str(run_id),
+            attempt,
+            job_timeout=self.analysis_timeout,
+            result_ttl=3600,
+            failure_ttl=7 * 24 * 3600,
+            on_failure=Callback("via_api.jobs.on_analysis_failure", timeout=60),
+            job_id=optimizer.optimization_job_id(run_id, attempt),
         )
 
     def job_alive(self, job_id: str) -> bool:
@@ -260,6 +275,27 @@ def analyze_run(run_id: str, attempt: int = 1) -> str:
         engine.dispose()
 
 
+def optimize_run(run_id: str, attempt: int = 1) -> str:
+    """RQ job: execute one optimization run."""
+    from rq import get_current_job
+
+    settings = get_settings()
+    current = get_current_job()
+    db, engine = _session(settings)
+    storage = get_storage()
+    try:
+        with Heartbeat(settings, run_id=uuid.UUID(run_id)):
+            run = optimizer.process(
+                db, storage, uuid.UUID(run_id),
+                reimport=lambda rid: process_revision(db, storage, rid, sandbox_limits(settings)),
+                attempt=attempt, job_id=current.id if current else optimizer.optimization_job_id(run_id, attempt),
+            )  # fmt: skip
+        return run.status.value if run else "missing"
+    finally:
+        db.close()
+        engine.dispose()
+
+
 def on_analysis_failure(job: Any, connection: Any, type: Any, value: Any, traceback: Any) -> None:
     """RQ failure callback for analysis jobs (crash, timeout, abandoned)."""
     settings = get_settings()
@@ -294,13 +330,17 @@ def _retry_or_fail_analysis(
         report.failed.append(run.id)
         return
     nxt = tried + 1
+    optimization = run.kind == AnalysisKind.PCB_OPTIMIZATION
     run.status = AnalysisStatus.QUEUED
     run.attempt = nxt
-    run.job_id = analysis_job_id(run.id, nxt)
+    run.job_id = optimizer.optimization_job_id(run.id, nxt) if optimization else analysis_job_id(run.id, nxt)
     run.heartbeat_at = None
     db.commit()
     try:
-        queue.enqueue_analysis(run.id, attempt=nxt)
+        if optimization:
+            queue.enqueue_optimization(run.id, attempt=nxt)
+        else:
+            queue.enqueue_analysis(run.id, attempt=nxt)
     except Exception:
         logger.warning("Could not re-queue analysis run %s; will retry", run.id, exc_info=True)
         return
@@ -316,7 +356,7 @@ def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetim
     stale = db.scalars(
         select(AnalysisRun)
         .where(
-            AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS,
+            AnalysisRun.kind.in_((AnalysisKind.PCB_ANALYSIS, AnalysisKind.PCB_OPTIMIZATION)),
             AnalysisRun.status == AnalysisStatus.RUNNING,
             func.coalesce(AnalysisRun.heartbeat_at, AnalysisRun.started_at) < stale_before,
         )
@@ -329,14 +369,17 @@ def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetim
     queued = db.scalars(
         select(AnalysisRun)
         .where(
-            AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS,
+            AnalysisRun.kind.in_((AnalysisKind.PCB_ANALYSIS, AnalysisKind.PCB_OPTIMIZATION)),
             AnalysisRun.status == AnalysisStatus.QUEUED,
             AnalysisRun.updated_at < lost_before,
         )
         .with_for_update(skip_locked=True)
     ).all()
     for run in queued:
-        if queue.job_alive(run.job_id or analysis_job_id(run.id, max(run.attempt, 1))):
+        default_id = (optimizer.optimization_job_id if run.kind == AnalysisKind.PCB_OPTIMIZATION else analysis_job_id)(
+            run.id, max(run.attempt, 1)
+        )
+        if queue.job_alive(run.job_id or default_id):
             continue
         logger.warning("Queued analysis run %s is missing from the queue", run.id)
         _retry_or_fail_analysis(db, queue, run, settings, report)

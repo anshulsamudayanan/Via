@@ -95,6 +95,7 @@ class InlineQueue:
         self.enqueued: list[uuid.UUID] = []
         self.attempts: list[int] = []
         self.analyses: list[tuple[uuid.UUID, int]] = []
+        self.optimizations: list[tuple[uuid.UUID, int]] = []
         self.alive: set[str] = set()  # job ids reported as still queued/running
         self.run = True
         self.fail = False
@@ -138,6 +139,24 @@ class InlineQueue:
                     )
                     if self.settings is not None and self.settings.eda_url
                     else None
+                ),
+                attempt=attempt,
+            )
+
+    def enqueue_optimization(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        if self.fail:
+            raise ConnectionError("queue down")
+        self.optimizations.append((run_id, attempt))
+        if self.run:
+            from via_api.services import optimizer
+
+            storage = LocalStorage(self.storage_root)
+            optimizer.process(
+                self.db,
+                storage,
+                run_id,
+                reimport=lambda rid: process_revision(
+                    self.db, storage, rid, SandboxLimits(timeout_seconds=30, memory_bytes=1024**3)
                 ),
                 attempt=attempt,
             )

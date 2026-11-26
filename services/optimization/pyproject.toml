@@ -1,0 +1,13 @@
+[project]
+name = "via-optimization"
+version = "0.1.0"
+description = "VIA Optimize: objectives, constraints, candidate generation, validation and Pareto comparison"
+requires-python = ">=3.12"
+dependencies = ["via-pcb-engine==0.1.0"]
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/via_opt"]

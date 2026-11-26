@@ -72,10 +72,22 @@ Decisions (owner, 2026-11-26):
 | 2 | Findings and analysis framework | ✅ done |
 | 3 | Deterministic analysis and KiCad DRC | ✅ done |
 | 4 | Engineering intelligence and component context | ✅ done |
-| 5 | Optimization framework | ⏳ next |
-| 6 | Change management, comparison and export | — |
+| 5 | Optimization framework | ✅ done |
+| 6 | Change management, comparison and export | ⏳ next |
 | 7 | Viewer and workspace UI | — |
 | 8 | Testing, performance and documentation | — |
+
+### M5: Optimization framework ✅
+- **`services/optimization` (`via_opt`):**
+  - an explicit change model with `apply` (never mutates the original);
+  - seven objectives with deterministic metrics, including an illustrative relative cost index;
+  - constraints (fixed/locked parts, connectors, keep-outs, outline, margins, size limits);
+  - generators: outline fit, via standardization, track widening (profile and IPC-2221), greedy ratsnest placement, layer-reduction proposal;
+  - validation by re-running VIA's checks on the modified design (`requires_rerouting` and `manual` states are honest);
+  - a Pareto front.
+- **Data:** migration `0007` (`optimization_candidates`, `design_changes`, `pcb_optimization` runs).
+- **API:** runs, candidates, comparison and decisions (only validated candidates can be accepted). Runs share the worker lifecycle.
+- **Docs:** new OPTIMIZATION_ENGINE.md.
 
 ### M4: Engineering intelligence and component context ✅
 - **`via_ai`:**

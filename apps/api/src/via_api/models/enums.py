@@ -44,6 +44,8 @@ class AnalysisKind(StrEnum):
     PCB_IMPORT = "pcb_import"
     #: Stage 2: run the analysis checks on a parsed revision.
     PCB_ANALYSIS = "pcb_analysis"
+    #: Stage 2: generate and validate optimization candidates.
+    PCB_OPTIMIZATION = "pcb_optimization"
 
 
 class FindingStatus(StrEnum):

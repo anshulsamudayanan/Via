@@ -70,6 +70,8 @@ BODIES = {
         "source": "pwned",
     },
     ("PATCH", "/api/v1/component-records/{record_id}"): {"verification": "verified"},
+    ("POST", "/api/v1/designs/{design_id}/optimization-runs"): {"objectives": ["area"]},
+    ("POST", "/api/v1/optimization-candidates/{candidate_id}/decision"): {"status": "rejected", "reason": "pwned"},
 }
 
 #: Required query parameters (other than project_id) for routes that take them.
@@ -92,6 +94,7 @@ ID_PARAMS = (
     "profile_id",
     "recommendation_id",
     "record_id",
+    "candidate_id",
 )
 
 
@@ -147,6 +150,10 @@ def world(make_client, db):
         json={"manufacturer": "Yageo", "part_number": "RC0603", "source": "entered by user"},
     ).json()
     recommendation = _recommendation(db, imported)
+    opt = owner.post(
+        f"/api/v1/designs/{imported['design']['id']}/optimization-runs", json={"objectives": ["placement"]}
+    ).json()
+    candidate = owner.get(f"/api/v1/optimization-runs/{opt['id']}/candidates").json()[0]
     profile = owner.post(
         f"/api/v1/projects/{project['id']}/manufacturing-profiles", json={"name": "Shop", "values": PROFILE}
     ).json()
@@ -163,6 +170,7 @@ def world(make_client, db):
         "profile_id": profile["key"],
         "record_id": record["id"],
         "recommendation_id": str(recommendation.id),
+        "candidate_id": candidate["id"],
         "stranger_email": "stranger@example.com",
     }
     return owner, stranger, ids
@@ -259,6 +267,8 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     assert [r["status"] for r in recs] == ["open"]  # not rejected by the stranger
     records = owner.get(f"/api/v1/projects/{ids['project_id']}/component-records").json()
     assert [r["verification"] for r in records] == ["unverified"]
+    cand = owner.get(f"/api/v1/optimization-candidates/{ids['candidate_id']}").json()
+    assert cand["status"] == "awaiting_validation" and cand["status_reason"] is None  # untouched by the stranger
 
 
 @pytest.mark.parametrize(
