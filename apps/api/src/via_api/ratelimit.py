@@ -31,6 +31,7 @@ REGISTER_PER_IP = Limit("register-ip", 10, 3600)
 PASSWORD_RESET_PER_IP = Limit("reset-ip", 5, 3600)
 PASSWORD_CHANGE_PER_USER = Limit("password-change-user", 10, 3600)
 MEMBER_LOOKUP_PER_USER = Limit("member-lookup-user", 30, 3600)
+ANALYSES_PER_USER = Limit("analysis-user", 60, 3600)
 
 
 class RateLimiter:

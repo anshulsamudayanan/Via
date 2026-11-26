@@ -1,6 +1,7 @@
 """SQLAlchemy models. Importing this package registers every table on ``Base.metadata``."""
 
 from via_api.models.activity import ActivityLog, AnalysisRun, DataConsent
+from via_api.models.analysis import AnalysisFinding, FindingEvidence, FindingReviewEvent
 from via_api.models.base import Base
 from via_api.models.design import Design, DesignFile, DesignRevision, UploadRecord
 from via_api.models.identity import (
@@ -15,12 +16,15 @@ from via_api.models.project import Project, ProjectMembership
 
 __all__ = [
     "ActivityLog",
+    "AnalysisFinding",
     "AnalysisRun",
     "Base",
     "DataConsent",
     "Design",
     "DesignFile",
     "DesignRevision",
+    "FindingEvidence",
+    "FindingReviewEvent",
     "Organization",
     "OrganizationMembership",
     "PCBComponent",

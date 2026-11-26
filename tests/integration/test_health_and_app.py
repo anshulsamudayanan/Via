@@ -27,7 +27,7 @@ def test_readiness_checks_database_migrations_redis_and_storage(client):
 
     head = ScriptDirectory.from_config(alembic_config("postgresql://unused")).get_current_head()
     assert body["checks"]["database"]["detail"] == f"migrations at {head}"
-    assert head == "0003"  # update when adding a migration (keeps this test honest)
+    assert head == "0004"  # update when adding a migration (keeps this test honest)
     assert all(c["status"] == "ok" for c in body["checks"].values())
 
 

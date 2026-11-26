@@ -1,6 +1,13 @@
 import type {
   ActivityItem,
+  AnalysisComparison,
+  AnalysisRun,
   BoardSummary,
+  CheckInfo,
+  FindingDetail,
+  FindingFilters,
+  FindingPage,
+  FindingStatus,
   Design,
   DesignDetail,
   ImportResponse,
@@ -242,6 +249,24 @@ export function createViaClient(options: ClientOptions = {}) {
       list: (projectId: string) => request<ProjectFile[]>(`/api/v1/files${q({ project_id: projectId })}`),
       /** Same-origin URL; the browser sends the session cookie. */
       downloadUrl: (id: string) => `${baseUrl}/api/v1/files/${enc(id)}/download`,
+    },
+    analysis: {
+      checks: () => request<CheckInfo[]>("/api/v1/analysis/checks"),
+      start: (designId: string, body: { revision_id?: string; checks?: string[] } = {}) =>
+        request<AnalysisRun>(`/api/v1/designs/${enc(designId)}/analysis-runs`, { method: "POST", body }),
+      runs: (designId: string, params: { limit?: number; offset?: number } = {}, signal?: AbortSignal) =>
+        request<Page<AnalysisRun>>(`/api/v1/designs/${enc(designId)}/analysis-runs${q(params)}`, { signal }),
+      run: (runId: string, signal?: AbortSignal) => request<AnalysisRun>(`/api/v1/analysis-runs/${enc(runId)}`, { signal }),
+      findings: (runId: string, filters: FindingFilters = {}, signal?: AbortSignal) =>
+        request<FindingPage>(`/api/v1/analysis-runs/${enc(runId)}/findings${q({ ...filters })}`, { signal }),
+      finding: (findingId: string, signal?: AbortSignal) =>
+        request<FindingDetail>(`/api/v1/findings/${enc(findingId)}`, { signal }),
+      review: (findingId: string, status: FindingStatus, reason?: string) =>
+        request<FindingDetail>(`/api/v1/findings/${enc(findingId)}/review`, { method: "POST", body: { status, reason } }),
+      compare: (designId: string, baseRunId: string, targetRunId: string) =>
+        request<AnalysisComparison>(
+          `/api/v1/designs/${enc(designId)}/analysis-compare${q({ base_run_id: baseRunId, target_run_id: targetRunId })}`,
+        ),
     },
     pcb: {
       limits: () => request<UploadLimits>("/api/v1/pcb/limits"),

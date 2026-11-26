@@ -45,10 +45,14 @@ from via_api.models.base import utcnow
 from via_api.models.enums import AnalysisKind, AnalysisStatus, RevisionStatus
 from via_api.parsing.importer import import_run, mark_failed, process_revision
 from via_api.parsing.sandbox import SandboxLimits
+from via_api.services.analysis import analysis_job_id, fail_run, process_analysis
 from via_api.storage import get_storage
 
 logger = logging.getLogger("via_api.jobs")
 
+WORKER_LOST_ANALYSIS_MESSAGE = (
+    "The analysis was interrupted repeatedly (the worker stopped or ran out of resources). Try running it again."
+)
 WORKER_LOST_MESSAGE = (
     "Processing was interrupted repeatedly (the worker stopped or ran out of resources). Try uploading the file again."
 )
@@ -60,6 +64,8 @@ def import_job_id(revision_id: uuid.UUID | str, attempt: int) -> str:
 
 class JobQueue(Protocol):
     def enqueue_import(self, revision_id: uuid.UUID, attempt: int = 1) -> None: ...
+
+    def enqueue_analysis(self, run_id: uuid.UUID, attempt: int = 1) -> None: ...
 
     def job_alive(self, job_id: str) -> bool: ...
 
@@ -74,6 +80,8 @@ class RQJobQueue:
         self.queue = Queue(settings.import_queue_name, connection=redis)
         # The job outlives the parser's own timeout (download + persist time).
         self.job_timeout = settings.parser_timeout_seconds + 120
+        # An analysis may first re-import an outdated revision, then run the checks.
+        self.analysis_timeout = settings.parser_timeout_seconds + settings.analysis_timeout_seconds + 120
 
     def enqueue_import(self, revision_id: uuid.UUID, attempt: int = 1) -> None:
         self.queue.enqueue(
@@ -85,6 +93,18 @@ class RQJobQueue:
             failure_ttl=7 * 24 * 3600,
             on_failure=Callback("via_api.jobs.on_import_failure", timeout=60),
             job_id=import_job_id(revision_id, attempt),
+        )
+
+    def enqueue_analysis(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        self.queue.enqueue(
+            "via_api.jobs.analyze_run",
+            str(run_id),
+            attempt,
+            job_timeout=self.analysis_timeout,
+            result_ttl=3600,
+            failure_ttl=7 * 24 * 3600,
+            on_failure=Callback("via_api.jobs.on_analysis_failure", timeout=60),
+            job_id=analysis_job_id(run_id, attempt),
         )
 
     def job_alive(self, job_id: str) -> bool:
@@ -110,22 +130,28 @@ def _session(settings: Settings) -> tuple[Session, Any]:
 
 
 class Heartbeat:
-    """Refreshes ``heartbeat_at`` on the running import run of a revision until stopped."""
+    """Refreshes ``heartbeat_at`` until stopped: on one run (``run_id``), or on the running
+    import run of a revision (imports create their run inside the job)."""
 
-    def __init__(self, settings: Settings, revision_id: uuid.UUID) -> None:
+    def __init__(
+        self, settings: Settings, revision_id: uuid.UUID | None = None, *, run_id: uuid.UUID | None = None
+    ) -> None:
+        if (revision_id is None) == (run_id is None):
+            raise ValueError("pass exactly one of revision_id and run_id")
         self.settings = settings
         self.revision_id = revision_id
+        self.run_id = run_id
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, name=f"heartbeat-{revision_id}", daemon=True)
+        self._thread = threading.Thread(target=self._run, name=f"heartbeat-{revision_id or run_id}", daemon=True)
 
     def beat(self, db: Session) -> None:
+        if self.run_id is not None:
+            target = AnalysisRun.id == self.run_id
+        else:
+            target = (AnalysisRun.revision_id == self.revision_id) & (AnalysisRun.kind == AnalysisKind.PCB_IMPORT)
         db.execute(
             update(AnalysisRun)
-            .where(
-                AnalysisRun.revision_id == self.revision_id,
-                AnalysisRun.kind == AnalysisKind.PCB_IMPORT,
-                AnalysisRun.status == AnalysisStatus.RUNNING,
-            )
+            .where(target, AnalysisRun.status == AnalysisStatus.RUNNING)
             .values(heartbeat_at=func.now())
         )
         db.commit()
@@ -199,6 +225,118 @@ def on_import_failure(job: Any, connection: Any, type: Any, value: Any, tracebac
     finally:
         db.close()
         engine.dispose()
+
+
+def analyze_run(run_id: str, attempt: int = 1) -> str:
+    """RQ job: execute one analysis run."""
+    from rq import get_current_job
+
+    settings = get_settings()
+    current = get_current_job()
+    db, engine = _session(settings)
+    storage = get_storage()
+
+    def reimport(revision_id: uuid.UUID) -> None:
+        process_revision(db, storage, revision_id, sandbox_limits(settings))
+
+    try:
+        with Heartbeat(settings, run_id=uuid.UUID(run_id)):
+            run = process_analysis(
+                db,
+                storage,
+                uuid.UUID(run_id),
+                reimport=reimport,
+                attempt=attempt,
+                job_id=current.id if current else analysis_job_id(run_id, attempt),
+            )
+        return run.status.value if run else "missing"
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def on_analysis_failure(job: Any, connection: Any, type: Any, value: Any, traceback: Any) -> None:
+    """RQ failure callback for analysis jobs (crash, timeout, abandoned)."""
+    settings = get_settings()
+    db, engine = _session(settings)
+    try:
+        run = db.get(AnalysisRun, uuid.UUID(job.args[0]))
+        if run is None or run.status not in (AnalysisStatus.QUEUED, AnalysisStatus.RUNNING):
+            return
+        job_id = getattr(job, "id", None)
+        if run.job_id and job_id and run.job_id != job_id:
+            return  # superseded attempt
+        if type is AbandonedJobError:
+            _retry_or_fail_analysis(db, RQJobQueue(connection, settings), run, settings, ReapReport())
+            return
+        logger.error("Analysis job %s failed: %s", run.id, type.__name__ if type else "unknown")
+        code = "timeout" if type is not None and "Timeout" in type.__name__ else "analysis_failed"
+        fail_run(db, run, code, "The analysis stopped unexpectedly. Try running it again.")
+        db.commit()
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def _retry_or_fail_analysis(
+    db: Session, queue: JobQueue, run: AnalysisRun, settings: Settings, report: ReapReport
+) -> None:
+    tried = max(run.attempt, 1)
+    if tried >= settings.job_max_attempts:
+        logger.error("Analysis run %s lost after %d attempts; marking failed", run.id, tried)
+        fail_run(db, run, "worker_lost", WORKER_LOST_ANALYSIS_MESSAGE)
+        db.commit()
+        report.failed.append(run.id)
+        return
+    nxt = tried + 1
+    run.status = AnalysisStatus.QUEUED
+    run.attempt = nxt
+    run.job_id = analysis_job_id(run.id, nxt)
+    run.heartbeat_at = None
+    db.commit()
+    try:
+        queue.enqueue_analysis(run.id, attempt=nxt)
+    except Exception:
+        logger.warning("Could not re-queue analysis run %s; will retry", run.id, exc_info=True)
+        return
+    logger.warning("Re-queued analysis run %s (attempt %d of %d)", run.id, nxt, settings.job_max_attempts)
+    report.requeued.append(run.id)
+
+
+def reap_analyses(db: Session, queue: JobQueue, settings: Settings, now: datetime | None = None) -> ReapReport:
+    """Recover analysis runs whose worker died (stale heartbeat) or whose queued job was lost."""
+    now = now or utcnow()
+    report = ReapReport()
+    stale_before = now - timedelta(seconds=settings.job_stale_after_seconds)
+    stale = db.scalars(
+        select(AnalysisRun)
+        .where(
+            AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS,
+            AnalysisRun.status == AnalysisStatus.RUNNING,
+            func.coalesce(AnalysisRun.heartbeat_at, AnalysisRun.started_at) < stale_before,
+        )
+        .with_for_update(skip_locked=True)
+    ).all()
+    for run in stale:
+        logger.warning("Analysis run %s has a stale heartbeat (job %s)", run.id, run.job_id)
+        _retry_or_fail_analysis(db, queue, run, settings, report)
+    lost_before = now - timedelta(seconds=settings.job_lost_after_seconds)
+    queued = db.scalars(
+        select(AnalysisRun)
+        .where(
+            AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS,
+            AnalysisRun.status == AnalysisStatus.QUEUED,
+            AnalysisRun.updated_at < lost_before,
+        )
+        .with_for_update(skip_locked=True)
+    ).all()
+    for run in queued:
+        if queue.job_alive(run.job_id or analysis_job_id(run.id, max(run.attempt, 1))):
+            continue
+        logger.warning("Queued analysis run %s is missing from the queue", run.id)
+        _retry_or_fail_analysis(db, queue, run, settings, report)
+    db.commit()
+    return report
 
 
 @dataclass
@@ -281,7 +419,9 @@ def reap_once(settings: Settings, queue: JobQueue) -> None:
     """One reaper pass with its own session; never raises (the worker must keep running)."""
     db, engine = _session(settings)
     try:
-        report = reap_imports(db, queue, settings)
+        imports = reap_imports(db, queue, settings)
+        analyses = reap_analyses(db, queue, settings)
+        report = ReapReport(imports.requeued + analyses.requeued, imports.failed + analyses.failed)
         if report.requeued or report.failed:
             logger.warning("Reaper: requeued %d, failed %d", len(report.requeued), len(report.failed))
     except Exception:

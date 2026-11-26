@@ -42,6 +42,16 @@ class UploadOutcome(StrEnum):
 
 class AnalysisKind(StrEnum):
     PCB_IMPORT = "pcb_import"
+    #: Stage 2: run the analysis checks on a parsed revision.
+    PCB_ANALYSIS = "pcb_analysis"
+
+
+class FindingStatus(StrEnum):
+    """User review state of a finding (separate from how the finding was verified)."""
+
+    OPEN = "open"
+    REVIEWED = "reviewed"
+    DISMISSED = "dismissed"
 
 
 class AnalysisStatus(StrEnum):

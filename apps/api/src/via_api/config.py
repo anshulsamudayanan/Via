@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     job_lost_after_seconds: int = Field(default=300, ge=5)
     job_max_attempts: int = Field(default=3, ge=1, le=10)
     job_reaper_interval_seconds: int = Field(default=30, ge=1)
+    #: Time budget for running the analysis checks on one revision (the RQ job adds parse time).
+    analysis_timeout_seconds: int = Field(default=300, ge=10)
     enable_docs: bool = True
 
     # --- Sessions & auth ---------------------------------------------------

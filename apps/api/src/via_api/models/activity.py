@@ -47,6 +47,15 @@ class AnalysisRun(UUIDPk, Timestamps, Base):
     job_id: Mapped[str | None] = mapped_column(String(128))
     #: Last sign of life from the process doing the work (updated every few seconds).
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Provenance of analysis runs (kind = pcb_analysis): exactly what produced the findings.
+    #: Options the run was started with (e.g. selected checks; manufacturing profile from M3).
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    #: Per-check outcome: [{check_id, version, status, finding_count, duration_ms, message}].
+    checks: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    analysis_version: Mapped[str | None] = mapped_column(String(32))
+    #: Parser and schema version of the design that was analysed.
+    design_parser_version: Mapped[str | None] = mapped_column(String(32))
+    design_schema_version: Mapped[str | None] = mapped_column(String(32))
 
 
 class ActivityLog(UUIDPk, CreatedAt, Base):

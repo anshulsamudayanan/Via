@@ -51,9 +51,28 @@ BODIES = {
     ("POST", "/api/v1/projects/{project_id}/members"): {"email": "{stranger_email}", "role": "editor"},
     ("PATCH", "/api/v1/projects/{project_id}/members/{user_id}"): {"role": "viewer"},
     ("PATCH", "/api/v1/designs/{design_id}"): {"name": "pwned"},
+    ("POST", "/api/v1/designs/{design_id}/analysis-runs"): {},
+    ("POST", "/api/v1/findings/{finding_id}/review"): {"status": "dismissed", "reason": "pwned"},
+}
+
+#: Required query parameters (other than project_id) for routes that take them.
+QUERY = {
+    ("GET", "/api/v1/designs/{design_id}/analysis-compare"): "?base_run_id={run_id}&target_run_id={run_id}",
 }
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+
+#: Path parameters that identify something owned by a project.
+ID_PARAMS = (
+    "project_id",
+    "design_id",
+    "revision_id",
+    "file_id",
+    "organization_id",
+    "session_id",
+    "run_id",
+    "finding_id",
+)
 
 
 def api_routes(app) -> set[tuple[str, str]]:
@@ -72,7 +91,7 @@ def fill(path: str, ids: dict[str, str]) -> str:
 
 
 def send(client, method: str, path: str, ids: dict[str, str], query: str = ""):
-    url = fill(path, ids) + query
+    url = fill(path, ids) + (query or QUERY.get((method, path), "").format(**ids))
     if (method, path) == ("POST", "/api/v1/pcb/import"):
         return client.post(
             url,
@@ -101,6 +120,8 @@ def world(make_client, db):
     files = owner.get(f"/api/v1/files?project_id={project['id']}").json()
     sessions = owner.get("/api/v1/auth/sessions").json()
     org_id = owner.get("/api/v1/organizations").json()[0]["id"]
+    run = owner.post(f"/api/v1/designs/{imported['design']['id']}/analysis-runs", json={}).json()
+    finding = owner.get(f"/api/v1/analysis-runs/{run['id']}/findings").json()["items"][0]
     ids = {
         "project_id": project["id"],
         "design_id": imported["design"]["id"],
@@ -109,6 +130,8 @@ def world(make_client, db):
         "organization_id": org_id,
         "session_id": sessions[0]["id"],
         "user_id": owner_me["user"]["id"],
+        "run_id": run["id"],
+        "finding_id": finding["id"],
         "stranger_email": "stranger@example.com",
     }
     return owner, stranger, ids
@@ -119,6 +142,7 @@ def test_every_route_is_classified(app):
     assert routes >= PUBLIC, f"stale PUBLIC entries: {PUBLIC - routes}"
     assert routes >= QUERY_SCOPED, f"stale QUERY_SCOPED entries: {QUERY_SCOPED - routes}"
     assert set(BODIES) <= routes, f"stale BODIES entries: {set(BODIES) - routes}"
+    assert set(QUERY) <= routes, f"stale QUERY entries: {set(QUERY) - routes}"
     # Everything not public must require a session (checked below); a route whose path
     # isn't under /api/v1 would escape the CSRF middleware and versioning.
     assert all(path.startswith("/api/v1/") for _, path in routes)
@@ -126,8 +150,7 @@ def test_every_route_is_classified(app):
 
 def test_every_authenticated_route_requires_a_session(app, make_client):
     anonymous = make_client()
-    ids = {name: str(uuid.uuid4()) for name in ("project_id", "design_id", "revision_id", "file_id")}
-    ids |= {name: str(uuid.uuid4()) for name in ("organization_id", "session_id", "user_id")}
+    ids = {name: str(uuid.uuid4()) for name in (*ID_PARAMS, "user_id")}
     ids["stranger_email"] = "nobody@example.com"
     checked = 0
     for method, path in sorted(api_routes(app) - PUBLIC):
@@ -155,7 +178,7 @@ def test_every_unsafe_route_requires_the_csrf_header(app, world, make_client):
 
 def test_every_scoped_route_hides_other_users_data(app, world):
     owner, stranger, ids = world
-    id_params = {"project_id", "design_id", "revision_id", "file_id", "organization_id", "session_id"}
+    id_params = set(ID_PARAMS)
     checked: list[tuple[str, str]] = []
     for method, path in sorted(api_routes(app) - PUBLIC):
         params = set(re.findall(r"\{(\w+)\}", path))
@@ -178,6 +201,9 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     assert owner.get(f"/api/v1/designs/{ids['design_id']}").json()["name"] == "board"
     assert owner.get(f"/api/v1/ai/consent/{ids['project_id']}").json()["granted"] is False
     assert owner.get("/api/v1/auth/me").status_code == 200  # session not revoked
+    finding = owner.get(f"/api/v1/findings/{ids['finding_id']}").json()
+    assert finding["status"] == "open" and finding["history"] == []  # not dismissed by the stranger
+    assert owner.get(f"/api/v1/designs/{ids['design_id']}/analysis-runs").json()["total"] == 1  # none started
 
 
 @pytest.mark.parametrize(
@@ -193,8 +219,10 @@ def test_every_scoped_route_hides_other_users_data(app, world):
          {"current_password": "correct horse battery", "new_password": "another horse battery"}),
         (ratelimit.MEMBER_LOOKUP_PER_USER, "{user_id}", "post", "/api/v1/projects/{project_id}/members",
          {"email": "stranger@example.com", "role": "viewer"}),
+        (ratelimit.ANALYSES_PER_USER, "{user_id}", "post", "/api/v1/designs/{design_id}/analysis-runs",
+         {"checks": ["board_outline"]}),
     ],
-    ids=["register", "login", "password-reset", "password-change", "member-lookup"],
+    ids=["register", "login", "password-reset", "password-change", "member-lookup", "analysis"],
 )  # fmt: skip
 def test_rate_limits_are_enforced(world, test_redis, limit, key, method, path, body):
     owner, _, ids = world

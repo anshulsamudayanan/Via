@@ -19,6 +19,7 @@ from via_api.main import create_app
 from via_api.parsing.importer import process_revision
 from via_api.parsing.sandbox import SandboxLimits
 from via_api.redis_client import get_redis
+from via_api.services.analysis import process_analysis
 from via_api.storage import LocalStorage, get_storage
 
 
@@ -91,6 +92,7 @@ class InlineQueue:
         self.storage_root = storage_root
         self.enqueued: list[uuid.UUID] = []
         self.attempts: list[int] = []
+        self.analyses: list[tuple[uuid.UUID, int]] = []
         self.alive: set[str] = set()  # job ids reported as still queued/running
         self.run = True
         self.fail = False
@@ -106,6 +108,22 @@ class InlineQueue:
                 LocalStorage(self.storage_root),
                 revision_id,
                 SandboxLimits(timeout_seconds=30, memory_bytes=1024**3),
+                attempt=attempt,
+            )
+
+    def enqueue_analysis(self, run_id: uuid.UUID, attempt: int = 1) -> None:
+        if self.fail:
+            raise ConnectionError("queue down")
+        self.analyses.append((run_id, attempt))
+        if self.run:
+            storage = LocalStorage(self.storage_root)
+            process_analysis(
+                self.db,
+                storage,
+                run_id,
+                reimport=lambda rid: process_revision(
+                    self.db, storage, rid, SandboxLimits(timeout_seconds=30, memory_bytes=1024**3)
+                ),
                 attempt=attempt,
             )
 

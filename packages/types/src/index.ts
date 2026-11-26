@@ -476,3 +476,143 @@ export interface PCBDesign {
   /** Schema 1.1+: null when the source declares no stackup. */
   stackup?: { layers: StackupLayer[]; copper_finish: string | null; dielectric_constraints: boolean | null } | null;
 }
+
+// --- Stage 2: analysis and findings -------------------------------------------------------
+
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
+export type FindingSource = "via_deterministic" | "kicad_drc" | "external_simulation" | "ai_suggestion";
+export type FindingVerification = "verified" | "heuristic" | "unverified";
+export type FindingStatus = "open" | "reviewed" | "dismissed";
+export type AnalysisStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface CheckInfo {
+  id: string;
+  version: string;
+  category: string;
+  title: string;
+  description: string;
+  source: FindingSource;
+}
+
+export interface CheckRun {
+  check_id: string;
+  version: string;
+  status: "ok" | "skipped" | "error";
+  finding_count: number;
+  duration_ms: number;
+  message: string | null;
+}
+
+export interface AnalysisRun {
+  id: string;
+  design_id: string;
+  revision_id: string;
+  revision_number: number;
+  status: AnalysisStatus;
+  attempt: number;
+  config: { checks?: string[] };
+  checks: CheckRun[];
+  summary: {
+    finding_count?: number;
+    by_severity?: Record<Severity, number>;
+    checks?: Record<"ok" | "skipped" | "error", number>;
+    duration_seconds?: number | null;
+  };
+  analysis_version: string | null;
+  engine_version: string | null;
+  design_parser_version: string | null;
+  design_schema_version: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  triggered_by: { id: string; display_name: string } | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface FindingObjectRef {
+  kind: "component" | "pad" | "track" | "via" | "zone" | "net" | "outline" | "layer";
+  id: string;
+  label: string | null;
+}
+
+export interface Finding {
+  id: string;
+  run_id: string;
+  project_id: string;
+  design_id: string;
+  revision_id: string;
+  check_id: string;
+  check_version: string;
+  rule: string;
+  category: string;
+  severity: Severity;
+  source: FindingSource;
+  verification: FindingVerification;
+  confidence: number;
+  title: string;
+  description: string;
+  explanation: string;
+  suggested_resolution: string | null;
+  objects: FindingObjectRef[];
+  components: string[];
+  nets: string[];
+  region: { bbox: BoundingBox; points: Point[]; layers: string[] } | null;
+  fingerprint: string;
+  status: FindingStatus;
+  status_reason: string | null;
+  status_changed_at: string | null;
+  inherited: boolean;
+  created_at: string;
+}
+
+export interface FindingDetail extends Finding {
+  evidence: {
+    kind: string;
+    label: string;
+    value: string;
+    numeric_value: number | null;
+    unit: string | null;
+    expected: string | null;
+  }[];
+  history: {
+    from_status: FindingStatus;
+    to_status: FindingStatus;
+    reason: string | null;
+    carried_over: boolean;
+    actor: { id: string; display_name: string } | null;
+    created_at: string;
+  }[];
+}
+
+export interface FindingPage {
+  items: Finding[];
+  total: number;
+  limit: number;
+  offset: number;
+  facets: Record<"severity" | "status" | "category" | "source", Record<string, number>>;
+}
+
+export interface FindingFilters {
+  severity?: string;
+  category?: string;
+  source?: string;
+  verification?: string;
+  status?: string;
+  check_id?: string;
+  component?: string;
+  net?: string;
+  q?: string;
+  sort?: "severity" | "category" | "title" | "check" | "status" | "confidence";
+  order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export interface AnalysisComparison {
+  base_run: AnalysisRun;
+  target_run: AnalysisRun;
+  new: Finding[];
+  resolved: Finding[];
+  persisting: Finding[];
+}
