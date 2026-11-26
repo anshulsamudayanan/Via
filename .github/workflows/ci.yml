@@ -109,7 +109,10 @@ jobs:
           echo "stack not ready after 5 minutes"; exit 1
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium for Playwright
-        run: pnpm --filter @via/web exec playwright install --with-deps chromium
+        # Refresh the runner's apt index first: a stale index 404s on superseded security packages.
+        run: |
+          sudo apt-get update
+          pnpm --filter @via/web exec playwright install --with-deps chromium
       - name: End-to-end tests
         run: pnpm --filter @via/web e2e
       - name: Service logs

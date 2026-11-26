@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { me, mockClient, navigation, page, project, renderWith, router } from "@/test/helpers";
+import { design, me, mockClient, navigation, page, project, renderWith, router } from "@/test/helpers";
 
 import { NewProjectDialog } from "./projects/new-project-dialog";
 import { ProjectsBrowser } from "./projects/projects-browser";
@@ -81,12 +81,14 @@ describe("ProjectsBrowser", () => {
 });
 
 describe("ProjectWorkspace", () => {
-  it("shows project details and honest coming-soon sections", async () => {
+  it("shows project details and each design's latest analysis", async () => {
     navigation.pathname = "/projects/p1";
     navigation.search = new URLSearchParams("tab=analysis");
-    renderWith(<ProjectWorkspace />, mockClient({ projects: { get: vi.fn().mockResolvedValue(project()) } }));
+    renderWith(<ProjectWorkspace />, mockClient({ projects: { get: vi.fn().mockResolvedValue(project()) }, designs: { list: vi.fn().mockResolvedValue([design()]) } }));
     expect(await screen.findByRole("heading", { name: "Motor Controller" })).toBeTruthy();
-    expect(screen.getByText("Coming soon")).toBeTruthy();
+    expect((await screen.findByRole("link", { name: "Motor board" })).getAttribute("href")).toBe("/projects/p1/designs/d1?tab=analysis");
+    expect(await screen.findByText("Not analysed yet")).toBeTruthy();
+    expect(screen.queryByText("Coming soon")).toBeNull();
     const nav = screen.getByRole("navigation", { name: "Project sections" });
     expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual([
       "Overview", "PCB Designs", "Files", "Components", "Analysis", "Activity", "Settings",

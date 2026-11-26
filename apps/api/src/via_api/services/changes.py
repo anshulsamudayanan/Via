@@ -10,6 +10,7 @@ Nothing is ever overwritten or deleted: rollback only makes the base revision cu
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import io
 import logging
@@ -370,7 +371,9 @@ def process_export(
         fail_change_set(db, cs, run, "storage_unavailable", "The original file couldn't be read. Try again shortly.")
         db.commit()
         return run
-    outcome = export(data, src.original_filename, [_as_change(r).model_dump(mode="json") for r in rows], limits)
+    # Export parses the board, patches it and parses the result again: allow twice the parser's time.
+    export_limits = dataclasses.replace(limits, timeout_seconds=limits.timeout_seconds * 2)
+    outcome = export(data, src.original_filename, [_as_change(r).model_dump(mode="json") for r in rows], export_limits)
     if outcome.data is None:
         fail_change_set(
             db, cs, run, outcome.error_code or "export_failed", outcome.error_message or "The export failed."

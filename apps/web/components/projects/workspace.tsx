@@ -3,13 +3,13 @@
 import { ApiError } from "@via/api-client";
 import type { Project } from "@via/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, cn, EmptyState, ErrorState, Skeleton } from "@via/ui";
-import { Archive, BarChart3, FolderX } from "lucide-react";
+import { Archive, FolderX } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 
 import { ActivityList } from "@/components/activity-list";
 import { useApi } from "@/components/api-context";
-import { ComingSoon } from "@/components/coming-soon";
+import { ProjectAnalysisSection } from "@/components/analysis/project-analysis";
 import { FilesTable } from "@/components/designs/files-table";
 import { DesignsSection, ProjectComponentsSection } from "@/components/designs/project-sections";
 import { ArchivedBadge, RoleBadge, VisibilityBadge } from "@/components/projects/badges";
@@ -122,13 +122,7 @@ function TabPanel({ tab, project, onChange, onReload }: { tab: TabId; project: P
     case "components":
       return <ProjectComponentsSection project={project} />;
     case "analysis":
-      return (
-        <ComingSoon
-          icon={<BarChart3 />}
-          title="Analysis"
-          description="Design analysis (rule checks, AI review) is planned for a later stage. Import results and parser warnings are on each design's page. VIA will never show analysis results it hasn't actually computed."
-        />
-      );
+      return <ProjectAnalysisSection project={project} />;
     case "activity":
       return (
         <Card>
