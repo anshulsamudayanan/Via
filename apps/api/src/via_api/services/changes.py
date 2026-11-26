@@ -19,7 +19,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from via_opt import EXPORTABLE, Change, ChangeKind, apply, metrics
 
@@ -282,8 +282,17 @@ def _require_draft(cs: ChangeSet) -> None:
 
 
 def request_apply(db: Session, ctx: AuthContext, cs: ChangeSet, client: ClientInfo) -> AnalysisRun:
+    # Lock the design, then the change set: concurrent applies serialize here.
+    design = db.scalar(select(Design).where(Design.id == cs.design_id).with_for_update())
+    db.refresh(cs, with_for_update=True)
     _require_draft(cs)
-    design = db.get(Design, cs.design_id)
+    busy = db.scalar(
+        select(ChangeSet.id).where(ChangeSet.design_id == cs.design_id, ChangeSet.status == ChangeSetStatus.APPLYING)
+    )
+    if busy is not None:
+        raise APIError(
+            409, "apply_in_progress", "Another change set is being applied to this design. Wait for it to finish."
+        )
     if design is None or design.current_revision_id != cs.base_revision_id:
         raise APIError(
             409,
@@ -384,9 +393,18 @@ def process_export(
         db.commit()
         return run
     sha = hashlib.sha256(outcome.data).hexdigest()
-    number = (
-        db.scalar(select(func.max(DesignRevision.revision_number)).where(DesignRevision.design_id == cs.design_id)) or 0
-    ) + 1
+    number = design_svc.next_revision_number(db, cs.design_id)  # locks the design row
+    current = db.scalar(select(Design.current_revision_id).where(Design.id == cs.design_id))
+    if current != base.id:
+        fail_change_set(
+            db,
+            cs,
+            run,
+            "base_not_current",
+            "The design changed while this change set was being applied. Create a new change set.",
+        )
+        db.commit()
+        return run
     rev = DesignRevision(design_id=cs.design_id, project_id=cs.project_id, revision_number=number, status=RevisionStatus.PENDING,
                          source_format=base.source_format, source_sha256=sha, created_by_id=cs.applied_by_id, parent_revision_id=base.id)  # fmt: skip
     db.add(rev)
@@ -456,9 +474,10 @@ def _follow_up_analysis(db: Session, cs: ChangeSet, rev: DesignRevision) -> None
 
 
 def rollback(db: Session, ctx: AuthContext, cs: ChangeSet, client: ClientInfo) -> None:
+    design = db.scalar(select(Design).where(Design.id == cs.design_id).with_for_update())
+    db.refresh(cs, with_for_update=True)
     if cs.status != ChangeSetStatus.APPLIED:
         raise APIError(409, "not_applied", "Only an applied change set can be rolled back.")
-    design = db.get(Design, cs.design_id)
     if design is None or design.current_revision_id != cs.result_revision_id:
         raise APIError(409, "not_current", "A newer revision is current; roll that back first.")
     design.current_revision_id = cs.base_revision_id

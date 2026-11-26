@@ -179,6 +179,13 @@ def list_designs(db: Session, project_id: uuid.UUID) -> list[DesignOut]:
 # ----------------------------------------------------------------- upload
 
 
+def next_revision_number(db: Session, design_id: uuid.UUID) -> int:
+    """The next revision number, with the design row locked so concurrent uploads/exports can't collide."""
+    db.execute(select(Design.id).where(Design.id == design_id).with_for_update())
+    latest = db.scalar(select(func.max(DesignRevision.revision_number)).where(DesignRevision.design_id == design_id))
+    return (latest or 0) + 1
+
+
 def clean_filename(filename: str | None) -> str:
     base = os.path.basename((filename or "").replace("\\", "/"))
     base = re.sub(r"[\x00-\x1f\x7f]", "", base).strip()
@@ -365,9 +372,7 @@ def import_upload(
         db.add(design)
         db.flush()
 
-    number = (
-        db.scalar(select(func.max(DesignRevision.revision_number)).where(DesignRevision.design_id == design.id)) or 0
-    ) + 1
+    number = next_revision_number(db, design.id)
     revision = DesignRevision(
         design_id=design.id,
         project_id=project.id,
