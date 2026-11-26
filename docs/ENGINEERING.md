@@ -101,6 +101,46 @@ interactive frame instead of about 536 ms).
   Selecting a finding zooms to all of this. Geometry comes only from the parsed design and the
   finding's stored region.
 
+## Stage 2 performance (measured)
+
+Measured with `scripts/bench_stage2.py`: each step runs in its own process, and peak memory is that
+process's max RSS. The machine is the development container (x86-64, shared CPU). Times are wall clock.
+"Parse" is reading the board file; the step column is the work after parsing.
+
+| Board | Size | Tracks | Parse | Analysis (all checks without KiCad DRC) | Optimization (area, manufacturability, placement) | Export (patch + verify) |
+|---|---|---|---|---|---|---|
+| KiCad `pic_programmer` 9.0 | 0.7 MB | 370 | 0.1 s | 0.06 s | 0.15 s | 0.45 s |
+| KiCad `video` 7.0 | 8.5 MB | 7,951 | 1.7 s, 182 MB | 0.4 s | 3.7 s | 3.5 s, 266 MB |
+| Stress board | 49.7 MB | 356,940 | 23–28 s, 1.9 GB | 12 s | 61 s, 2.4 GB | 65 s |
+
+- **Stress board.** `scripts/bench_stage2.py --make-stress 47 out.kicad_pcb` builds it by repeating
+  the `video` board's tracks and vias 44 times beside the original. It's for timing only; its
+  geometry isn't a meaningful design.
+- **Export on the 50 MB board.**
+  - Before the M8 work: 83 s and 4.7 GB, which failed inside the sandbox's 3 GB limit.
+  - The verifier now parses the original once, and the patcher shares that tree with the adapter.
+  - It keeps only a compact digest of the expected result before re-parsing the patched file.
+  - Run through the real sandbox (`run_exporter`, 3 GB address-space limit), it succeeds in 54 s.
+  - The export job gets twice the parser time limit (120 s by default).
+- **Limits in production.**
+  - Parser: 60 s and 3 GB per file (`VIA_PARSER_TIMEOUT_SECONDS`, `VIA_PARSER_MEMORY_LIMIT_MB`).
+  - Analysis and optimization jobs: up to parser time + `VIA_ANALYSIS_TIMEOUT_SECONDS` (300 s) +
+    120 s; a heartbeat lets the reaper recover a run whose worker died.
+  - Uploads: 50 MB.
+  - At the upload limit, the slowest step is optimization on dense boards (about 1 minute). It runs
+    in the worker, never in a request.
+- **Load test.** `scripts/load_test.py`, run against the Docker Compose stack with one worker:
+  - 6 concurrent uploads of the 6.5 MB KiCad 8 `video` board: all accepted in under 2 s each;
+    parsing all six took 23 s.
+  - 6 analyses started at the same moment, including KiCad 9 DRC: all succeeded in 55 s
+    (6.5 per minute).
+  - A burst of 5 identical starts produced exactly one run.
+  - 5,685 API reads during processing: median 57 ms, p95 81 ms, max 195 ms, no errors.
+  - Throughput scales with the number of worker containers; API latency doesn't depend on queue
+    length, because the work is in the worker.
+- **Board viewer.** The browser loads boards in a Web Worker, and boards with more than 40,000
+  tracks and pads use snapshot previews while zooming (see "Board viewer").
+
 ## Running inside VIA (Checkpoint 4)
 
 The API never parses in-process. The worker runs `python -I -B -m via_pcb.cli --filename <name>`

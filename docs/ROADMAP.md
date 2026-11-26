@@ -75,7 +75,28 @@ Decisions (owner, 2026-11-26):
 | 5 | Optimization framework | ✅ done |
 | 6 | Change management, comparison and export | ✅ done |
 | 7 | Viewer and workspace UI | ✅ done |
-| 8 | Testing, performance and documentation | ⏳ next |
+| 8 | Testing, performance and documentation | ✅ done |
+
+### M8: Testing, performance and documentation ✅
+- **Concurrency** (`tests/integration/test_concurrency.py`, real threads with separate connections). Each test fails without its fix:
+  - identical concurrent analysis starts share one run;
+  - one apply per design at a time;
+  - concurrent applies of one change set run once;
+  - revision numbers never collide (concurrent uploads could crash before);
+  - an export whose base stopped being current is refused.
+- **Failure modes** (`tests/integration/test_failure_modes.py`):
+  - storage outages during upload, analysis and export, and the export can be retried afterwards;
+  - AI provider outage and refusal give 503/422 and store nothing.
+- **Performance** (ENGINEERING.md "Stage 2 performance"):
+  - exporting the 50 MB stress board went from 83 s and 4.7 GB (failed in the sandbox) to 54 s within the 3 GB sandbox limit;
+  - export of the 8.5 MB board: 8.4 s → 3.5 s;
+  - load test against the Compose stack: no errors, API p95 81 ms while analyses run.
+- **Fixes found on the way:**
+  - AI grounding treated numbers inside UUIDs as design data;
+  - the project Analysis tab still showed a "coming soon" panel;
+  - Compose tried to pull the locally built API image;
+  - CI's stale apt index broke the Chromium install.
+- **Docs:** STAGE_2_ACCEPTANCE.md maps the 14 acceptance criteria to tests and limits; performance and load results added to ENGINEERING.md.
 
 ### M7: Viewer and workspace UI ✅
 - **Viewer:**

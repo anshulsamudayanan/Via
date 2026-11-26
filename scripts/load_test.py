@@ -20,22 +20,83 @@ starts created more than one run. Everything it creates is in projects named "lo
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
+import json as jsonlib
 import os
 import statistics
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import httpx
-
 HEADERS = {"X-VIA-Request": "1"}
 
 
-def session(base: str, email: str, password: str, register: bool) -> httpx.Client:
-    c = httpx.Client(base_url=base, headers=HEADERS, timeout=120)
+class Resp:
+    def __init__(self, status: int, body: bytes) -> None:
+        self.status_code, self.content = status, body
+
+    @property
+    def text(self) -> str:
+        return self.content.decode("utf-8", "replace")
+
+    def json(self):
+        return jsonlib.loads(self.content)
+
+
+class HTTPError(Exception):
+    pass
+
+
+class Client:
+    """Minimal cookie-keeping HTTP client on the standard library (no extra dependency)."""
+
+    def __init__(self, base: str) -> None:
+        if not base.startswith(("http://", "https://")):
+            raise SystemExit("--base must be an http(s) URL")
+        self.base = base.rstrip("/")
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+    def _send(self, method: str, path: str, body: bytes | None = None, ctype: str | None = None) -> Resp:
+        req = urllib.request.Request(  # noqa: S310 - scheme checked in __init__
+            self.base + path, data=body, method=method, headers={**HEADERS, "Accept": "application/json"}
+        )
+        if ctype:
+            req.add_header("Content-Type", ctype)
+        try:
+            with self.opener.open(req, timeout=120) as r:
+                return Resp(r.status, r.read())
+        except urllib.error.HTTPError as e:
+            return Resp(e.code, e.read())
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            raise HTTPError(str(e)) from e
+
+    def get(self, path: str) -> Resp:
+        return self._send("GET", path)
+
+    def post(self, path: str, json: dict | None = None, data: dict | None = None, files: dict | None = None) -> Resp:
+        if files is None:
+            return self._send("POST", path, jsonlib.dumps(json or {}).encode(), "application/json")
+        boundary = uuid.uuid4().hex
+        parts = []
+        for k, v in (data or {}).items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        for k, (name, content, ctype) in files.items():
+            parts.append(
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{name}"\r\nContent-Type: {ctype}\r\n\r\n'.encode()
+                + content
+                + b"\r\n"
+            )
+        parts.append(f"--{boundary}--\r\n".encode())
+        return self._send("POST", path, b"".join(parts), f"multipart/form-data; boundary={boundary}")
+
+
+def session(base: str, email: str, password: str, register: bool) -> Client:
+    c = Client(base)
     if register:
         r = c.post("/api/v1/auth/register", json={"email": email, "password": password, "display_name": "Load test"})
         if r.status_code not in (201, 409):
@@ -134,7 +195,7 @@ def main() -> int:
                 try:
                     r = c.get(path)
                     ok = r.status_code < 500
-                except httpx.HTTPError as exc:
+                except HTTPError as exc:
                     ok, r = False, exc
                 dt = time.perf_counter() - t0
                 with lock:
