@@ -28,10 +28,16 @@ from via_pcb.analysis.registry import Check, CheckRegistry
 
 def default_registry() -> CheckRegistry:
     from via_pcb.analysis.checks.board_outline import BoardOutlineCheck
-    from via_pcb.analysis.checks.connectivity import PadsWithoutNetCheck
+    from via_pcb.analysis.checks.connectivity import (
+        CopperIslandsCheck,
+        CopperLayerUsageCheck,
+        PadsWithoutNetCheck,
+        SinglePadNetsCheck,
+    )
     from via_pcb.analysis.checks.design_rules import DesignRulesSourceCheck
     from via_pcb.analysis.checks.import_warnings import ImportWarningsCheck
     from via_pcb.analysis.checks.kicad_drc import KiCadDrcCheck
+    from via_pcb.analysis.checks.manufacturing import MANUFACTURING_CHECKS
 
     registry = CheckRegistry()
     for check in (
@@ -39,6 +45,10 @@ def default_registry() -> CheckRegistry:
         BoardOutlineCheck(),
         DesignRulesSourceCheck(),
         PadsWithoutNetCheck(),
+        CopperIslandsCheck(),
+        SinglePadNetsCheck(),
+        CopperLayerUsageCheck(),
+        *(cls() for cls in MANUFACTURING_CHECKS),
         ImportWarningsCheck(),
     ):
         registry.register(check)

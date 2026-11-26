@@ -267,7 +267,8 @@ class KiCadAdapter(PCBAdapter):
 
         components = [self._component(n, ctx) for n in root.children() if n.name in {"footprint", "module"}]
         tracks = self._tracks(root, ctx)
-        vias = [self._via(n, ctx) for n in root.children("via")]
+        constraints = self._constraints(root)
+        vias = [self._via(n, ctx, constraints, root) for n in root.children("via")]
         zones = [z for n in root.children("zone") if (z := self._zone(n, ctx)) is not None]
 
         board_graphics: list[Graphic] = []
@@ -284,7 +285,6 @@ class KiCadAdapter(PCBAdapter):
         other_graphics = [g for g in board_graphics if g.layer != "Edge.Cuts"]
         outline = self._outline(outline_graphics, ctx)
 
-        constraints = self._constraints(root)
         stackup = self._stackup(root, ctx)
         assign_ids(components, tracks, vias, zones)
         bbox = outline.bbox or self._content_bbox(components, tracks, vias, other_graphics)
@@ -578,7 +578,7 @@ class KiCadAdapter(PCBAdapter):
             )
         return tracks
 
-    def _via(self, node: SExpr, ctx: _Context) -> Via:
+    def _via(self, node: SExpr, ctx: _Context, constraints: DesignConstraints, root: SExpr) -> Via:
         at = _xy(node.child("at")) or (0.0, 0.0)
         via_type = "through"
         if node.has_atom("blind"):
@@ -587,12 +587,21 @@ class KiCadAdapter(PCBAdapter):
             via_type = "micro"
         layers_node = node.child("layers")
         layers = ctx.expand_layers(layers_node.atoms()) if layers_node is not None else ["F.Cu", "B.Cu"]
+        net = ctx.resolve_net(node)
+        drill = node.number("drill")
+        if drill is None:
+            # KiCad 5 omits the drill when a via uses its net class's default (KiCad 6+ always writes it).
+            drill = _default_via_drill(net, constraints, root)
+            if drill is None:
+                ctx.warn("via_drill_unknown", "Via without a drill size and no net-class default; drill recorded as 0")
+            else:
+                ctx.warn("via_default_drill", f"Via drill not stored; using the net class default {drill:g} mm")
         return Via(
             position=_pt(at),
             diameter=node.number("size", default=0.0) or 0.0,
-            drill=node.number("drill", default=0.0) or 0.0,
+            drill=drill or 0.0,
             layers=layers,
-            net=ctx.resolve_net(node),
+            net=net,
             via_type=via_type,
             uuid=_uuid(node),
             locked=_locked(node),
@@ -806,6 +815,18 @@ class KiCadAdapter(PCBAdapter):
             unconnected_pad_count=unconnected,
         )
         return stats, sorted(per_net.values(), key=lambda s: s.name)
+
+
+def _default_via_drill(net: str | None, constraints: DesignConstraints, root: SExpr) -> float | None:
+    """The drill KiCad 5 uses for a via without one: its net class's via_drill, else the board default."""
+    classes = constraints.net_classes
+    cls = next((c for c in classes if net and net in c.nets), None) or next(
+        (c for c in classes if c.name == "Default"), None
+    )
+    if cls is not None and cls.via_drill:
+        return cls.via_drill
+    setup = root.child("setup")
+    return setup.number("via_drill") if setup is not None else None
 
 
 _ZONE_CONNECT = {"0": "none", "1": "thermal", "2": "solid", "3": "thru_hole_only"}

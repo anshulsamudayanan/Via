@@ -60,7 +60,13 @@ def broken(client):
     return project, imported["design"], imported["revision"]
 
 
+#: The checks these framework tests were written against; later checks have their own tests
+#: (test_connectivity_and_manufacturing.py, test_kicad_drc_mapping.py, ...).
+FRAMEWORK_CHECKS = ["board_outline", "design_rules_source", "import_warnings", "kicad_drc", "pads_without_net"]
+
+
 def start(client, design_id, **body):
+    body.setdefault("checks", FRAMEWORK_CHECKS)
     return client.post(f"/api/v1/designs/{design_id}/analysis-runs", json=body)
 
 

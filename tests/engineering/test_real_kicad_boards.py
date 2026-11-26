@@ -65,7 +65,11 @@ def test_counts_match_independent_text_scan(fx):
     head = text[: re.search(r"^\s*\((?:footprint|module) ", text, flags=re.MULTILINE).start()]
     assert design.stats.net_count == regex_count(head, r"^\s*\(net [1-9]\d* ")
     assert design.outline.closed
-    assert design.warnings == []
+    # Only informational notes are allowed: KiCad 5 boards omit default via drills, which VIA
+    # resolves from the net class (via_default_drill); anything else would be a parser gap.
+    assert [w for w in design.warnings if w.code != "via_default_drill"] == []
+    if fx["kicad_tag"].startswith("5."):
+        assert "via_default_drill" in {w.code for w in design.warnings}
 
 
 @pytest.mark.parametrize("project", sorted({fx["project"] for fx in FIXTURES}))

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from via_pcb.models import Component, Pad, PCBDesign
+
+if TYPE_CHECKING:
+    from via_pcb.analysis.profiles import ManufacturingProfile
+    from via_pcb.analysis.shapes import Grid, Hole, Shape
 
 
 @dataclass
@@ -61,6 +65,48 @@ class AnalysisContext:
     @cached_property
     def copper_layers(self) -> set[str]:
         return {layer.name for layer in self.design.layers if layer.kind == "copper"}
+
+    @cached_property
+    def copper_order(self) -> list[str]:
+        from via_pcb.analysis.shapes import copper_order
+
+        return copper_order(self.design)
+
+    @cached_property
+    def shapes(self) -> list[Shape]:
+        from via_pcb.analysis.shapes import copper_shapes
+
+        return copper_shapes(self.design)
+
+    @cached_property
+    def shape_grid(self) -> Grid:
+        from via_pcb.analysis.shapes import Grid
+
+        grid = Grid(cell=2.0)
+        for i, s in enumerate(self.shapes):
+            grid.insert(i, s.bbox)
+        return grid
+
+    @cached_property
+    def holes(self) -> list[Hole]:
+        from via_pcb.analysis.shapes import holes
+
+        return holes(self.design)
+
+    @cached_property
+    def edge_segments(self) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+        from via_pcb.analysis.shapes import outline_segments
+
+        return outline_segments(self.design.outline.graphics)
+
+    @cached_property
+    def profile(self) -> ManufacturingProfile:
+        from via_pcb.analysis.profiles import BUILTIN, DEFAULT_PROFILE, ManufacturingProfile
+
+        raw = self.options.get("manufacturing_profile")
+        if isinstance(raw, dict):
+            return ManufacturingProfile.model_validate(raw)
+        return BUILTIN[DEFAULT_PROFILE]
 
     @property
     def kicad_file_version(self) -> int | None:
