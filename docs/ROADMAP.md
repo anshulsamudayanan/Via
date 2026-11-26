@@ -71,11 +71,27 @@ Decisions (owner, 2026-11-26):
 | 1 | Audit fixes and PCB model 1.1 | ✅ done |
 | 2 | Findings and analysis framework | ✅ done |
 | 3 | Deterministic analysis and KiCad DRC | ✅ done |
-| 4 | Engineering intelligence and component context | ⏳ next |
-| 5 | Optimization framework | — |
+| 4 | Engineering intelligence and component context | ✅ done |
+| 5 | Optimization framework | ⏳ next |
 | 6 | Change management, comparison and export | — |
 | 7 | Viewer and workspace UI | — |
 | 8 | Testing, performance and documentation | — |
+
+### M4: Engineering intelligence and component context ✅
+- **`via_ai`:**
+  - versioned prompts;
+  - strict output schemas (explanation, design review with findings separated from hypotheses, recommendations with benefits, trade-offs, validation, evidence and confidence);
+  - orchestration and a grounding verification step that rejects invented objects or numbers;
+  - a scripted provider and an evaluation harness.
+- **Context:** now includes analysis findings with evidence, the focused object (finding, component, net or region), project rules and matched component records.
+- **API:**
+  - explain (design or finding) and design review;
+  - recommendations with decisions;
+  - an `ai_outputs` audit trail, accepted and rejected;
+  - component records with sourced specs, and part-number matching from footprint properties (migration `0006`);
+  - consent, rate limit (30/h) and the security suite cover all routes.
+- **Docs:** new AI_INTELLIGENCE.md.
+- **AI remains disabled by default; no key is configured.**
 
 ### M3: Deterministic analysis and KiCad DRC ✅
 - **KiCad DRC:** the `eda` service (KiCad 9.0.6 official image, no credentials, internal network, hardened) and the `kicad_drc` check:

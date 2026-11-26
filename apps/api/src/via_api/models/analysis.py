@@ -119,3 +119,72 @@ class ManufacturingProfileRow(UUIDPk, Timestamps, Base):
     #: {min_track_width, min_clearance, ...} in mm, validated against via_pcb's ManufacturingProfile.
     values: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class AIOutput(UUIDPk, CreatedAt, Base):
+    """Every model output VIA requested, accepted or rejected by verification (audit trail).
+
+    Records what was asked, which prompt version and model answered, a hash of the exact context sent,
+    and the verification result. Rejected outputs are kept for audit but never shown as answers.
+    """
+
+    __tablename__ = "ai_outputs"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"))
+    revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))
+    analysis_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("analysis_runs.id", ondelete="SET NULL"))
+    kind: Mapped[str] = mapped_column(String(32))  # explanation | design_review
+    question: Mapped[str | None] = mapped_column(Text)
+    focus: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    provider: Mapped[str] = mapped_column(String(64))
+    model: Mapped[str] = mapped_column(String(128))
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    context_sha256: Mapped[str] = mapped_column(String(64))
+    output: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    accepted: Mapped[bool] = mapped_column(Boolean)
+    verification: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class RecommendationRow(UUIDPk, Timestamps, Base):
+    """An AI-suggested improvement from an accepted design review. Always an unverified suggestion."""
+
+    __tablename__ = "recommendations"
+
+    ai_output_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ai_outputs.id", ondelete="CASCADE"), index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    design_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("designs.id", ondelete="CASCADE"), index=True)
+    revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("design_revisions.id", ondelete="CASCADE"))
+    problem: Mapped[str] = mapped_column(Text)
+    proposed_change: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str] = mapped_column(Text)
+    #: {expected_benefits, trade_offs, required_validation, references, numbers_used, uncertainty}
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    evidence_finding_ids: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list, server_default="{}")
+    confidence: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default="open", server_default="open")  # open | accepted | rejected
+    status_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class ComponentRecord(UUIDPk, Timestamps, Base):
+    """Stored information about a part used in a project. Specs carry their source and verification status;
+    VIA never fills them in itself."""
+
+    __tablename__ = "component_records"
+    __table_args__ = (UniqueConstraint("project_id", "manufacturer", "part_number"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    manufacturer: Mapped[str] = mapped_column(String(200))
+    part_number: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    package: Mapped[str | None] = mapped_column(String(200))
+    #: [{name, value, unit, source, verified}]
+    specs: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    #: [{url, title, revision, source}]
+    datasheets: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    source: Mapped[str] = mapped_column(String(200))
+    verification: Mapped[str] = mapped_column(String(16), default="unverified", server_default="unverified")
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

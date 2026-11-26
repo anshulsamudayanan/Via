@@ -173,6 +173,20 @@ options {
 - The run's `config.options.manufacturing_profile` holds the exact values used.
 - Run `checks[].details` carry per-check facts (e.g. `kicad_drc`: KiCad version, rules, suppressed environment checks).
 
+### VIA Intelligence (Milestone 4)
+See docs/AI_INTELLIGENCE.md. AI is disabled by default (`503 ai_disabled`); 30 requests/h per user.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/designs/{design_id}/ai/explain` | viewer | `{question, focus?{kind: finding\|component\|net\|region, id}, run_id?}` → `{id, kind, source: ai_suggestion, verification: unverified, output, grounding, provider, model, prompt_version, analysis_run_id, ...}`. `403 consent_required` (external provider without consent), `422 ai_refused`, `502 ai_output_rejected` (`details.problems`) |
+| POST | `/findings/{finding_id}/explain` | viewer | `{question?}`, focused on the finding |
+| POST | `/designs/{design_id}/ai/review` | editor | `{run_id?}` → `{review, recommendations[]}` |
+| GET | `/designs/{design_id}/recommendations?status=` | viewer | Stored AI recommendations |
+| PATCH | `/recommendations/{recommendation_id}` | editor | `{status: open\|accepted\|rejected, reason?}` |
+| GET/POST | `/projects/{project_id}/component-records` | viewer/editor | `?q=`; create `{manufacturer, part_number, description?, package?, specs[{name, value, unit?, source, verified}], datasheets[{url, title?, revision?, source?}], source, verification}`; `409 record_exists` |
+| PATCH/DELETE | `/component-records/{record_id}` | editor | Update description, package, specs, datasheets or verification; delete |
+| GET | `/designs/{design_id}/component-matches` | viewer | Each component's part number from footprint properties and the matching record id |
+
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.

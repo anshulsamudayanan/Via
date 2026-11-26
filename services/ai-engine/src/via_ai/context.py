@@ -20,10 +20,54 @@ from pydantic import BaseModel, ConfigDict, Field
 #: Caps keep context small and bounded; truncation is always reported.
 MAX_COMPONENTS = 500
 MAX_NETS = 1000
+MAX_FINDINGS = 200
 
 
 class ContextPurpose(StrEnum):
     DESIGN_REVIEW = "design_review"
+    EXPLAIN = "explain"
+
+
+class ContextFinding(BaseModel):
+    """A finding from an analysis run, as the model sees it (no internal ids beyond the finding id)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    check_id: str
+    rule: str
+    severity: str
+    source: str
+    verification: str
+    title: str
+    description: str
+    components: list[str] = Field(default_factory=list)
+    nets: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list, description="'label: value' lines, measured or quoted")
+
+
+class ContextFocus(BaseModel):
+    """The object a question is about: a finding, component, net or board region."""
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: str = Field(description="finding | component | net | region")
+    id: str
+    details: dict[str, str | float | int | list[str] | None] = Field(default_factory=dict)
+
+
+class ContextComponentRecord(BaseModel):
+    """Component information stored for the project, with where it came from."""
+
+    model_config = ConfigDict(frozen=True)
+
+    references: list[str]
+    manufacturer: str
+    part_number: str
+    description: str | None = None
+    package: str | None = None
+    specs: list[str] = Field(default_factory=list, description="'name: value unit (source, verified|unverified)'")
+    verification: str = "unverified"
 
 
 class ContextComponent(BaseModel):
@@ -59,11 +103,25 @@ class ProjectContext(BaseModel):
     components: list[ContextComponent]
     warnings: list[str]
     truncated: dict[str, int] = Field(default_factory=dict, description="Items left out because of size caps, by field")
+    #: Stage 2: analysis findings of the latest successful run (capped), the question's focus,
+    #: rules from the project file and stored component records. All optional.
+    analysis_run_id: uuid.UUID | None = None
+    findings: list[ContextFinding] = Field(default_factory=list)
+    focus: ContextFocus | None = None
+    design_rules: dict[str, float | bool | str | None] = Field(default_factory=dict)
+    component_records: list[ContextComponentRecord] = Field(default_factory=list)
 
 
 class ContextProvider(Protocol):
     def build(
-        self, *, user_id: uuid.UUID, design_id: uuid.UUID, purpose: ContextPurpose, external: bool
+        self,
+        *,
+        user_id: uuid.UUID,
+        design_id: uuid.UUID,
+        purpose: ContextPurpose,
+        external: bool,
+        focus: tuple[str, str] | None = None,
+        run_id: uuid.UUID | None = None,
     ) -> ProjectContext:
         """Build context for a model call, enforcing access and consent. Raises on denial."""
         ...

@@ -29,7 +29,7 @@ Note on `0001`: `designs.current_revision_id` ↔ `design_revisions.design_id` i
 circular reference. The FK on `designs` is added with `ALTER TABLE` after both
 tables exist (hand-edited after autogenerate).
 
-Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`, `0004` analysis findings, `0005` manufacturing profiles.
+Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`, `0004` analysis findings, `0005` manufacturing profiles, `0006` AI outputs, recommendations, component records.
 
 ## Tables (revision 0001, with later additions noted)
 
@@ -88,6 +88,10 @@ Every finding is tied to the exact revision and run that produced it, and the ru
 schema, analysis and check versions. History is never overwritten: re-running creates new rows.
 
 | `manufacturing_profiles` (0005) | A project's fabrication profiles | `project_id` (CASCADE), `name` unique per project, `description`, `values` (JSONB, mm, validated by the API), `created_by_id`. Runs snapshot the values they use into `analysis_runs.config` |
+
+| `ai_outputs` (0006) | Audit of every AI request | project/design/revision (CASCADE), `analysis_run_id` (SET NULL), `kind`, `question`, `focus`, `provider`, `model`, `prompt_version`, `context_sha256`, `output` (JSONB), `accepted`, `verification` (JSONB), token counts, `created_by_id` |
+| `recommendations` (0006) | AI recommendations from accepted reviews | `ai_output_id` (CASCADE), project/design/revision, `problem`, `proposed_change`, `rationale`, `details` (benefits, trade-offs, validation, references, numbers, uncertainty), `evidence_finding_ids` (text[]), `confidence`, `status` open/accepted/rejected + reason |
+| `component_records` (0006) | Part information per project | unique `(project_id, manufacturer, part_number)`, `description`, `package`, `specs` and `datasheets` (JSONB, each with a source), `source`, `verification` |
 
 ## Authorization model (enforced in the API service layer, CP3+)
 

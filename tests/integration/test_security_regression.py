@@ -60,6 +60,16 @@ BODIES = {
     ("POST", "/api/v1/findings/{finding_id}/review"): {"status": "dismissed", "reason": "pwned"},
     ("POST", "/api/v1/projects/{project_id}/manufacturing-profiles"): {"name": "pwned", "values": PROFILE},
     ("PATCH", "/api/v1/manufacturing-profiles/{profile_id}"): {"name": "pwned"},
+    ("POST", "/api/v1/designs/{design_id}/ai/explain"): {"question": "pwned?"},
+    ("POST", "/api/v1/findings/{finding_id}/explain"): {},
+    ("POST", "/api/v1/designs/{design_id}/ai/review"): {},
+    ("PATCH", "/api/v1/recommendations/{recommendation_id}"): {"status": "rejected"},
+    ("POST", "/api/v1/projects/{project_id}/component-records"): {
+        "manufacturer": "X",
+        "part_number": "Y",
+        "source": "pwned",
+    },
+    ("PATCH", "/api/v1/component-records/{record_id}"): {"verification": "verified"},
 }
 
 #: Required query parameters (other than project_id) for routes that take them.
@@ -80,6 +90,8 @@ ID_PARAMS = (
     "run_id",
     "finding_id",
     "profile_id",
+    "recommendation_id",
+    "record_id",
 )
 
 
@@ -130,6 +142,11 @@ def world(make_client, db):
     org_id = owner.get("/api/v1/organizations").json()[0]["id"]
     run = owner.post(f"/api/v1/designs/{imported['design']['id']}/analysis-runs", json={}).json()
     finding = owner.get(f"/api/v1/analysis-runs/{run['id']}/findings").json()["items"][0]
+    record = owner.post(
+        f"/api/v1/projects/{project['id']}/component-records",
+        json={"manufacturer": "Yageo", "part_number": "RC0603", "source": "entered by user"},
+    ).json()
+    recommendation = _recommendation(db, imported)
     profile = owner.post(
         f"/api/v1/projects/{project['id']}/manufacturing-profiles", json={"name": "Shop", "values": PROFILE}
     ).json()
@@ -144,9 +161,31 @@ def world(make_client, db):
         "run_id": run["id"],
         "finding_id": finding["id"],
         "profile_id": profile["key"],
+        "record_id": record["id"],
+        "recommendation_id": str(recommendation.id),
         "stranger_email": "stranger@example.com",
     }
     return owner, stranger, ids
+
+
+def _recommendation(db, imported):
+    """A stored AI recommendation (written directly: AI is disabled in tests)."""
+    import uuid as _uuid
+
+    from via_api.models import AIOutput, DesignRevision, RecommendationRow
+
+    revision = db.get(DesignRevision, _uuid.UUID(imported["revision"]["id"]))
+    out = AIOutput(project_id=revision.project_id, design_id=revision.design_id, revision_id=revision.id,
+                   kind="design_review", provider="scripted", model="scripted", prompt_version="test",
+                   context_sha256="0" * 64, output={}, accepted=True, verification={"ok": True})  # fmt: skip
+    db.add(out)
+    db.flush()
+    rec = RecommendationRow(ai_output_id=out.id, project_id=revision.project_id, design_id=revision.design_id,
+                            revision_id=revision.id, problem="p", proposed_change="c", rationale="r", details={},
+                            confidence="low")  # fmt: skip
+    db.add(rec)
+    db.flush()
+    return rec
 
 
 def test_every_route_is_classified(app):
@@ -216,6 +255,10 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     finding = owner.get(f"/api/v1/findings/{ids['finding_id']}").json()
     assert finding["status"] == "open" and finding["history"] == []  # not dismissed by the stranger
     assert owner.get(f"/api/v1/designs/{ids['design_id']}/analysis-runs").json()["total"] == 1  # none started
+    recs = owner.get(f"/api/v1/designs/{ids['design_id']}/recommendations").json()
+    assert [r["status"] for r in recs] == ["open"]  # not rejected by the stranger
+    records = owner.get(f"/api/v1/projects/{ids['project_id']}/component-records").json()
+    assert [r["verification"] for r in records] == ["unverified"]
 
 
 @pytest.mark.parametrize(

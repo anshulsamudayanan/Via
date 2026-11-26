@@ -24,6 +24,7 @@ class Task(StrEnum):
     """What a model call is for. New features add a task; routing picks the model."""
 
     DESIGN_REVIEW = "design_review"
+    EXPLAIN = "explain"
     SUMMARIZE = "summarize"
     EXTRACT = "extract"
 

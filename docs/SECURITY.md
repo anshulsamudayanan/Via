@@ -74,7 +74,12 @@ Also recorded: design uploaded / upload rejected (with reason) / parsed / parse 
 - API keys only come from the environment, read by the provider SDK; `/ai/status` never exposes them ✅.
 - Project data reaches a model only through `ContextProvider` (`via_api/ai/context.py`), which checks project access (404 otherwise) and, for external providers, an active per-project `external_ai_processing` consent granted by the project owner (403 `consent_required` otherwise). Consent is policy-versioned, revocable with immediate effect, and audited ✅.
 - The context is a bounded summary from database rows: counts, layers, net names, component list, warnings. No source files, normalized geometry, storage keys, emails or upload hashes; truncation is reported ✅ (`tests/integration/test_ai.py`).
-- Refusals raise `AIRefusedError` and are never replaced by invented output ✅. No feature calls a model in Stage 1.
+- Refusals raise `AIRefusedError` and are never replaced by invented output ✅.
+- Stage 2 AI features (Milestone 4):
+  - every output is verified against the exact context sent, and outputs citing objects or numbers that aren't in the design are rejected and audited, never shown ✅;
+  - all outputs are labelled unverified AI suggestions ✅;
+  - the context adds analysis findings, the focused object, project rules and component records, still from database rows only, with no files, geometry, keys or emails ✅ (`tests/integration/test_intelligence_api.py`);
+  - consent applies as before ✅.
 
 ## Future hardening (post Stage 1)
 Parser in a separate no-network container (gVisor/Firecracker) instead of a subprocess in the worker container, presigned direct-to-storage uploads (avoids proxy buffering), Postgres row-level security, 2FA/WebAuthn, malware scanning of uploads, signed and expiring download URLs everywhere.
