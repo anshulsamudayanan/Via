@@ -69,13 +69,32 @@ Decisions (owner, 2026-11-26):
 | M | Deliverable | Status |
 |---|---|---|
 | 1 | Audit fixes and PCB model 1.1 | ✅ done |
-| 2 | Findings and analysis framework | ✅ done (pending review) |
-| 3 | Deterministic analysis and KiCad DRC | ⏳ next, after M2 review |
-| 4 | Engineering intelligence and component context | — |
+| 2 | Findings and analysis framework | ✅ done |
+| 3 | Deterministic analysis and KiCad DRC | ✅ done |
+| 4 | Engineering intelligence and component context | ⏳ next |
 | 5 | Optimization framework | — |
 | 6 | Change management, comparison and export | — |
 | 7 | Viewer and workspace UI | — |
 | 8 | Testing, performance and documentation | — |
+
+### M3: Deterministic analysis and KiCad DRC ✅
+- **KiCad DRC:** the `eda` service (KiCad 9.0.6 official image, no credentials, internal network, hardened) and the `kicad_drc` check:
+  - violations mapped to objects by UUID or description;
+  - default-rules results marked heuristic;
+  - environment-only library checks suppressed.
+- **Geometry kernel:** exact core+radius copper shapes, spatial grid.
+- **Checks:**
+  - connectivity: islands, single-pad nets, layer usage;
+  - manufacturing against profiles: width, vias, pad holes, hole spacing, copper-to-edge, copper spacing, silkscreen;
+  - placement: orientation, connector edge access, decoupling, board space;
+  - routing: detours, net-class widths;
+  - IPC-2221 current capacity and IPC-2141 microstrip impedance, run only with user inputs.
+- **Profiles:** VIA conservative/advanced plus project profiles (migration `0005`, CRUD API); start options; exact profile values snapshotted per run.
+- **Validation:** no spacing or island findings on real KiCad 6–9 boards where KiCad's DRC with project rules reports none; e2e test with real KiCad DRC in CI.
+- **Fixed (real bugs found by the new checks):**
+  - KiCad 5 default via drills had been recorded as 0 (750 of 815 vias in the 5.1 `video` demo).
+  - ENGINEERING.md wrongly said KiCad's DRC refills zones (KiCad 9.0.6's CLI doesn't).
+- *Tests changed because behaviour changed:* framework tests pin their original checks; the "no warnings on real boards" test allows the new informational `via_default_drill` note.
 
 ### M2: Findings and analysis framework ✅
 - **Engine (`via_pcb.analysis`):**

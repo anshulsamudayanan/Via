@@ -150,6 +150,29 @@ See docs/FINDINGS_SYSTEM.md for the finding contract. Reading needs viewer acces
 | POST | `/findings/{finding_id}/review` | editor | `{status: open\|reviewed\|dismissed, reason?}`; `422 reason_required` when dismissing without a reason. Appends to the history |
 | GET | `/designs/{design_id}/analysis-compare?base_run_id=&target_run_id=` | viewer | `{base_run, target_run, new, resolved, persisting}` by fingerprint. Both runs must be finished runs of this design (`404` otherwise; `409 run_not_finished`) |
 
+### Manufacturing profiles and analysis options (Milestone 3)
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/projects/{project_id}/manufacturing-profiles` | viewer | Built-in VIA profiles (`via-conservative`, `via-advanced`) then the project's: `{key, name, description, source, builtin, values}` |
+| POST | `/projects/{project_id}/manufacturing-profiles` | editor | `{name, description?, values{min_track_width, min_clearance, min_drill, min_via_diameter, min_annular_ring, min_hole_to_hole, min_copper_to_edge, min_silk_width}}` (mm, > 0) → `201`; `409 profile_exists` |
+| PATCH | `/manufacturing-profiles/{profile_id}` | editor | Edit name, description or values (future runs only) |
+| DELETE | `/manufacturing-profiles/{profile_id}` | editor | `204` |
+
+`POST /designs/{id}/analysis-runs` also accepts:
+
+```
+options {
+  profile?,                              # key from the list above
+  power?: {nets{net: amps}, temperature_rise_c?, copper_thickness_mm?},
+  impedance?: {nets{net: ohms}, tolerance_pct?},
+  decoupling_max_distance_mm?
+}
+```
+
+- `422 unknown_profile` for a key that isn't built in or belongs to another project.
+- The run's `config.options.manufacturing_profile` holds the exact values used.
+- Run `checks[].details` carry per-check facts (e.g. `kicad_drc`: KiCad version, rules, suppressed environment checks).
+
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.

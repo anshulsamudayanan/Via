@@ -54,8 +54,8 @@ Accepted file versions: anything that parses. Outside `20171130`…`20250324` a
 | Pads | ✅ | Number, type (smd, through_hole, npth, connect), shape, absolute position, rotation, size, layers (wildcards like `*.Cu` expanded), net, drill (round / oval slot, offset), uuid, roundrect ratio, local clearance, solder mask/paste margins and paste ratio, zone connection. Custom pad primitives and chamfer settings are not modelled. |
 | Footprint graphics | ✅ | `fp_line/arc/circle/rect/poly` transformed to board space; rotated rects become polygons. |
 | Tracks | ✅ | Segments and arcs: start, end, mid, width, layer, net, length (true arc length), uuid, `locked` (KiCad 6+; KiCad 5's status-bit lock isn't read). |
-| Vias | ✅ | Position, diameter, drill, layers, net, type (through/blind/micro), uuid, `locked`. |
-| Zones | ✅ | Net, layers, outline polygon, outline area, filled flag, keep-out flag and rules (tracks, vias, pads, copper pour, footprints: allowed / not allowed), name, uuid, priority, clearance, minimum thickness. Filled polygons are **not** stored (only the flag); KiCad's DRC refills zones itself. |
+| Vias | ✅ | Position, diameter, drill, layers, net, type (through/blind/micro), uuid, `locked`. KiCad 5 omits the drill when a via uses its net class default: VIA resolves it from the net's class `via_drill` (else `setup via_drill`) and notes `via_default_drill` (found in Stage 2: 750 of 815 vias in the KiCad 5.1 `video` demo had been recorded with drill 0). |
+| Zones | ✅ | Net, layers, outline polygon, outline area, filled flag, keep-out flag and rules (tracks, vias, pads, copper pour, footprints: allowed / not allowed), name, uuid, priority, clearance, minimum thickness. Filled polygons are **not** stored (only the flag). KiCad's DRC (Stage 2) checks the fills as stored in the file; KiCad 9.0.6's CLI doesn't refill them. |
 | Stackup | ✅ | `(setup (stackup ...))`: each layer's name, type, thickness, material, εr, loss tangent; copper finish; dielectric constraints. Only the first sub-layer of a multi-material dielectric is recorded (`stackup_sublayers` warning). No stackup in the file → `null`, never assumed. |
 | Board graphics | ✅ | `gr_line/arc/circle/rect/poly` on non-Edge layers. |
 | Design constraints | ✅ with a project archive; ⚠️ board file alone | From the board file: thickness, `pad_to_mask_clearance`, `solder_mask_min_width`, `pad_to_paste_clearance`, legacy in-file net classes (KiCad 5). From a project `.zip` (see below): board-wide minimums, net classes with resolved nets, custom rules. `constraints.rules_source` says which (`board_file` or `project_file`). |
@@ -148,7 +148,7 @@ KiCad's own DRC reported 54 false violations without the project file and none w
 
 ## Warning codes
 
-`missing_version`, `old_version`, `new_version`, `missing_layers`, `missing_outline`, `open_outline`, `unknown_net`, `unknown_pad_type`, `missing_reference`, `invalid_track`, `invalid_zone`, `unsupported_curve`, `unsupported_object`, `footprint_side`, `stackup_sublayers`; for project archives `missing_project_file`, `legacy_project_file`, `invalid_project_file`, `invalid_rules_file`.
+`via_default_drill`, `via_drill_unknown`, `missing_version`, `old_version`, `new_version`, `missing_layers`, `missing_outline`, `open_outline`, `unknown_net`, `unknown_pad_type`, `missing_reference`, `invalid_track`, `invalid_zone`, `unsupported_curve`, `unsupported_object`, `footprint_side`, `stackup_sublayers`; for project archives `missing_project_file`, `legacy_project_file`, `invalid_project_file`, `invalid_rules_file`.
 
 ## Errors
 

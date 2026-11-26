@@ -4,11 +4,12 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 2 in progress (Milestone 2 of 8, pending review).** Stage 1 is complete:
+> **Status: Stage 2 in progress (Milestone 3 of 8 done).** Stage 1 is complete:
 > accounts, projects, sharing, the PCB pipeline and an interactive board viewer, covered by unit,
 > integration, security and browser tests. Stage 2 so far adds KiCad project (`.zip`) import with
 > design rules, schema 1.1 (stable object ids, stackup, locks), job recovery after worker crashes, and
-> the analysis/findings framework (API; the analysis UI arrives in Milestone 7).
+> the analysis/findings framework with KiCad 9's real DRC and VIA's geometry, manufacturing,
+> placement and routing checks (API; the analysis UI arrives in Milestone 7).
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md).
 
 ## What works today
@@ -68,7 +69,8 @@ The first build compiles MinIO from source and takes a few minutes. When it's up
 | MinIO console | http://localhost:9001 (user `MINIO_ROOT_USER`, password `MINIO_ROOT_PASSWORD`) |
 
 Services: `postgres`, `redis`, `minio`, `migrate` (one-shot: applies migrations and
-verifies storage, then exits), `api`, `worker` (parses uploads), `web`. All host ports
+verifies storage, then exits), `api`, `worker` (parses uploads, runs analyses), `eda` (KiCad 9 for
+DRC; the image is ~2.3 GB on first build), `web`. All host ports
 bind to `127.0.0.1`.
 
 Behind a corporate TLS-intercepting proxy, set `VIA_BUILD_CA_CERT=/path/to/ca.pem` in

@@ -170,6 +170,21 @@ All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC
 
 The analysis engine lives in `services/pcb-engine` (`via_pcb.analysis`) with no API or DB dependencies, so it can run in the worker, the CLI or future services. Findings contract: docs/FINDINGS_SYSTEM.md.
 
+## 5c. KiCad tool service (Stage 2, Milestone 3)
+
+`services/eda-runner` (`via_eda`) runs KiCad's own tools in the official KiCad 9.0.6 image. It's a standard-library HTTP service with:
+- no credentials and no published ports;
+- only Compose's internal `eda` network, shared with the worker;
+- a read-only root filesystem, no capabilities and `no-new-privileges`.
+
+How a DRC request flows:
+1. The worker opens the upload only inside the parser sandbox, re-packs it as a fixed-name bundle, and POSTs it to `/drc`.
+2. The service runs `kicad-cli` in a throwaway directory with ulimit CPU, memory and file-size limits and a minimal environment.
+3. The service returns KiCad's JSON report.
+4. The `kicad_drc` check maps the report to findings.
+
+The service is optional: without it, KiCad DRC is skipped with the reason. Milestone 6 reuses it to validate exported changes.
+
 ## 6. Technical risks
 
 | # | Risk | Impact | Mitigation |

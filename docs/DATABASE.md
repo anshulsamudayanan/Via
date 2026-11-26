@@ -29,7 +29,7 @@ Note on `0001`: `designs.current_revision_id` ↔ `design_revisions.design_id` i
 circular reference. The FK on `designs` is added with `ALTER TABLE` after both
 tables exist (hand-edited after autogenerate).
 
-Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`, `0004` analysis findings.
+Revisions: `0001` initial schema, `0002` `design_revisions.summary`, `0003` job lifecycle columns on `analysis_runs`, `0004` analysis findings, `0005` manufacturing profiles.
 
 ## Tables (revision 0001, with later additions noted)
 
@@ -86,6 +86,8 @@ storage. These tables hold what the API paginates, searches and summarizes:
 
 Every finding is tied to the exact revision and run that produced it, and the run records the parser,
 schema, analysis and check versions. History is never overwritten: re-running creates new rows.
+
+| `manufacturing_profiles` (0005) | A project's fabrication profiles | `project_id` (CASCADE), `name` unique per project, `description`, `values` (JSONB, mm, validated by the API), `created_by_id`. Runs snapshot the values they use into `analysis_runs.config` |
 
 ## Authorization model (enforced in the API service layer, CP3+)
 
