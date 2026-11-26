@@ -105,6 +105,7 @@ services:
 
   api:
     image: via/api:dev
+    pull_policy: never  # built locally by the migrate service; never pulled from a registry
     environment: *api-env
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -117,6 +118,7 @@ services:
   # subprocess inside this container (see apps/api/src/via_api/parsing/sandbox.py).
   worker:
     image: via/api:dev
+    pull_policy: never  # built locally by the migrate service; never pulled from a registry
     command: ["via-api", "worker"]
     environment: *api-env
     depends_on:
