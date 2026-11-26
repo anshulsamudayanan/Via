@@ -30,6 +30,7 @@ from via_api.models import (
     DesignRevision,
     FindingEvidence,
     FindingReviewEvent,
+    ManufacturingProfileRow,
     PCBGeometry,
 )
 from via_api.models.base import utcnow
@@ -41,6 +42,7 @@ from via_api.services.auth import AuthContext
 from via_api.storage import ObjectNotFoundError, StorageBackend, StorageError
 from via_pcb import SCHEMA_VERSION, PCBDesign
 from via_pcb.analysis import ANALYSIS_VERSION, AnalysisResult, default_engine, default_registry
+from via_pcb.analysis.profiles import BUILTIN, DEFAULT_PROFILE, ManufacturingProfile
 
 logger = logging.getLogger("via_api.analysis")
 
@@ -59,14 +61,59 @@ def analysis_job_id(run_id: uuid.UUID | str, attempt: int) -> str:
 # ----------------------------------------------------------------- starting
 
 
-def normalize_config(checks: list[str] | None) -> dict[str, Any]:
+def normalize_config(checks: list[str] | None, options: dict[str, Any] | None = None) -> dict[str, Any]:
     known = {c.id for c in default_registry().all()}
-    if checks is None:
-        return {}
-    unknown = sorted(set(checks) - known)
-    if unknown:
-        raise APIError(422, "unknown_check", f"Unknown check(s): {', '.join(unknown)}.", {"known": sorted(known)})
-    return {"checks": sorted(set(checks))}
+    config: dict[str, Any] = {}
+    if checks is not None:
+        unknown = sorted(set(checks) - known)
+        if unknown:
+            raise APIError(422, "unknown_check", f"Unknown check(s): {', '.join(unknown)}.", {"known": sorted(known)})
+        config["checks"] = sorted(set(checks))
+    if options:
+        config["options"] = options
+    return config
+
+
+# ----------------------------------------------------------------- manufacturing profiles
+
+
+def builtin_profiles() -> list[dict[str, Any]]:
+    return [p.model_dump() for p in BUILTIN.values()]
+
+
+def resolve_profile(db: Session, project_id: uuid.UUID, key: str | None) -> dict[str, Any]:
+    """The full profile (a snapshot for the run's config) for a built-in key or a project profile id."""
+    key = key or DEFAULT_PROFILE
+    if key in BUILTIN:
+        return BUILTIN[key].model_dump()
+    try:
+        pid = uuid.UUID(key)
+    except ValueError:
+        raise APIError(422, "unknown_profile", f"Unknown manufacturing profile '{key[:64]}'.") from None
+    row = db.get(ManufacturingProfileRow, pid)
+    if row is None or row.project_id != project_id:
+        raise APIError(422, "unknown_profile", "That manufacturing profile doesn't belong to this project.")
+    return ManufacturingProfile(
+        key=str(row.id), name=row.name, description=row.description,
+        source="Project profile (user-defined values)", **row.values,
+    ).model_dump()  # fmt: skip
+
+
+def get_profile(
+    db: Session, user_id: uuid.UUID, profile_id: uuid.UUID, minimum: ProjectRole
+) -> ManufacturingProfileRow:
+    row = db.get(ManufacturingProfileRow, profile_id)
+    if row is None:
+        raise not_found("Manufacturing profile")
+    try:
+        project, _ = access.get_project(db, user_id, row.project_id, minimum, action="manage manufacturing profiles")
+    except APIError as exc:
+        if exc.status_code == 404:
+            raise not_found("Manufacturing profile") from exc
+        raise
+    if minimum != ProjectRole.VIEWER:
+        access.ensure_active(project)
+    return row
 
 
 def start_analysis(
@@ -76,12 +123,16 @@ def start_analysis(
     revision_id: uuid.UUID | None,
     checks: list[str] | None,
     client: ClientInfo,
+    options: dict[str, Any] | None = None,
 ) -> tuple[AnalysisRun, bool]:
     """Create a queued run, or return the identical run already queued/running. Returns (run, created)."""
     design, project, _ = design_svc.get_design(db, ctx.user.id, design_id, ProjectRole.EDITOR, action="run analyses")
     access.ensure_active(project)
     revision = design_svc.resolve_parsed_revision(db, design, revision_id)
-    config = normalize_config(checks)
+    run_options: dict[str, Any] = {k: v for k, v in (options or {}).items() if v is not None and k != "profile"}
+    # Snapshot the exact profile values: later edits to the profile don't change this run's meaning.
+    run_options["manufacturing_profile"] = resolve_profile(db, project.id, (options or {}).get("profile"))
+    config = normalize_config(checks, run_options)
     existing = db.scalar(
         select(AnalysisRun)
         .where(

@@ -105,3 +105,17 @@ class FindingReviewEvent(UUIDPk, CreatedAt, Base):
     reason: Mapped[str | None] = mapped_column(Text)
     #: True when this event copied the state of the same issue from an earlier run.
     carried_over: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class ManufacturingProfileRow(UUIDPk, Timestamps, Base):
+    """A project's own fabrication profile. Analysis runs copy the values they use into their config."""
+
+    __tablename__ = "manufacturing_profiles"
+    __table_args__ = (UniqueConstraint("project_id", "name"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    #: {min_track_width, min_clearance, ...} in mm, validated against via_pcb's ManufacturingProfile.
+    values: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

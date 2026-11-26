@@ -10,7 +10,14 @@ from sqlalchemy import Select, func, or_, select
 
 from via_api.deps import DB, Client, CurrentAuth, Limiter, Queue
 from via_api.errors import APIError, error_responses, not_found
-from via_api.models import AnalysisFinding, AnalysisRun, DesignRevision, FindingEvidence, FindingReviewEvent
+from via_api.models import (
+    AnalysisFinding,
+    AnalysisRun,
+    DesignRevision,
+    FindingEvidence,
+    FindingReviewEvent,
+    ManufacturingProfileRow,
+)
 from via_api.models.enums import FindingStatus, ProjectRole
 from via_api.ratelimit import ANALYSES_PER_USER
 from via_api.schemas.analysis import (
@@ -24,9 +31,14 @@ from via_api.schemas.analysis import (
     FindingDetail,
     FindingOut,
     FindingPage,
+    ProfileCreate,
+    ProfileOut,
+    ProfileUpdate,
+    ProfileValues,
     ReviewEventOut,
     ReviewRequest,
 )
+from via_api.services import access
 from via_api.services import analysis as svc
 from via_api.services import designs as design_svc
 from via_pcb.analysis import Category, Severity, Source, Verification, default_registry
@@ -97,7 +109,8 @@ def start_run(
     Idempotent: if the same analysis is already queued or running for that revision, it is
     returned with `200` instead of starting another. Poll `GET /analysis-runs/{id}`.
     """
-    run, created = svc.start_analysis(db, ctx, design_id, body.revision_id, body.checks, client)
+    options = body.options.model_dump(exclude_none=True) if body.options else None
+    run, created = svc.start_analysis(db, ctx, design_id, body.revision_id, body.checks, client, options)
     if not created:
         response.status_code = status.HTTP_200_OK
         return run_out(db, run)
@@ -288,3 +301,92 @@ def compare_runs(
         target_run=run_out(db, runs[1]),
         **{k: [finding_out(f) for f in v] for k, v in groups.items()},
     )
+
+
+# --- Manufacturing profiles ------------------------------------------------------------------
+
+
+def _name_taken(db: DB, project_id: uuid.UUID, name: str) -> bool:
+    stmt = select(ManufacturingProfileRow.id).where(
+        ManufacturingProfileRow.project_id == project_id, ManufacturingProfileRow.name == name
+    )
+    return db.scalar(stmt) is not None
+
+
+def _profile_out(row: ManufacturingProfileRow) -> ProfileOut:
+    return ProfileOut(key=str(row.id), name=row.name, description=row.description,
+                      source="Project profile (user-defined values)", builtin=False,
+                      values=ProfileValues(**row.values))  # fmt: skip
+
+
+@router.get(
+    "/projects/{project_id}/manufacturing-profiles",
+    response_model=list[ProfileOut],
+    responses=error_responses(401, 404),
+)
+def list_profiles(project_id: uuid.UUID, db: DB, ctx: CurrentAuth) -> list[ProfileOut]:
+    """VIA's built-in profiles followed by the project's own."""
+    access.get_project(db, ctx.user.id, project_id)
+    builtins = [
+        ProfileOut(key=p["key"], name=p["name"], description=p["description"], source=p["source"], builtin=True,
+                   values=ProfileValues(**{k: p[k] for k in ProfileValues.model_fields}))
+        for p in svc.builtin_profiles()
+    ]  # fmt: skip
+    rows = db.scalars(
+        select(ManufacturingProfileRow)
+        .where(ManufacturingProfileRow.project_id == project_id)
+        .order_by(ManufacturingProfileRow.name)
+    ).all()
+    return builtins + [_profile_out(r) for r in rows]
+
+
+@router.post(
+    "/projects/{project_id}/manufacturing-profiles",
+    response_model=ProfileOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 403, 404, 409, 422),
+)
+def create_profile(project_id: uuid.UUID, body: ProfileCreate, db: DB, ctx: CurrentAuth) -> ProfileOut:
+    project, _ = access.get_project(
+        db, ctx.user.id, project_id, ProjectRole.EDITOR, action="manage manufacturing profiles"
+    )
+    access.ensure_active(project)
+    if _name_taken(db, project.id, body.name.strip()):
+        raise APIError(409, "profile_exists", "This project already has a profile with that name.")
+    row = ManufacturingProfileRow(project_id=project.id, name=body.name.strip(), description=body.description,
+                                  values=body.values.model_dump(), created_by_id=ctx.user.id)  # fmt: skip
+    db.add(row)
+    db.commit()
+    return _profile_out(row)
+
+
+@router.patch(
+    "/manufacturing-profiles/{profile_id}",
+    response_model=ProfileOut,
+    responses=error_responses(401, 403, 404, 409, 422),
+)
+def update_profile(profile_id: uuid.UUID, body: ProfileUpdate, db: DB, ctx: CurrentAuth) -> ProfileOut:
+    """Edits apply to future analyses only: each run keeps the values it used."""
+    row = svc.get_profile(db, ctx.user.id, profile_id, ProjectRole.EDITOR)
+    if body.name is not None and body.name.strip() != row.name:
+        if _name_taken(db, row.project_id, body.name.strip()):
+            raise APIError(409, "profile_exists", "This project already has a profile with that name.")
+        row.name = body.name.strip()
+    if body.description is not None:
+        row.description = body.description
+    if body.values is not None:
+        row.values = body.values.model_dump()
+    db.commit()
+    return _profile_out(row)
+
+
+@router.delete(
+    "/manufacturing-profiles/{profile_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 403, 404),
+)
+def delete_profile(profile_id: uuid.UUID, db: DB, ctx: CurrentAuth) -> Response:
+    row = svc.get_profile(db, ctx.user.id, profile_id, ProjectRole.EDITOR)
+    db.delete(row)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

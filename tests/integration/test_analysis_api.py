@@ -192,7 +192,8 @@ def test_start_is_idempotent_while_queued(client, broken, job_queue):
     assert again.json()["id"] == first.json()["id"] and again.json()["status"] == "queued"
     other = start(client, design["id"], checks=["board_outline"])
     assert other.status_code == 202 and other.json()["id"] != first.json()["id"]
-    assert other.json()["config"] == {"checks": ["board_outline"]}
+    assert other.json()["config"]["checks"] == ["board_outline"]
+    assert other.json()["config"]["options"]["manufacturing_profile"]["key"] == "via-conservative"  # snapshot
     assert len(job_queue.analyses) == 2
 
 

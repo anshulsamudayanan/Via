@@ -38,6 +38,8 @@ def default_registry() -> CheckRegistry:
     from via_pcb.analysis.checks.import_warnings import ImportWarningsCheck
     from via_pcb.analysis.checks.kicad_drc import KiCadDrcCheck
     from via_pcb.analysis.checks.manufacturing import MANUFACTURING_CHECKS
+    from via_pcb.analysis.checks.placement import PLACEMENT_CHECKS
+    from via_pcb.analysis.checks.routing import ROUTING_CHECKS
 
     registry = CheckRegistry()
     for check in (
@@ -49,6 +51,8 @@ def default_registry() -> CheckRegistry:
         SinglePadNetsCheck(),
         CopperLayerUsageCheck(),
         *(cls() for cls in MANUFACTURING_CHECKS),
+        *(cls() for cls in PLACEMENT_CHECKS),
+        *(cls() for cls in ROUTING_CHECKS),
         ImportWarningsCheck(),
     ):
         registry.register(check)

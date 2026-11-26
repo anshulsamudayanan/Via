@@ -44,6 +44,11 @@ QUERY_SCOPED = {
     ("GET", "/api/v1/activity"),
 }
 
+PROFILE = {
+    **{"min_track_width": 0.1, "min_clearance": 0.1, "min_drill": 0.2, "min_via_diameter": 0.4},
+    **{"min_annular_ring": 0.1, "min_hole_to_hole": 0.2, "min_copper_to_edge": 0.2, "min_silk_width": 0.1},
+}
+
 #: Valid request bodies for write routes, so access checks are reached instead of a 422.
 #: A new write route with a body needs an entry here (the 404 test fails with a 422 otherwise).
 BODIES = {
@@ -53,6 +58,8 @@ BODIES = {
     ("PATCH", "/api/v1/designs/{design_id}"): {"name": "pwned"},
     ("POST", "/api/v1/designs/{design_id}/analysis-runs"): {},
     ("POST", "/api/v1/findings/{finding_id}/review"): {"status": "dismissed", "reason": "pwned"},
+    ("POST", "/api/v1/projects/{project_id}/manufacturing-profiles"): {"name": "pwned", "values": PROFILE},
+    ("PATCH", "/api/v1/manufacturing-profiles/{profile_id}"): {"name": "pwned"},
 }
 
 #: Required query parameters (other than project_id) for routes that take them.
@@ -72,6 +79,7 @@ ID_PARAMS = (
     "session_id",
     "run_id",
     "finding_id",
+    "profile_id",
 )
 
 
@@ -122,6 +130,9 @@ def world(make_client, db):
     org_id = owner.get("/api/v1/organizations").json()[0]["id"]
     run = owner.post(f"/api/v1/designs/{imported['design']['id']}/analysis-runs", json={}).json()
     finding = owner.get(f"/api/v1/analysis-runs/{run['id']}/findings").json()["items"][0]
+    profile = owner.post(
+        f"/api/v1/projects/{project['id']}/manufacturing-profiles", json={"name": "Shop", "values": PROFILE}
+    ).json()
     ids = {
         "project_id": project["id"],
         "design_id": imported["design"]["id"],
@@ -132,6 +143,7 @@ def world(make_client, db):
         "user_id": owner_me["user"]["id"],
         "run_id": run["id"],
         "finding_id": finding["id"],
+        "profile_id": profile["key"],
         "stranger_email": "stranger@example.com",
     }
     return owner, stranger, ids
