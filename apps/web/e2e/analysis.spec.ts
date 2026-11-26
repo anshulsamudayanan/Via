@@ -7,7 +7,7 @@ type Page = { total: number; items: { rule: string; source: string; severity: st
 
 /**
  * The analysis pipeline against the real stack, including KiCad 9's DRC in the eda service.
- * (The analysis UI arrives in Milestone 7; this drives the API with the signed-in browser session.)
+ * (Drives the API with the signed-in browser session; workspace.spec.ts covers the analysis UI.)
  */
 test("analysis runs VIA's checks and KiCad's real DRC on an uploaded board", async ({ page }) => {
   await register(page, "Analyst", uniqueEmail("analysis"));

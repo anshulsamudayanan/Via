@@ -169,4 +169,23 @@ describe("pcb.upload", () => {
     await client.analysis.compare("d1", "a", "b");
     expect(fetch.mock.calls[2]?.[0]).toBe("/api/v1/designs/d1/analysis-compare?base_run_id=a&target_run_id=b");
   });
+
+  it("routes Stage 2 calls (AI, optimization, change sets) to the right endpoints", async () => {
+    const fetch = vi.fn().mockImplementation(async () => jsonResponse(200, {}));
+    const client = createViaClient({ fetch });
+    await client.ai.explainFinding("f 1");
+    await client.optimization.decide("c1", "rejected", "too risky");
+    await client.changes.create("d1", { candidate_ids: ["c1"] });
+    await client.changes.compare("d1", "r1", "r2");
+    await client.changes.rollback("cs1");
+    const calls = fetch.mock.calls.map(([url, init]) => [url, (init as RequestInit).method, (init as RequestInit).body ?? null]);
+    expect(calls).toEqual([
+      ["/api/v1/findings/f%201/explain", "POST", "{}"],
+      ["/api/v1/optimization-candidates/c1/decision", "POST", JSON.stringify({ status: "rejected", reason: "too risky" })],
+      ["/api/v1/designs/d1/change-sets", "POST", JSON.stringify({ candidate_ids: ["c1"] })],
+      ["/api/v1/designs/d1/compare?base=r1&head=r2", "GET", null],
+      ["/api/v1/change-sets/cs1/rollback", "POST", null],
+    ]);
+    expect(client.changes.downloadUrl("cs1")).toBe("/api/v1/change-sets/cs1/download");
+  });
 });

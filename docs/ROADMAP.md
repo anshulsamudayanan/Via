@@ -74,8 +74,22 @@ Decisions (owner, 2026-11-26):
 | 4 | Engineering intelligence and component context | ✅ done |
 | 5 | Optimization framework | ✅ done |
 | 6 | Change management, comparison and export | ✅ done |
-| 7 | Viewer and workspace UI | ⏳ next |
-| 8 | Testing, performance and documentation | — |
+| 7 | Viewer and workspace UI | ✅ done |
+| 8 | Testing, performance and documentation | ⏳ next |
+
+### M7: Viewer and workspace UI ✅
+- **Viewer:**
+  - finding overlays (severity-coloured regions, highlighted components and net copper) that zoom to the selection;
+  - boards load, parse and build their render model in a Web Worker.
+- **Design workspace tabs:**
+  - **Analysis:** run or re-run; run summary with per-check status; findings filtered by severity, source, category and status, with search; a finding panel with source, verification, confidence, measured evidence, suggested resolution, review (reason required to dismiss) and history; AI explain and AI design review with recommendations, shown only when a provider is configured and always labelled "AI suggestion · unverified" with VIA's grounding result.
+  - **Optimize:** objectives, candidates with validation state, Pareto badge, metric before/after/delta, benefits, trade-offs and changes; accept (validated only) or reject (reason required); create a change set from accepted candidates.
+  - **Changes:** change sets with status, changes, simulated preview, undo and discard, apply, download, rollback, and the revision comparison (findings resolved or introduced).
+  - **Revisions:** lineage ("from rev N by a change set") and the current marker.
+- **Client:** typed `ai`, `optimization` and `changes` methods in `@via/api-client`, and their types in `@via/types`.
+- **Tests:**
+  - unit tests for overlays, labels and the panels;
+  - a Playwright flow against the real stack: analyse, inspect a finding, optimize, accept, change set, apply, compare, download, roll back.
 
 ### M6: Change management, comparison and export ✅
 - **Export:**

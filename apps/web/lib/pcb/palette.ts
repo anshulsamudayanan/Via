@@ -18,11 +18,24 @@ export interface ViewerColors {
   hole: string;
   selection: string;
   selectionFill: string;
+  /** Highlighted nets and components (findings, search). */
+  highlight: string;
+  highlightFill: string;
+  /** Finding regions by severity. */
+  severity: Record<"critical" | "high" | "medium" | "low" | "info", string>;
 }
 
 export const VIEWER_COLORS: Record<Theme, ViewerColors> = {
-  dark: { background: "#0a0c0f", board: "#10161c", via: "#c9ced6", hole: "#0a0c0f", selection: "#5b9cff", selectionFill: "rgba(91,156,255,0.12)" },
-  light: { background: "#f4f5f7", board: "#e9edf1", via: "#5c6470", hole: "#f4f5f7", selection: "#2563eb", selectionFill: "rgba(37,99,235,0.10)" },
+  dark: {
+    background: "#0a0c0f", board: "#10161c", via: "#c9ced6", hole: "#0a0c0f", selection: "#5b9cff", selectionFill: "rgba(91,156,255,0.12)",
+    highlight: "#ffd84a", highlightFill: "rgba(255,216,74,0.16)",
+    severity: { critical: "#ff4d5e", high: "#ff8a3d", medium: "#f2c94c", low: "#5bc0eb", info: "#9aa4b2" },
+  },
+  light: {
+    background: "#f4f5f7", board: "#e9edf1", via: "#5c6470", hole: "#f4f5f7", selection: "#2563eb", selectionFill: "rgba(37,99,235,0.10)",
+    highlight: "#b7791f", highlightFill: "rgba(183,121,31,0.14)",
+    severity: { critical: "#c81e3a", high: "#c2410c", medium: "#a16207", low: "#0369a1", info: "#4b5563" },
+  },
 };
 
 const INNER = {

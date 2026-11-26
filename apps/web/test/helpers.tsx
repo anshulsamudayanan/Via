@@ -71,6 +71,17 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
       limits: vi.fn().mockResolvedValue({ max_upload_bytes: 1024, formats: [{ id: "kicad", name: "KiCad PCB", extensions: [".kicad_pcb"] }] }),
       summary: vi.fn(), components: vi.fn(), nets: vi.fn(), layers: vi.fn(), upload: vi.fn(), normalized: vi.fn().mockReturnValue(new Promise(() => {})),
     },
+    analysis: { checks: vi.fn(), start: vi.fn(), runs: vi.fn().mockResolvedValue(page([])), run: vi.fn(), findings: vi.fn(), finding: vi.fn(), review: vi.fn(), compare: vi.fn() },
+    ai: {
+      status: vi.fn().mockResolvedValue({ enabled: false, provider: "disabled", text: false, structured_output: false, embeddings: false, external: false, default_model: null }),
+      consent: vi.fn(), grantConsent: vi.fn(), explain: vi.fn(), explainFinding: vi.fn(), review: vi.fn(),
+      recommendations: vi.fn().mockResolvedValue([]), decideRecommendation: vi.fn(), componentMatches: vi.fn(),
+    },
+    optimization: { start: vi.fn(), runs: vi.fn().mockResolvedValue([]), run: vi.fn(), candidates: vi.fn(), compare: vi.fn(), candidate: vi.fn(), decide: vi.fn() },
+    changes: {
+      create: vi.fn(), list: vi.fn().mockResolvedValue([]), get: vi.fn(), preview: vi.fn(), removeChange: vi.fn(), discard: vi.fn(), apply: vi.fn(),
+      rollback: vi.fn(), downloadUrl: (id: string) => `/api/v1/change-sets/${id}/download`, lineage: vi.fn().mockResolvedValue([]), compare: vi.fn(),
+    },
     request: vi.fn(),
   } as Record<string, unknown>;
   for (const [k, v] of Object.entries(overrides)) base[k] = { ...(base[k] as object), ...v };

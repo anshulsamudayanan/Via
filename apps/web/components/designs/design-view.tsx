@@ -23,6 +23,9 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { AnalysisPanel } from "@/components/analysis/analysis-panel";
+import { ChangesPanel } from "@/components/analysis/changes-panel";
+import { OptimizePanel } from "@/components/analysis/optimize-panel";
 import { useApi } from "@/components/api-context";
 import { ComponentsTable, LayersTable, NetsTable } from "@/components/designs/data-tables";
 import { isTerminal, RevisionStatusBadge } from "@/components/designs/revision-status";
@@ -31,12 +34,16 @@ import { useRevisionPoll } from "@/components/designs/use-revision-poll";
 import { BoardViewer } from "@/components/viewer/board-viewer";
 import { errorMessage } from "@/lib/errors";
 import { formatBytes, formatDateTime, mm } from "@/lib/format";
+import type { Highlight } from "@/lib/pcb/overlay";
 import { useAsync } from "@/lib/use-async";
 
 const TABS = [
   { id: "components", label: "Components" },
   { id: "nets", label: "Nets" },
   { id: "layers", label: "Layers" },
+  { id: "analysis", label: "Analysis" },
+  { id: "optimize", label: "Optimize" },
+  { id: "changes", label: "Changes" },
   { id: "revisions", label: "Revisions" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -118,7 +125,14 @@ export function DesignView() {
       ) : null}
 
       {viewedRevisionId ? (
-        <ParsedDesign design={d} revisionId={viewedRevisionId} isCurrent={viewedRevisionId === d.current_revision?.id} />
+        <ParsedDesign
+          design={d}
+          projectId={p.id}
+          canEdit={canEdit}
+          revisionId={viewedRevisionId}
+          isCurrent={viewedRevisionId === d.current_revision?.id}
+          onDesignChanged={() => design.reload()}
+        />
       ) : (
         <Card>
           <EmptyState
@@ -147,10 +161,19 @@ function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: 
   );
 }
 
-function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail; revisionId: string; isCurrent: boolean }) {
+function ParsedDesign({ design, projectId, canEdit, revisionId, isCurrent, onDesignChanged }: {
+  design: DesignDetail;
+  projectId: string;
+  canEdit: boolean;
+  revisionId: string;
+  isCurrent: boolean;
+  onDesignChanged: () => void;
+}) {
   const client = useApi();
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
+  const [highlight, setHighlight] = useState<Highlight | null>(null);
   const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "components") as Tab;
   const summary = useAsync((s) => client.pcb.summary(design.id, isCurrent ? undefined : revisionId, s), [client, design.id, revisionId, isCurrent]);
 
@@ -233,7 +256,13 @@ function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail;
         designName={design.name}
         expandHref={`${pathname}/viewer${isCurrent ? "" : `?revision=${revisionId}`}`}
         className="h-[560px]"
+        highlight={highlight ?? undefined}
       />
+      {highlight ? (
+        <div className="-mt-2 flex justify-end">
+          <button type="button" className="text-xs text-accent hover:underline" onClick={() => setHighlight(null)}>Clear highlight</button>
+        </div>
+      ) : null}
 
       <nav aria-label="Design data" className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1">
         {TABS.map((t) => (
@@ -253,6 +282,18 @@ function ParsedDesign({ design, revisionId, isCurrent }: { design: DesignDetail;
       {tab === "components" ? <ComponentsTable designId={design.id} revisionId={isCurrent ? undefined : revisionId} /> : null}
       {tab === "nets" ? <NetsTable designId={design.id} revisionId={isCurrent ? undefined : revisionId} /> : null}
       {tab === "layers" ? <LayersTable designId={design.id} revisionId={isCurrent ? undefined : revisionId} /> : null}
+      {tab === "analysis" ? (
+        <AnalysisPanel projectId={projectId} designId={design.id} revisionId={revisionId} canEdit={canEdit} onHighlight={setHighlight} />
+      ) : null}
+      {tab === "optimize" ? (
+        isCurrent ? (
+          <OptimizePanel designId={design.id} revisionId={revisionId} canEdit={canEdit} onHighlight={setHighlight}
+            onChangeSetCreated={() => router.push(query("changes"))} />
+        ) : <EmptyState title="Optimization works on the current revision" description="Switch to the current revision to optimize it." />
+      ) : null}
+      {tab === "changes" ? (
+        <ChangesPanel designId={design.id} currentRevisionId={design.current_revision?.id ?? null} canEdit={canEdit} onRevisionChanged={onDesignChanged} />
+      ) : null}
       {tab === "revisions" ? <Revisions design={design} viewing={revisionId} /> : null}
     </div>
   );
@@ -292,6 +333,10 @@ function Warnings({ summary }: { summary: BoardSummary }) {
 
 function Revisions({ design, viewing }: { design: DesignDetail; viewing: string }) {
   const pathname = usePathname();
+  const client = useApi();
+  const lineage = useAsync((s) => client.changes.lineage(design.id, s), [client, design.id]);
+  const numbers = new Map(design.revisions.map((r) => [r.id, r.revision_number]));
+  const parents = new Map((lineage.data ?? []).map((l) => [l.revision_id, l.parent_revision_id]));
   return (
     <Card>
       <ul className="divide-y divide-border">
@@ -299,7 +344,11 @@ function Revisions({ design, viewing }: { design: DesignDetail; viewing: string 
           <li key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-2 text-sm">
             <span className="w-12 font-mono text-xs text-muted">rev {r.revision_number}</span>
             <RevisionStatusBadge status={r.status} />
-            <span className="min-w-0 flex-1 truncate">{r.source_file?.original_filename ?? "-"}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {r.source_file?.original_filename ?? "-"}
+              {parents.get(r.id) ? <span className="ml-2 text-xs text-muted">from rev {numbers.get(parents.get(r.id) ?? "") ?? "?"} by a change set</span> : null}
+            </span>
+            {r.id === design.current_revision?.id ? <Badge tone="success">Current</Badge> : null}
             <span className="text-xs text-muted">{r.created_by?.display_name ?? ""} · {formatDateTime(r.created_at)}</span>
             {r.status === "ready" ? (
               r.id === viewing ? <Badge tone="accent">Viewing</Badge> : <Link href={`${pathname}?revision=${r.id}`} className="text-xs text-accent hover:underline">View</Link>

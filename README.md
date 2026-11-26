@@ -4,14 +4,15 @@ VIA is an AI-native collective engineering platform. Stage 1 focuses on **PCB
 design intelligence**: ingesting real PCB files into a normalized, tool-agnostic
 model, then exploring them in a secure, project-based workspace.
 
-> **Status: Stage 2 in progress (Milestone 6 of 8 done).** Stage 1 is complete:
+> **Status: Stage 2 in progress (Milestone 7 of 8 done).** Stage 1 is complete:
 > accounts, projects, sharing, the PCB pipeline and an interactive board viewer, covered by unit,
 > integration, security and browser tests. Stage 2 so far adds KiCad project (`.zip`) import with
 > design rules, schema 1.1 (stable object ids, stackup, locks), job recovery after worker crashes, and
 > the analysis/findings framework with KiCad 9's real DRC and VIA's geometry, manufacturing,
 > placement and routing checks, and grounded AI explanations and reviews (disabled until a provider
 > is configured), validated optimization candidates, and change sets that patch your original KiCad file in place, verify
-> it and import it as a new revision with rollback and comparison (API only; the UI arrives in Milestone 7).
+> it and import it as a new revision with rollback and comparison, all usable from the design workspace
+> (Analysis, Optimize and Changes tabs, with finding overlays on the board).
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/STAGE_2_AUDIT.md](docs/STAGE_2_AUDIT.md).
 
 ## What works today

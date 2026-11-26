@@ -1,4 +1,20 @@
 import type {
+  AIFocus,
+  AIOutput,
+  AIStatus,
+  CandidateDetail,
+  Candidate,
+  ChangeInput,
+  ChangePreview,
+  ChangeSet,
+  ComponentMatch,
+  ConsentStatus,
+  LineageEntry,
+  Objective,
+  OptimizationComparison,
+  OptimizationRun,
+  Recommendation,
+  RevisionComparison,
   ActivityItem,
   AnalysisComparison,
   AnalysisRun,
@@ -267,6 +283,57 @@ export function createViaClient(options: ClientOptions = {}) {
         request<AnalysisComparison>(
           `/api/v1/designs/${enc(designId)}/analysis-compare${q({ base_run_id: baseRunId, target_run_id: targetRunId })}`,
         ),
+    },
+    ai: {
+      status: (signal?: AbortSignal) => request<AIStatus>("/api/v1/ai/status", { signal }),
+      consent: (projectId: string) => request<ConsentStatus>(`/api/v1/ai/consent/${enc(projectId)}`),
+      grantConsent: (projectId: string) => request<ConsentStatus>(`/api/v1/ai/consent/${enc(projectId)}`, { method: "PUT" }),
+      explain: (designId: string, body: { question: string; focus?: AIFocus; run_id?: string }) =>
+        request<AIOutput>(`/api/v1/designs/${enc(designId)}/ai/explain`, { method: "POST", body }),
+      explainFinding: (findingId: string, question?: string) =>
+        request<AIOutput>(`/api/v1/findings/${enc(findingId)}/explain`, { method: "POST", body: question ? { question } : {} }),
+      review: (designId: string, runId?: string) =>
+        request<{ review: AIOutput; recommendations: Recommendation[] }>(`/api/v1/designs/${enc(designId)}/ai/review`, {
+          method: "POST",
+          body: runId ? { run_id: runId } : {},
+        }),
+      recommendations: (designId: string, status?: string, signal?: AbortSignal) =>
+        request<Recommendation[]>(`/api/v1/designs/${enc(designId)}/recommendations${q({ status })}`, { signal }),
+      decideRecommendation: (id: string, status: "open" | "accepted" | "rejected", reason?: string) =>
+        request<Recommendation>(`/api/v1/recommendations/${enc(id)}`, { method: "PATCH", body: { status, reason } }),
+      componentMatches: (designId: string, signal?: AbortSignal) =>
+        request<ComponentMatch[]>(`/api/v1/designs/${enc(designId)}/component-matches`, { signal }),
+    },
+    optimization: {
+      start: (designId: string, body: { objectives: Objective[]; constraints?: Record<string, unknown>; options?: Record<string, unknown> }) =>
+        request<OptimizationRun>(`/api/v1/designs/${enc(designId)}/optimization-runs`, { method: "POST", body }),
+      runs: (designId: string, signal?: AbortSignal) =>
+        request<OptimizationRun[]>(`/api/v1/designs/${enc(designId)}/optimization-runs`, { signal }),
+      run: (runId: string, signal?: AbortSignal) => request<OptimizationRun>(`/api/v1/optimization-runs/${enc(runId)}`, { signal }),
+      candidates: (runId: string, signal?: AbortSignal) =>
+        request<Candidate[]>(`/api/v1/optimization-runs/${enc(runId)}/candidates`, { signal }),
+      compare: (runId: string, signal?: AbortSignal) =>
+        request<OptimizationComparison>(`/api/v1/optimization-runs/${enc(runId)}/compare`, { signal }),
+      candidate: (id: string, signal?: AbortSignal) => request<CandidateDetail>(`/api/v1/optimization-candidates/${enc(id)}`, { signal }),
+      decide: (id: string, status: "accepted" | "rejected", reason?: string) =>
+        request<CandidateDetail>(`/api/v1/optimization-candidates/${enc(id)}/decision`, { method: "POST", body: { status, reason } }),
+    },
+    changes: {
+      create: (designId: string, body: { title?: string; candidate_ids?: string[]; changes?: ChangeInput[] }) =>
+        request<ChangeSet>(`/api/v1/designs/${enc(designId)}/change-sets`, { method: "POST", body }),
+      list: (designId: string, signal?: AbortSignal) => request<ChangeSet[]>(`/api/v1/designs/${enc(designId)}/change-sets`, { signal }),
+      get: (id: string, signal?: AbortSignal) => request<ChangeSet>(`/api/v1/change-sets/${enc(id)}`, { signal }),
+      preview: (id: string, signal?: AbortSignal) => request<ChangePreview>(`/api/v1/change-sets/${enc(id)}/preview`, { signal }),
+      removeChange: (id: string, changeId: string) =>
+        request<void>(`/api/v1/change-sets/${enc(id)}/changes/${enc(changeId)}`, { method: "DELETE" }),
+      discard: (id: string) => request<void>(`/api/v1/change-sets/${enc(id)}`, { method: "DELETE" }),
+      apply: (id: string) => request<ChangeSet>(`/api/v1/change-sets/${enc(id)}/apply`, { method: "POST" }),
+      rollback: (id: string) => request<ChangeSet>(`/api/v1/change-sets/${enc(id)}/rollback`, { method: "POST" }),
+      /** Same-origin URL of the exported (patched) file. */
+      downloadUrl: (id: string) => `${baseUrl}/api/v1/change-sets/${enc(id)}/download`,
+      lineage: (designId: string, signal?: AbortSignal) => request<LineageEntry[]>(`/api/v1/designs/${enc(designId)}/lineage`, { signal }),
+      compare: (designId: string, base: string, head: string, signal?: AbortSignal) =>
+        request<RevisionComparison>(`/api/v1/designs/${enc(designId)}/compare${q({ base, head })}`, { signal }),
     },
     pcb: {
       limits: () => request<UploadLimits>("/api/v1/pcb/limits"),

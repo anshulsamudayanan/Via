@@ -9,7 +9,8 @@
 
 import type { Side } from "@via/types";
 
-import { layerColor, type Theme, VIEWER_COLORS } from "./palette";
+import type { ResolvedOverlay } from "./overlay";
+import { layerColor, type Theme, VIEWER_COLORS, type ViewerColors } from "./palette";
 import type { Circle, LayerPrims, RenderComponent, RenderModel, StrokeGroup } from "./render-model";
 import type { Viewport } from "./viewport";
 
@@ -29,6 +30,8 @@ export interface DrawOptions {
   visibleLayers: ReadonlySet<string>;
   show: ObjectToggles;
   selected: RenderComponent | null;
+  /** Finding regions and highlighted components/nets, drawn above everything else. */
+  overlay?: ResolvedOverlay | null;
 }
 
 interface PathSink {
@@ -217,5 +220,58 @@ export function drawBoard(ctx: CanvasRenderingContext2D, model: RenderModel, opt
     for (const poly of sel.padPolygons) tracePolyline(ctx, poly, true);
     for (const c of sel.padCircles) traceCircle(ctx, c);
     ctx.stroke();
+  }
+  if (opts.overlay) drawOverlay(ctx, opts.overlay, colors, px);
+}
+
+function drawOverlay(ctx: CanvasRenderingContext2D, o: ResolvedOverlay, colors: ViewerColors, px: number): void {
+  if (o.net) {
+    ctx.strokeStyle = colors.highlight;
+    ctx.fillStyle = colors.highlight;
+    ctx.globalAlpha = 0.9;
+    const s = o.net.segments;
+    for (let i = 0; i < s.length; i += 5) {
+      ctx.lineWidth = Math.max(s[i + 4]!, 2 * px);
+      ctx.beginPath();
+      ctx.moveTo(s[i]!, s[i + 1]!);
+      ctx.lineTo(s[i + 2]!, s[i + 3]!);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    for (const c of o.net.circles) traceCircle(ctx, c);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  for (const c of o.components) {
+    const b = c.bbox;
+    const pad = 3 * px;
+    ctx.fillStyle = colors.highlightFill;
+    ctx.fillRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + 2 * pad, b.maxY - b.minY + 2 * pad);
+    ctx.strokeStyle = colors.highlight;
+    ctx.lineWidth = 1.5 * px;
+    ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + 2 * pad, b.maxY - b.minY + 2 * pad);
+  }
+  for (const r of o.regions) {
+    const color = colors.severity[r.severity];
+    const pad = 6 * px; // keep zero-size regions (a point) visible
+    const x = r.bbox.min_x - pad;
+    const y = r.bbox.min_y - pad;
+    const w = r.bbox.max_x - r.bbox.min_x + 2 * pad;
+    const h = r.bbox.max_y - r.bbox.min_y + 2 * pad;
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 * px;
+    ctx.setLineDash([6 * px, 4 * px]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    if (r.points?.length) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (const p of r.points) traceCircle(ctx, { x: p.x, y: p.y, r: 3 * px, width: 0 });
+      ctx.fill();
+    }
   }
 }

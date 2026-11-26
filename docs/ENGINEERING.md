@@ -84,6 +84,23 @@ zoom step. Boards with more than 40,000 tracks + pads switch to a snapshot previ
 zoom or pan and redraw in full detail when you stop (351k tracks: about 31 ms per
 interactive frame instead of about 536 ms).
 
+### Loading off the main thread and overlays (Stage 2, Milestone 7)
+
+- **Web Worker.** `lib/pcb/board-loader.ts` loads the board in a Web Worker
+  (`lib/pcb/board.worker.ts`). The worker fetches the normalized design (same origin, session cookie),
+  parses the JSON and builds the render model there. Only the render model and stats come back, so a
+  large board no longer freezes the page while it loads. The parsed design stays in the worker, which
+  computes net highlights on request. Without `Worker` (tests, or a worker that fails to start), the
+  same code runs on the main thread.
+- **Overlays.** `lib/pcb/overlay.ts` and `drawOverlay` in the renderer draw, on top of everything else:
+  - a finding's region (its bounding box, dashed, in the severity colour, plus its points);
+  - the components it names (outlined);
+  - the copper of the nets it names: tracks, vias and pads. Arcs are drawn as two chords through
+    their midpoint.
+
+  Selecting a finding zooms to all of this. Geometry comes only from the parsed design and the
+  finding's stored region.
+
 ## Running inside VIA (Checkpoint 4)
 
 The API never parses in-process. The worker runs `python -I -B -m via_pcb.cli --filename <name>`

@@ -1,6 +1,5 @@
 "use client";
 
-import type { PCBDesign } from "@via/types";
 import { Badge, Button, cn, EmptyState, ErrorState, Input, Spinner, Table, TBody, TD, TH, THead, TR, Tooltip } from "@via/ui";
 import { Expand, Maximize, Minus, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +8,16 @@ import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useMemo,
 import { useApi } from "@/components/api-context";
 import { errorMessage } from "@/lib/errors";
 import { layerColor, VIEWER_COLORS } from "@/lib/pcb/palette";
-import { buildRenderModel, componentAt, type RenderComponent, type RenderModel } from "@/lib/pcb/render-model";
+import { type LoadedBoard, loadBoard } from "@/lib/pcb/board-loader";
+import {
+  EMPTY_HIGHLIGHT,
+  type Highlight,
+  type NetGeometry,
+  overlayBounds,
+  type ResolvedOverlay,
+  resolveComponents,
+} from "@/lib/pcb/overlay";
+import { componentAt, type RenderComponent, type RenderModel } from "@/lib/pcb/render-model";
 import { drawBoard, type ObjectToggles, visibleSides } from "@/lib/pcb/renderer";
 import { fitViewport, focusOn, panBy, screenToWorld, type Viewport, zoomAt } from "@/lib/pcb/viewport";
 import { useAsync } from "@/lib/use-async";
@@ -22,25 +30,34 @@ interface Props {
   /** Link to the full-page viewer (shown when embedded). */
   expandHref?: string;
   className?: string;
+  /** Finding regions and components/nets to highlight (e.g. the selected finding). */
+  highlight?: Highlight;
 }
 
-/** Loads the parsed design and renders the interactive viewer. */
-export function BoardViewer({ designId, revisionId, designName, expandHref, className }: Props) {
+/** Loads the parsed design (in a Web Worker when available) and renders the interactive viewer. */
+export function BoardViewer({ designId, revisionId, designName, expandHref, className, highlight }: Props) {
   const client = useApi();
-  const design = useAsync((s) => client.pcb.normalized(designId, revisionId, s), [client, designId, revisionId]);
-  const model = useMemo(() => (design.data ? buildRenderModel(design.data) : null), [design.data]);
+  const board = useAsync((s) => loadBoard(client, designId, revisionId, s), [client, designId, revisionId]);
 
-  if (design.error) {
-    return <ErrorState title="Couldn't load the board for viewing" description={errorMessage(design.error)} />;
+  if (board.error) {
+    return <ErrorState title="Couldn't load the board for viewing" description={errorMessage(board.error)} />;
   }
-  if (!model || !design.data) {
+  if (!board.data) {
     return (
       <div className={cn("flex items-center justify-center rounded-lg border border-border bg-surface", className)}>
         <Spinner label="Loading board" />
       </div>
     );
   }
-  return <ViewerCanvas model={model} design={design.data} designName={designName} expandHref={expandHref} className={className} />;
+  return (
+    <ViewerCanvas
+      board={board.data}
+      designName={designName}
+      expandHref={expandHref}
+      className={className}
+      highlight={highlight ?? EMPTY_HIGHLIGHT}
+    />
+  );
 }
 
 const ZOOM_STEP = 1.25;
@@ -52,18 +69,19 @@ const ZOOM_STEP = 1.25;
 const HEAVY_PRIMITIVES = 40_000;
 
 function ViewerCanvas({
-  model,
-  design,
+  board,
   designName,
   expandHref,
   className,
+  highlight,
 }: {
-  model: RenderModel;
-  design: PCBDesign;
+  board: LoadedBoard;
   designName: string;
   expandHref?: string;
   className?: string;
+  highlight: Highlight;
 }) {
+  const model = board.model;
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,7 +100,27 @@ function ViewerCanvas({
   const [zoomPct, setZoomPct] = useState(100);
   const [panel, setPanel] = useState<"layers" | "components">("layers");
 
-  const optsRef = useRef({ visibleLayers, show, selected, theme });
+  const [netGeo, setNetGeo] = useState<{ key: string; geometry: NetGeometry } | null>(null);
+  const netKey = highlight.nets.join("\u0000");
+  useEffect(() => {
+    if (!highlight.nets.length) return;
+    let live = true;
+    void board.nets(highlight.nets).then((geometry) => {
+      if (live) setNetGeo({ key: netKey, geometry });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- netKey identifies highlight.nets
+  }, [board, netKey]);
+  const overlay = useMemo<ResolvedOverlay | null>(() => {
+    const components = resolveComponents(model, highlight.references);
+    const net = highlight.nets.length && netGeo?.key === netKey ? netGeo.geometry : null;
+    if (!components.length && !net && !highlight.regions.length) return null;
+    return { components, net, regions: highlight.regions };
+  }, [model, highlight, netGeo, netKey]);
+
+  const optsRef = useRef({ visibleLayers, show, selected, theme, overlay });
 
   // On very large boards, zoom/pan first shows a scaled snapshot of the last
   // full frame; the full-detail render follows once interaction pauses.
@@ -178,11 +216,20 @@ function ViewerCanvas({
     return () => observer.disconnect();
   }, [fit, schedule]);
 
-  // Redraw when visibility, selection or theme change.
+  // Redraw when visibility, selection, highlight or theme change.
   useEffect(() => {
-    optsRef.current = { visibleLayers, show, selected, theme };
+    optsRef.current = { visibleLayers, show, selected, theme, overlay };
     schedule();
-  }, [visibleLayers, show, selected, theme, schedule]);
+  }, [visibleLayers, show, selected, theme, overlay, schedule]);
+
+  // Zoom to a newly focused highlight (e.g. a finding picked from the list).
+  useEffect(() => {
+    if (!highlight.focus || !overlay) return;
+    const b = overlayBounds(overlay);
+    const { width, height } = sizeRef.current;
+    if (b && width && height) setViewport(focusOn(b, width, height, 0.35, fitScaleRef.current * 40));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the highlight itself changes
+  }, [overlay]);
 
   // Wheel zoom (non-passive so the page doesn't scroll).
   useEffect(() => {
@@ -282,7 +329,7 @@ function ViewerCanvas({
       return next;
     });
 
-  const s = design.stats;
+  const s = board.stats;
   return (
     <div
       className={cn("flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface lg:flex-row", className)}

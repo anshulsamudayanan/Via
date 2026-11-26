@@ -616,3 +616,241 @@ export interface AnalysisComparison {
   resolved: Finding[];
   persisting: Finding[];
 }
+
+// --- Stage 2: VIA Intelligence (AI, always labelled as unverified suggestions) -------------
+
+export interface AIStatus {
+  enabled: boolean;
+  provider: string;
+  text: boolean;
+  structured_output: boolean;
+  embeddings: boolean;
+  external: boolean;
+  default_model: string | null;
+}
+
+export interface ConsentStatus {
+  scope: string;
+  granted: boolean;
+  policy_version: string;
+  granted_at: string | null;
+}
+
+export interface AIFocus {
+  kind: "finding" | "component" | "net" | "region";
+  id: string;
+}
+
+export interface AIReference {
+  kind: string;
+  id: string;
+}
+
+export interface AIExplanationOutput {
+  answer: string;
+  key_points?: string[];
+  references?: AIReference[];
+  numbers_used?: { value: number; unit?: string | null; source: string }[];
+  uncertainties?: string[];
+}
+
+export interface AIOutput {
+  id: string;
+  kind: string;
+  source: "ai_suggestion";
+  verification: "unverified";
+  question: string | null;
+  focus: AIFocus | null;
+  output: AIExplanationOutput & Record<string, unknown>;
+  grounding: { ok: boolean; problems?: string[] } & Record<string, unknown>;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  analysis_run_id: string | null;
+  revision_id: string;
+  created_at: string;
+}
+
+export interface Recommendation {
+  id: string;
+  ai_output_id: string;
+  design_id: string;
+  revision_id: string;
+  source: "ai_suggestion";
+  verification: "unverified";
+  problem: string;
+  proposed_change: string;
+  rationale: string;
+  expected_benefits: string[];
+  trade_offs: string[];
+  required_validation: string[];
+  uncertainty: string;
+  references: AIReference[];
+  numbers_used: { value: number; unit?: string | null; source: string }[];
+  evidence_finding_ids: string[];
+  confidence: string;
+  status: "open" | "accepted" | "rejected";
+  status_reason: string | null;
+  created_at: string;
+}
+
+export interface ComponentMatch {
+  reference: string;
+  value: string | null;
+  footprint: string;
+  manufacturer: string | null;
+  part_number: string | null;
+  record_id: string | null;
+}
+
+// --- Stage 2: VIA Optimize -----------------------------------------------------------------
+
+export type Objective = "area" | "cost" | "manufacturability" | "routing" | "placement" | "thermal" | "layers";
+
+export interface OptimizationRun {
+  id: string;
+  design_id: string;
+  revision_id: string;
+  revision_number: number;
+  status: AnalysisStatus;
+  attempt: number;
+  config: { objectives?: Objective[]; constraints?: Record<string, unknown>; options?: Record<string, unknown> };
+  summary: { baseline?: Record<string, number | null>; pareto?: string[]; notes?: string[]; candidate_count?: number; duration_seconds?: number | null };
+  optimizer_version: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface DesignChangeDef {
+  id: string;
+  ordinal: number;
+  kind: string;
+  target: { kind: string; id: string; uuid?: string | null; label?: string | null };
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  reason: string;
+  source: string;
+  exportable: boolean;
+}
+
+export type CandidateStatus = "proposed" | "awaiting_validation" | "validated" | "rejected" | "accepted";
+
+export interface CandidateValidation {
+  status: "passed" | "failed" | "requires_rerouting" | "manual";
+  checks_run: string[];
+  new_problems: string[];
+  resolved_problems: number;
+  constraint_violations: string[];
+  notes: string[];
+}
+
+export interface Candidate {
+  id: string;
+  run_id: string;
+  key: string;
+  algorithm: string;
+  algorithm_version: string;
+  objectives: string[];
+  title: string;
+  summary: string;
+  metrics_before: Record<string, number | null>;
+  metrics_after: Record<string, number | null>;
+  expected_benefits: string[];
+  trade_offs: string[];
+  validation: CandidateValidation;
+  pareto: boolean;
+  status: CandidateStatus;
+  status_reason: string | null;
+  change_count: number;
+  exportable_changes: number;
+}
+
+export interface CandidateDetail extends Candidate {
+  changes: DesignChangeDef[];
+  details: Record<string, unknown>;
+}
+
+export interface OptimizationComparison {
+  objectives: string[];
+  metrics: string[];
+  baseline: Record<string, number | null>;
+  rows: { id: string; key: string; title: string; status: string; metrics: Record<string, number | null>; deltas: Record<string, number | null> }[];
+  pareto: string[];
+  dominance: Record<string, string[]>;
+}
+
+// --- Stage 2: change management ------------------------------------------------------------
+
+export type ChangeSetStatus = "draft" | "applying" | "applied" | "failed" | "rolled_back";
+
+export interface ChangeInput {
+  kind: string;
+  target: { kind: string; id: string; label?: string };
+  after: Record<string, number>;
+  reason?: string;
+}
+
+export interface SetChange {
+  id: string;
+  ordinal: number;
+  kind: string;
+  target: { kind: string; id: string; label?: string | null };
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  reason: string;
+  source: string;
+  origin_candidate_id: string | null;
+  status: "proposed" | "applied" | "refused";
+  status_reason: string | null;
+}
+
+export interface ChangeSet {
+  id: string;
+  design_id: string;
+  base_revision_id: string;
+  result_revision_id: string | null;
+  export_run_id: string | null;
+  title: string;
+  status: ChangeSetStatus;
+  result: { applied?: number; sha256?: string; size_bytes?: number; verification?: string; follow_up_analysis_run_id?: string } & Record<string, unknown>;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  applied_at: string | null;
+  rolled_back_at: string | null;
+  changes: SetChange[];
+}
+
+export interface ChangePreview {
+  source: "simulated";
+  before: Record<string, number | null>;
+  after: Record<string, number | null>;
+  deltas: Record<string, number | null>;
+}
+
+export interface LineageEntry {
+  revision_id: string;
+  revision_number: number;
+  status: RevisionStatus;
+  parent_revision_id: string | null;
+  change_set_id: string | null;
+  created_at: string;
+}
+
+export interface FindingBrief {
+  id: string;
+  rule: string;
+  severity: Severity;
+  title: string;
+  source: FindingSource;
+}
+
+export interface RevisionComparison {
+  base: { revision_id: string; revision_number: number; analysis_run_id: string | null };
+  head: { revision_id: string; revision_number: number; analysis_run_id: string | null };
+  object_counts: Record<string, { base: number | null; head: number | null }>;
+  findings: { introduced: FindingBrief[]; resolved: FindingBrief[]; persisting: number; base_total: number; head_total: number } | null;
+  findings_note?: string;
+}
