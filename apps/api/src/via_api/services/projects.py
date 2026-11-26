@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from via_api.errors import APIError, not_found
-from via_api.models import Design, Organization, Project, ProjectMembership, User
+from via_api.models import AnalysisRun, Design, DesignRevision, Organization, Project, ProjectMembership, User
 from via_api.models.base import utcnow
-from via_api.models.enums import ProjectRole, ProjectVisibility
+from via_api.models.enums import AnalysisKind, AnalysisStatus, ProjectRole, ProjectVisibility
 from via_api.schemas.projects import (
+    LatestAnalysis,
+    LatestImport,
     OrganizationRef,
     ProjectMemberOut,
     ProjectOut,
@@ -30,12 +34,68 @@ def _escape_like(term: str) -> str:
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def to_out(db: Session, project: Project, role: ProjectRole, design_count: int | None = None) -> ProjectOut:
+def latest_work(
+    db: Session, project_ids: list[uuid.UUID]
+) -> tuple[dict[uuid.UUID, LatestImport], dict[uuid.UUID, LatestAnalysis]]:
+    """Most recent upload and analysis run per project: two queries for any number of projects."""
+    if not project_ids:
+        return {}, {}
+    imports = db.execute(
+        select(DesignRevision, Design.name)
+        .join(Design, Design.id == DesignRevision.design_id)
+        .where(DesignRevision.project_id.in_(project_ids))
+        .order_by(DesignRevision.project_id, DesignRevision.created_at.desc(), DesignRevision.id.desc())
+        .ext(distinct_on(DesignRevision.project_id))
+    ).all()
+    analyses = db.execute(
+        select(AnalysisRun, Design.id, Design.name)
+        .join(DesignRevision, DesignRevision.id == AnalysisRun.revision_id)
+        .join(Design, Design.id == DesignRevision.design_id)
+        .where(AnalysisRun.project_id.in_(project_ids), AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS)
+        .order_by(AnalysisRun.project_id, AnalysisRun.created_at.desc(), AnalysisRun.id.desc())
+        .ext(distinct_on(AnalysisRun.project_id))
+    ).all()
+    return (
+        {
+            rev.project_id: LatestImport(
+                design_id=rev.design_id,
+                design_name=name,
+                revision_number=rev.revision_number,
+                status=rev.status,
+                at=rev.created_at,
+            )
+            for rev, name in imports
+        },
+        {
+            run.project_id: LatestAnalysis(
+                design_id=design_id,
+                design_name=name,
+                status=run.status,
+                at=run.finished_at or run.created_at,
+                finding_count=(
+                    run.result_summary.get("finding_count") if run.status == AnalysisStatus.SUCCEEDED else None
+                ),
+            )
+            for run, design_id, name in analyses
+        },
+    )
+
+
+def to_out(
+    db: Session,
+    project: Project,
+    role: ProjectRole,
+    design_count: int | None = None,
+    latest: tuple[LatestImport | None, LatestAnalysis | None] | None = None,
+) -> ProjectOut:
     org = db.get(Organization, project.organization_id)
     owner = db.get(User, project.owner_id)
     assert org is not None and owner is not None  # FKs guarantee both
     if design_count is None:
         design_count = db.scalar(select(func.count(Design.id)).where(Design.project_id == project.id)) or 0
+    if latest is None:
+        imports, analyses = latest_work(db, [project.id])
+        latest = (imports.get(project.id), analyses.get(project.id))
     return ProjectOut(
         id=project.id,
         name=project.name,
@@ -45,6 +105,8 @@ def to_out(db: Session, project: Project, role: ProjectRole, design_count: int |
         owner=UserRef.model_validate(owner),
         my_role=role,
         design_count=design_count,
+        latest_import=latest[0],
+        latest_analysis=latest[1],
         archived_at=project.archived_at,
         created_at=project.created_at,
         updated_at=project.updated_at,
@@ -132,19 +194,40 @@ def list_for_user(
         .limit(limit)
         .offset(offset)
     ).all()
+    imports, analyses = latest_work(db, [project.id for project, _ in rows])
     items = []
     for project, count in rows:
         role = access.project_role(db, user_id, project)
         assert role is not None  # guaranteed by accessible_projects_clause
-        items.append(to_out(db, project, role, design_count=count))
+        latest = (imports.get(project.id), analyses.get(project.id))
+        items.append(to_out(db, project, role, design_count=count, latest=latest))
     return items, total
 
 
 def summary_for_user(db: Session, user_id: uuid.UUID) -> ProjectSummary:
-    base = select(func.count(Project.id)).where(access.accessible_projects_clause(user_id))
+    accessible = access.accessible_projects_clause(user_id)
+    base = select(func.count(Project.id)).where(accessible)
+    active_ids = select(Project.id).where(accessible, Project.archived_at.is_(None))
+    since = utcnow() - timedelta(days=7)
     return ProjectSummary(
         active=db.scalar(base.where(Project.archived_at.is_(None))) or 0,
         archived=db.scalar(base.where(Project.archived_at.is_not(None))) or 0,
+        designs=db.scalar(select(func.count(Design.id)).where(Design.project_id.in_(active_ids))) or 0,
+        imports_7d=db.scalar(
+            select(func.count(DesignRevision.id)).where(
+                DesignRevision.project_id.in_(active_ids), DesignRevision.created_at >= since
+            )
+        )
+        or 0,
+        analyses_7d=db.scalar(
+            select(func.count(AnalysisRun.id)).where(
+                AnalysisRun.project_id.in_(active_ids),
+                AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS,
+                AnalysisRun.status.in_([AnalysisStatus.SUCCEEDED, AnalysisStatus.FAILED]),
+                AnalysisRun.created_at >= since,
+            )
+        )
+        or 0,
     )
 
 

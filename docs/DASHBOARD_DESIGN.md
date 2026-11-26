@@ -1,8 +1,9 @@
 # Dashboard and shell redesign
 
-Status: **Phase 1 (audit) and Phase 2 (proposal), awaiting approval.** No application code has
-changed. Screenshots of the current UI are in `docs/design/current/`, captured from the running
-Compose stack with a fresh account and two projects, each with one uploaded board.
+Status: **implemented.** Approved with all three recommendations (IBM Plex, additive summary fields,
+"Soon" navigation). Before: `docs/design/current/`. After: `docs/design/after/` (both themes at
+1535, 1280, 768 and 390 px, plus the empty account, command menu, collapsed sidebar and mobile
+drawer), captured with Playwright from the Compose stack. The QA results are in Part 3 at the end.
 
 ---
 
@@ -290,3 +291,49 @@ Expanded (232 px)                    Collapsed (52 px)
    column it can't fill.
 3. **Engineering nav items** (Designs, Analysis, Components): show them disabled with "Soon"
    (recommended), or hide them until cross-project views exist.
+
+---
+
+## Part 3: Implementation and QA
+
+### What changed from the proposal
+
+- **Projects table:** the Role column is hidden below 1024 px so project names keep their width.
+  Below 768 px the table becomes a two-line list.
+- **"Last analysis":** shipped, because decision 2 was approved. `latest_import` and
+  `latest_analysis` come from two batched `DISTINCT ON` queries per page, with no per-row requests.
+- **Command menu:** searches projects (server `q`, including archived ones), pages and one action
+  (switch theme). It does not offer to create a project; that stays on the explicit button.
+- **Motion:** only the active-nav marker uses `motion/react` (`layoutId`, via `LazyMotion` with
+  `domAnimation`). Everything else is CSS transitions and `data-state` keyframes. Reduced motion is
+  honoured through `MotionConfig reducedMotion="user"` and the existing global CSS rule.
+
+### QA results (executed)
+
+- **Python:** `pytest` passed (483 tests, 4 skips that need S3 or a non-root user). This includes
+  `test_dashboard_summary_and_latest_work`, which checks the counts, latest work, access scoping
+  and archived exclusion.
+- **Web:** `pnpm -r test` passed: web 86, ui 8, api-client 14.
+  - `components/dashboard/dashboard.test.tsx` covers: populated, empty and error with retry;
+    debounced server filter; sort with `aria-sort`; active and disabled nav; collapse persistence;
+    ⌘K search with Enter.
+  - `lib/lib.test.ts` covers the activity describers and categories.
+- **Lint and types:** `pnpm lint` and `pnpm -r typecheck` are clean; ruff, ruff format and mypy are
+  clean.
+- **End to end:** Playwright against the rebuilt Compose stack passed all 8 specs, including the new
+  `e2e/dashboard.spec.ts`. It covers the first-run state, real counts, search to project, collapse
+  persisting across a reload, disabled "Soon" items, theme switching, the mobile drawer, and no
+  horizontal overflow at 390 px. `core-flow` now checks the Dashboard heading and the account
+  name; the greeting heading was removed.
+- **Visual:** the screenshot script reported no console errors and no horizontal overflow at any of
+  the four widths in either theme.
+- **Contrast:** computed WCAG ratios for every text token against `background` and `surface`
+  (see DESIGN_SYSTEM.md). All text tokens are at least 4.5 : 1.
+
+### Not done or not measured
+
+- No automated axe or Lighthouse audit was run (no such tool is in the repository).
+- Bundle size before and after was not measured. The additions are two Plex families (Latin,
+  5 weights) and `motion`'s `domAnimation` feature set.
+- The Unslop and Frontend Design plugins were not available in this cloud session, so no review
+  by them was run.

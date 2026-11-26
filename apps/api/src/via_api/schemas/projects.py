@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from via_api.models.enums import OrganizationRole, ProjectRole, ProjectVisibility
+from via_api.models.enums import AnalysisStatus, OrganizationRole, ProjectRole, ProjectVisibility, RevisionStatus
 from via_api.schemas.common import APIModel, Email, Name
 
 
@@ -67,6 +67,27 @@ class ProjectUpdate(BaseModel):
     visibility: ProjectVisibility | None = None
 
 
+class LatestImport(BaseModel):
+    """The project's most recent upload (any design), whatever its status."""
+
+    design_id: uuid.UUID
+    design_name: str
+    revision_number: int
+    status: RevisionStatus
+    at: datetime
+
+
+class LatestAnalysis(BaseModel):
+    """The project's most recent analysis run (any design)."""
+
+    design_id: uuid.UUID
+    design_name: str
+    status: AnalysisStatus
+    at: datetime
+    #: Only for succeeded runs.
+    finding_count: int | None = None
+
+
 class ProjectOut(APIModel):
     id: uuid.UUID
     name: str
@@ -76,6 +97,8 @@ class ProjectOut(APIModel):
     owner: UserRef
     my_role: ProjectRole
     design_count: int
+    latest_import: LatestImport | None = None
+    latest_analysis: LatestAnalysis | None = None
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -129,3 +152,8 @@ class ProjectSummary(BaseModel):
 
     active: int
     archived: int
+    #: Designs in active projects.
+    designs: int = 0
+    #: Uploads (revisions) and completed analysis runs in active projects over the last 7 days.
+    imports_7d: int = 0
+    analyses_7d: int = 0

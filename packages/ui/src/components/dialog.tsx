@@ -14,38 +14,49 @@ interface DialogContentProps extends ComponentProps<typeof DialogPrimitive.Conte
   title: string;
   description?: ReactNode;
   footer?: ReactNode;
+  /** Render only the children (title kept for screen readers): for search-style dialogs. */
+  bare?: boolean;
 }
 
 /** Modal dialog with focus trap, Escape to close and labelled title/description. */
-export function DialogContent({ title, description, footer, className, children, ...props }: DialogContentProps) {
+export function DialogContent({ title, description, footer, bare = false, className, children, ...props }: DialogContentProps) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/50" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60 data-[state=open]:animate-fade-in" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-border bg-surface shadow-xl",
+          "fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-border bg-surface-raised shadow-overlay data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out",
           "focus-visible:outline-none",
           className,
         )}
         {...(description ? {} : { "aria-describedby": undefined })}
         {...props}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-          <div className="space-y-0.5">
-            <DialogPrimitive.Title className="text-sm font-semibold">{title}</DialogPrimitive.Title>
-            {description ? (
-              <DialogPrimitive.Description className="text-xs text-muted">{description}</DialogPrimitive.Description>
-            ) : null}
-          </div>
-          <DialogPrimitive.Close
-            className="rounded-sm p-1 text-muted hover:bg-surface-hover hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="size-4" />
-          </DialogPrimitive.Close>
-        </div>
-        <div className="px-4 py-4">{children}</div>
-        {footer ? <div className="flex justify-end gap-2 border-t border-border px-4 py-3">{footer}</div> : null}
+        {bare ? (
+          <>
+            <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
+            {children}
+          </>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="space-y-0.5">
+                <DialogPrimitive.Title className="text-sm font-semibold">{title}</DialogPrimitive.Title>
+                {description ? (
+                  <DialogPrimitive.Description className="text-xs text-muted">{description}</DialogPrimitive.Description>
+                ) : null}
+              </div>
+              <DialogPrimitive.Close
+                className="rounded-sm p-1 text-muted hover:bg-surface-hover hover:text-foreground"
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </DialogPrimitive.Close>
+            </div>
+            <div className="px-4 py-4">{children}</div>
+            {footer ? <div className="flex justify-end gap-2 border-t border-border px-4 py-3">{footer}</div> : null}
+          </>
+        )}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );

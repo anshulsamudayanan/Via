@@ -16,3 +16,5 @@ export { EmptyState, ErrorState, Skeleton, Spinner } from "./components/states";
 export { StatusDot, type StatusTone } from "./components/status-dot";
 export { Table, TBody, TD, TH, THead, TR } from "./components/table";
 export { Tooltip, TooltipProvider } from "./components/tooltip";
+export { Kbd, Mono, Panel } from "./components/primitives";
+export { Sheet, SheetClose, SheetContent, SheetTrigger } from "./components/sheet";

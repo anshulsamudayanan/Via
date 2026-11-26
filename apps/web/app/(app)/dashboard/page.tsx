@@ -1,64 +1,60 @@
 "use client";
 
-import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, ErrorState, Skeleton } from "@via/ui";
-import { ArrowRight, FolderKanban, FolderPlus, Plus } from "lucide-react";
+import { Button, Kbd, Panel } from "@via/ui";
+import { ArrowRight, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ActivityList } from "@/components/activity-list";
 import { useApi } from "@/components/api-context";
-import { UploadShortcut } from "@/components/designs/upload-shortcut";
 import { PageHeader } from "@/components/app-shell";
-import { RoleBadge } from "@/components/projects/badges";
+import { OverviewStrip } from "@/components/dashboard/overview-strip";
+import { ProjectsPanel } from "@/components/dashboard/projects-panel";
+import { UploadShortcut } from "@/components/designs/upload-shortcut";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
-import { useSession } from "@/components/session";
-import { errorMessage } from "@/lib/errors";
-import { relativeTime } from "@/lib/format";
+import { useOpenCommandMenu } from "@/components/shell/command-menu";
 import { useAsync } from "@/lib/use-async";
-
-function Stat({ label, value, href }: { label: string; value: number | undefined; href: string }) {
-  return (
-    <Link href={href} className="rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:bg-surface-hover">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-        {value === undefined ? <Skeleton className="mt-1 h-6 w-10" /> : value}
-      </div>
-    </Link>
-  );
-}
 
 export default function DashboardPage() {
   const client = useApi();
   const router = useRouter();
-  const { me } = useSession();
-  const summary = useAsync(() => client.projects.summary(), [client]);
-  const recent = useAsync((signal) => client.projects.list({ sort: "updated", limit: 5 }, signal), [client]);
-  const firstName = me.user.display_name.split(/\s+/)[0];
-  const isNew = summary.data && summary.data.active + summary.data.archived === 0;
+  const openSearch = useOpenCommandMenu();
+  const summary = useAsync((s) => client.projects.summary(s), [client]);
+  const isNew = summary.data !== undefined && summary.data.active + summary.data.archived === 0;
   const goTo = (id: string) => router.push(`/projects/${id}`);
 
   return (
     <>
       <PageHeader
-        title={`Welcome${isNew ? "" : " back"}, ${firstName}`}
-        description="Your projects and recent activity."
+        title="Dashboard"
+        description="Projects, PCB designs and engineering activity you have access to."
         actions={
           <>
+            <Button variant="secondary" onClick={openSearch} className="hidden text-muted md:inline-flex" aria-keyshortcuts="Meta+K Control+K">
+              <Search /> Search <Kbd className="ml-2">⌘K</Kbd>
+            </Button>
             {isNew ? null : <UploadShortcut />}
             <NewProjectDialog onCreated={(p) => goTo(p.id)} />
           </>
         }
       />
 
-      {summary.error ? <ErrorState className="mb-4" title="Couldn't load your projects" description={errorMessage(summary.error)} /> : null}
-
       {isNew ? (
-        <Card>
-          <EmptyState
-            icon={<FolderPlus />}
-            title="Create your first project"
-            description="A project is a private workspace for PCB designs. Create one, then upload a KiCad board into it."
-            action={
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <Panel title="Get started">
+            <div className="space-y-3 px-4 py-4 text-[13px] text-muted">
+              <ol className="list-decimal space-y-1.5 pl-5">
+                <li>
+                  <span className="text-foreground">Create a project</span>: a private workspace for one board or product.
+                </li>
+                <li>
+                  <span className="text-foreground">Upload a KiCad board</span>: a <code className="font-mono text-[12.5px] text-foreground">.kicad_pcb</code> file, or a zipped project
+                  with its <code className="font-mono text-[12.5px] text-foreground">.kicad_pro</code> design rules.
+                </li>
+                <li>
+                  <span className="text-foreground">Run an analysis</span> on the design to get deterministic findings with evidence.
+                </li>
+              </ol>
               <NewProjectDialog
                 onCreated={(p) => goTo(p.id)}
                 trigger={
@@ -67,58 +63,27 @@ export default function DashboardPage() {
                   </Button>
                 }
               />
-            }
-          />
-        </Card>
+            </div>
+          </Panel>
+          <Panel title="Activity">
+            <ActivityList pageSize={6} preview engineeringOnly />
+          </Panel>
+        </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Active projects" value={summary.data?.active} href="/projects" />
-            <Stat label="Archived projects" value={summary.data?.archived} href="/projects?status=archived" />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-5">
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Recent projects</CardTitle>
-                <Link href="/projects" className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground">
-                  All projects <ArrowRight className="size-3" aria-hidden="true" />
-                </Link>
-              </CardHeader>
-              {recent.loading && !recent.data ? (
-                <CardContent className="space-y-2">
-                  {Array.from({ length: 3 }, (_, i) => (
-                    <Skeleton key={i} className="h-9 w-full" />
-                  ))}
-                </CardContent>
-              ) : recent.data && recent.data.items.length > 0 ? (
-                <ul className="divide-y divide-border">
-                  {recent.data.items.map((p) => (
-                    <li key={p.id}>
-                      <Link href={`/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-hover">
-                        <FolderKanban className="size-4 shrink-0 text-subtle" aria-hidden="true" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{p.name}</span>
-                          <span className="block truncate text-xs text-muted">{p.description || "No description"}</span>
-                        </span>
-                        <RoleBadge role={p.my_role} />
-                        <span className="hidden w-24 text-right text-xs text-subtle sm:block">{relativeTime(p.updated_at)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState title="No active projects" description="Archived projects are listed on the Projects page." />
-              )}
-            </Card>
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Recent activity</CardTitle>
+          <OverviewStrip data={summary.data} error={summary.error} onRetry={summary.reload} />
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <ProjectsPanel />
+            <Panel
+              title="Activity"
+              actions={
                 <Link href="/activity" className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground">
                   View all <ArrowRight className="size-3" aria-hidden="true" />
                 </Link>
-              </CardHeader>
-              <ActivityList pageSize={8} preview />
-            </Card>
+              }
+            >
+              <ActivityList pageSize={8} preview engineeringOnly />
+            </Panel>
           </div>
         </div>
       )}

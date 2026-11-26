@@ -2,7 +2,7 @@ import { ApiError } from "@via/api-client";
 import type { ActivityItem } from "@via/types";
 import { describe, expect, it } from "vitest";
 
-import { describeActivity } from "./activity";
+import { activityFailed, activityKind, describeActivity } from "./activity";
 import { fieldErrors, safeNext } from "./errors";
 import { relativeTime } from "./format";
 
@@ -48,6 +48,22 @@ describe("describeActivity", () => {
     );
     expect(describeActivity(item("project.member_added", { member: "Bob", role: "editor" }))).toBe("added Bob as editor");
     expect(describeActivity(item("project.member_removed", { self: true }))).toBe("left the project");
+  });
+  it("describes Stage 2 engineering events from their recorded details", () => {
+    expect(describeActivity(item("design.uploaded", { design: "Motor board", revision: 2, filename: "m.kicad_pcb" }))).toBe('uploaded "Motor board" (r2)');
+    expect(describeActivity(item("design.parsed", { revision: 2, components: 1 }))).toBe("imported revision (r2): 1 component");
+    expect(describeActivity(item("analysis.completed", { revision: 2, findings: 0 }))).toBe("completed an analysis (r2): 0 findings");
+    expect(describeActivity(item("change_set.applied", { revision: 3 }))).toBe("applied a change set, creating revision (r3)");
+    expect(describeActivity(item("ai.explained"))).toContain("unverified");
+    // Missing details never produce "undefined".
+    expect(describeActivity(item("analysis.completed"))).toBe("completed an analysis");
+  });
+  it("classifies events for icons, failures and the engineering-only feed", () => {
+    expect(activityKind(item("auth.login_succeeded"))).toBe("account");
+    expect(activityKind(item("design.parsed"))).toBe("design");
+    expect(activityKind(item("finding.reviewed"))).toBe("analysis");
+    expect(activityFailed(item("design.parse_failed"))).toBe(true);
+    expect(activityFailed(item("design.parsed"))).toBe(false);
   });
   it("falls back to the raw action name", () => {
     expect(describeActivity(item("something.new"))).toBe("something.new");

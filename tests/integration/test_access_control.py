@@ -58,7 +58,13 @@ def test_private_project_never_appears_in_lists_search_or_counts(alice_and_bob):
     _, bob, _, _, _ = alice_and_bob
     assert bob.get("/api/v1/projects?status=all").json()["total"] == 0
     assert bob.get("/api/v1/projects?q=secret&status=all").json()["items"] == []
-    assert bob.get("/api/v1/projects/summary").json() == {"active": 0, "archived": 0}
+    assert bob.get("/api/v1/projects/summary").json() == {
+        "active": 0,
+        "archived": 0,
+        "designs": 0,
+        "imports_7d": 0,
+        "analyses_7d": 0,
+    }
 
 
 def test_activity_feed_is_isolated(alice_and_bob):

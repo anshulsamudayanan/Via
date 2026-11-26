@@ -87,8 +87,8 @@ Invitations and organization role management are not part of Stage 1.
 |---|---|---|---|
 | POST | *(base path)* | any (org member) | `{name, description?, organization_id?, visibility?}`; defaults: personal organization, **private** |
 | GET | *(base path)* | any | Paginated projects you can access. Query: `q` (name/description, case-insensitive), `status` = `active`\|`archived`\|`all`, `organization_id`, `sort` = `updated`\|`created`\|`name`, `limit`, `offset` |
-| GET | `/summary` | any | `{active, archived}` counts |
-| GET | `/{id}` | viewer | Includes `my_role` and `design_count` |
+| GET | `/summary` | any | Dashboard counts over projects you can access: `{active, archived, designs, imports_7d, analyses_7d}`. `designs`, `imports_7d` (uploaded revisions) and `analyses_7d` (finished `pcb_analysis` runs) count active projects only |
+| GET | `/{id}` | viewer | Includes `my_role`, `design_count`, `latest_import` (`{design_id, design_name, revision_number, status, at}` of the newest upload, any status) and `latest_analysis` (`{design_id, design_name, status, at, finding_count}`; count only when succeeded). Both are `null` when there is none and are also on every list item |
 | PATCH | `/{id}` | editor (name, description); owner (visibility) | `409 project_archived` when archived |
 | POST | `/{id}/archive`, `/{id}/unarchive` | owner | Archived projects are read-only |
 | DELETE | `/{id}` | owner | Permanent → `204` |

@@ -107,14 +107,40 @@ export interface Project {
   owner: UserRef;
   my_role: ProjectRole;
   design_count: number;
+  /** Most recent upload in the project (any design), whatever its status. */
+  latest_import?: LatestImport | null;
+  /** Most recent analysis run in the project (any design). */
+  latest_analysis?: LatestAnalysis | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
+export interface LatestImport {
+  design_id: string;
+  design_name: string;
+  revision_number: number;
+  status: RevisionStatus;
+  at: string;
+}
+
+export interface LatestAnalysis {
+  design_id: string;
+  design_name: string;
+  status: AnalysisStatus;
+  at: string;
+  /** Only for succeeded runs. */
+  finding_count: number | null;
+}
+
 export interface ProjectSummary {
   active: number;
   archived: number;
+  /** Designs in active projects. */
+  designs: number;
+  /** Uploads and completed analysis runs in active projects, last 7 days. */
+  imports_7d: number;
+  analyses_7d: number;
 }
 
 export interface ProjectMember {

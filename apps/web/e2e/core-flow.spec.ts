@@ -5,7 +5,8 @@ import { chooseFile, currentPath, createProject, REFERENCE_BOARD, register, sign
 test("register → create project → upload → view board → select component → sign out → sign in", async ({ page }) => {
   const email = uniqueEmail("core");
   await register(page, "Grace Hopper", email);
-  await expect(page.getByRole("heading", { name: /Grace/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Account menu" })).toContainText("Grace Hopper");
 
   const projectUrl = await createProject(page, "E2E power board");
 

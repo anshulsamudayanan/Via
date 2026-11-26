@@ -1,7 +1,7 @@
 # VIA design system
 
-Status: **proposal, awaiting approval.** Nothing here is implemented yet. This document says what
-the tokens and primitives will be; `packages/ui/src/styles.css` stays as it is until approval.
+Status: **implemented** (tokens in `packages/ui/src/styles.css`, primitives in `packages/ui`). Approved
+choices: self-hosted IBM Plex, purple accent, unbuilt navigation shown disabled with "Soon".
 
 ## Principles
 

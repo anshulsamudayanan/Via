@@ -315,3 +315,37 @@ def test_rq_enqueues_analysis_jobs(settings, test_redis):
     job = queue.queue.fetch_job(f"analysis-{rid}-a1")
     assert job.func_name == "via_api.jobs.analyze_run" and list(job.args) == [str(rid), 1]
     assert job.failure_callback is jobs.on_analysis_failure
+
+
+def test_dashboard_summary_and_latest_work(client, make_client, broken):
+    """The dashboard's counts and per-project status come from real rows, scoped to access."""
+    project, design, revision = broken
+    before = client.get(f"/api/v1/projects/{project['id']}").json()
+    assert before["latest_import"] == {
+        "design_id": design["id"], "design_name": design["name"], "revision_number": 1,
+        "status": "ready", "at": before["latest_import"]["at"],
+    }  # fmt: skip
+    assert before["latest_analysis"] is None
+    summary = client.get("/api/v1/projects/summary").json()
+    assert summary == {"active": 1, "archived": 0, "designs": 1, "imports_7d": 1, "analyses_7d": 0}
+
+    run_id = start(client, design["id"]).json()["id"]
+    listed = client.get("/api/v1/projects").json()["items"][0]
+    assert listed["latest_analysis"]["status"] == "succeeded"
+    assert listed["latest_analysis"]["finding_count"] == 3
+    assert listed["latest_analysis"]["design_id"] == design["id"]
+    assert client.get("/api/v1/projects/summary").json()["analyses_7d"] == 1
+    assert client.get(f"/api/v1/analysis-runs/{run_id}").json()["revision_id"] == revision["id"]
+
+    # Another user sees none of it.
+    other = make_client()
+    register(other, "outsider@example.com", "Outsider")
+    assert other.get("/api/v1/projects/summary").json() == {
+        "active": 0, "archived": 0, "designs": 0, "imports_7d": 0, "analyses_7d": 0,
+    }  # fmt: skip
+
+    # Archived projects drop out of the active counts.
+    client.post(f"/api/v1/projects/{project['id']}/archive")
+    assert client.get("/api/v1/projects/summary").json() == {
+        "active": 0, "archived": 1, "designs": 0, "imports_7d": 0, "analyses_7d": 0,
+    }  # fmt: skip

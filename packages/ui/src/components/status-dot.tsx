@@ -5,6 +5,8 @@ const tones = {
   warning: "bg-warning",
   error: "bg-danger",
   unknown: "bg-subtle",
+  // In progress (queued, running): VIA is working on it.
+  accent: "bg-accent",
 } as const;
 
 export type StatusTone = keyof typeof tones;

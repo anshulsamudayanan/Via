@@ -4,7 +4,7 @@ import { useId } from "react";
 import { cn } from "../cn";
 
 const control =
-  "w-full rounded-md border border-border-strong bg-surface-raised px-2.5 text-sm text-foreground " +
+  "w-full rounded-md border border-border-strong bg-surface px-2.5 text-sm text-foreground " +
   "placeholder:text-subtle transition-colors hover:border-subtle " +
   "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-ring " +
   "disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger";

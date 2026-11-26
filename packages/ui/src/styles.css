@@ -11,54 +11,61 @@
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --via-background: #0b0d10;
-  --via-surface: #111418;
-  --via-surface-raised: #171b21;
-  --via-surface-hover: #1d222a;
-  --via-border: #262c35;
-  --via-border-strong: #343b47;
-  --via-foreground: #e7e9ec;
-  --via-muted: #8e96a3;
-  --via-subtle: #636b78;
-  --via-accent: #5b9cff;
-  --via-accent-hover: #78afff;
-  --via-accent-foreground: #08111f;
-  --via-accent-soft: rgb(91 156 255 / 0.12);
-  --via-success: #3fb27f;
-  --via-success-soft: rgb(63 178 127 / 0.12);
-  --via-warning: #d6a43a;
-  --via-warning-soft: rgb(214 164 58 / 0.12);
-  --via-danger: #f0605d;
-  --via-danger-soft: rgb(240 96 93 / 0.12);
-  --via-ring: rgb(91 156 255 / 0.55);
+  --via-background: #111214;
+  --via-surface-sunken: #0d0e10;
+  --via-surface: #17181b;
+  --via-surface-raised: #1c1d21;
+  --via-surface-hover: #212226;
+  --via-border: #2a2b30;
+  --via-border-strong: #3a3c42;
+  --via-foreground: #e6e6e3;
+  --via-muted: #9a9ca1;
+  --via-subtle: #80838a;
+  --via-accent: #8b7ab8;
+  --via-accent-hover: #9b87d4;
+  --via-accent-foreground: #0f0e14;
+  --via-accent-soft: rgb(139 122 184 / 0.12);
+  --via-accent-border: rgb(155 135 212 / 0.35);
+  --via-success: #5fae84;
+  --via-success-soft: rgb(95 174 132 / 0.12);
+  --via-warning: #c9a14a;
+  --via-warning-soft: rgb(201 161 74 / 0.12);
+  --via-danger: #d9706a;
+  --via-danger-soft: rgb(217 112 106 / 0.12);
+  --via-ring: rgb(155 135 212 / 0.6);
+  --via-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --via-background: #f6f7f9;
+  --via-background: #f4f4f2;
+  --via-surface-sunken: #ececea;
   --via-surface: #ffffff;
   --via-surface-raised: #ffffff;
-  --via-surface-hover: #f0f2f5;
-  --via-border: #e1e4e9;
-  --via-border-strong: #cdd2d9;
-  --via-foreground: #15181d;
-  --via-muted: #5a6371;
-  --via-subtle: #7d8693;
-  --via-accent: #2563eb;
-  --via-accent-hover: #1d4fd8;
+  --via-surface-hover: #efefed;
+  --via-border: #dedfdc;
+  --via-border-strong: #c8cac6;
+  --via-foreground: #1b1c1f;
+  --via-muted: #5c5f66;
+  --via-subtle: #6d7077;
+  --via-accent: #5e4d93;
+  --via-accent-hover: #6a58a0;
   --via-accent-foreground: #ffffff;
-  --via-accent-soft: rgb(37 99 235 / 0.08);
-  --via-success: #1a8a5a;
-  --via-success-soft: rgb(26 138 90 / 0.1);
-  --via-warning: #a76f06;
-  --via-warning-soft: rgb(167 111 6 / 0.1);
-  --via-danger: #d03a37;
-  --via-danger-soft: rgb(208 58 55 / 0.08);
-  --via-ring: rgb(37 99 235 / 0.45);
+  --via-accent-soft: rgb(94 77 147 / 0.08);
+  --via-accent-border: rgb(94 77 147 / 0.3);
+  --via-success: #2f7a52;
+  --via-success-soft: rgb(47 122 82 / 0.1);
+  --via-warning: #8a6110;
+  --via-warning-soft: rgb(138 97 16 / 0.1);
+  --via-danger: #b4423c;
+  --via-danger-soft: rgb(180 66 60 / 0.08);
+  --via-ring: rgb(94 77 147 / 0.5);
+  --via-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 }
 
 @theme inline {
   --color-background: var(--via-background);
+  --color-surface-sunken: var(--via-surface-sunken);
   --color-surface: var(--via-surface);
   --color-surface-raised: var(--via-surface-raised);
   --color-surface-hover: var(--via-surface-hover);
@@ -71,6 +78,7 @@
   --color-accent-hover: var(--via-accent-hover);
   --color-accent-foreground: var(--via-accent-foreground);
   --color-accent-soft: var(--via-accent-soft);
+  --color-accent-border: var(--via-accent-border);
   --color-success: var(--via-success);
   --color-success-soft: var(--via-success-soft);
   --color-warning: var(--via-warning);
@@ -79,12 +87,36 @@
   --color-danger-soft: var(--via-danger-soft);
   --color-ring: var(--via-ring);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --shadow-overlay: var(--via-shadow);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  --animate-overlay-in: via-overlay-in 140ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-overlay-out: via-overlay-out 100ms ease-in;
+  --animate-fade-in: via-fade-in 140ms ease-out;
+}
+
+@keyframes via-overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes via-overlay-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes via-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @layer base {
@@ -113,5 +145,16 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+@keyframes via-sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes via-sheet-in-right {
+  from {
+    transform: translateX(100%);
   }
 }

@@ -9,14 +9,14 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex items-start justify-between gap-3 border-b border-border px-4 py-3", className)}
+      className={cn("flex min-h-10 items-center justify-between gap-3 border-b border-border px-4 py-2", className)}
       {...props}
     />
   );
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-sm font-semibold text-foreground", className)} {...props} />;
+  return <h2 className={cn("text-[13px] font-semibold text-foreground", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {

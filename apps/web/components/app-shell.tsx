@@ -1,122 +1,96 @@
 "use client";
 
-import {
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@via/ui";
-import { Activity, ChevronsUpDown, FolderKanban, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { cn, Sheet, SheetContent, SheetTrigger } from "@via/ui";
+import { Menu, Search } from "lucide-react";
+import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
-import { useSession } from "@/components/session";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { CommandMenuProvider, useOpenCommandMenu } from "@/components/shell/command-menu";
+import { SidebarContent } from "@/components/shell/sidebar";
+import { setSidebarCollapsed, useSidebarCollapsed } from "@/components/shell/use-sidebar";
 import { ViaLogo } from "@/components/via-logo";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/activity", label: "Activity", icon: Activity },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
+function isTyping(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return Boolean(el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)));
 }
 
-function UserMenu() {
-  const { me, signOut } = useSession();
-  const router = useRouter();
+function MobileTopBar() {
+  const [open, setOpen] = useState(false);
+  const openSearch = useOpenCommandMenu();
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-hover"
-        aria-label="Account menu"
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-1 border-b border-border bg-surface-sunken px-2 md:hidden">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger
+          aria-label="Open navigation"
+          className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
+        >
+          <Menu aria-hidden="true" />
+        </SheetTrigger>
+        <SheetContent title="Navigation">
+          <SidebarContent layoutGroup="mobile" onNavigate={() => setOpen(false)} />
+        </SheetContent>
+      </Sheet>
+      <Link href="/dashboard" aria-label="VIA dashboard" className="rounded-sm px-1">
+        <ViaLogo />
+      </Link>
+      <button
+        type="button"
+        onClick={openSearch}
+        aria-label="Search"
+        className="ml-auto flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
       >
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent">
-          {initials(me.user.display_name)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm text-foreground">{me.user.display_name}</span>
-          <span className="block truncate text-xs text-muted">{me.user.email}</span>
-        </span>
-        <ChevronsUpDown className="size-3.5 text-subtle" aria-hidden="true" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top">
-        <DropdownMenuLabel>Signed in as {me.user.email}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => router.push("/settings")}>
-          <Settings /> Account settings
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void signOut()}>
-          <LogOut /> Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <Search aria-hidden="true" />
+      </button>
+    </header>
   );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const collapsed = useSidebarCollapsed();
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "[" && !e.metaKey && !e.ctrlKey && !e.altKey && !isTyping(e.target)) setSidebarCollapsed(!collapsed);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [collapsed]);
 
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-col border-b border-border bg-surface md:sticky md:top-0 md:h-dvh md:w-56 md:border-r md:border-b-0">
-        <div className="flex h-12 items-center justify-between px-3">
-          <Link href="/dashboard" aria-label="VIA dashboard" className="rounded-sm">
-            <ViaLogo />
-          </Link>
-          <ThemeToggle />
-        </div>
-        <nav aria-label="Main" className="flex gap-0.5 overflow-x-auto px-2 pb-2 md:flex-1 md:flex-col md:pb-0">
-          {NAV.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActive(href) ? "page" : undefined}
+    <MotionConfig reducedMotion="user">
+      <LazyMotion features={domAnimation} strict>
+        <CommandMenuProvider>
+          <div className="flex min-h-dvh flex-col md:flex-row">
+            <MobileTopBar />
+            <aside
+              aria-label="Sidebar"
               className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm whitespace-nowrap transition-colors",
-                isActive(href)
-                  ? "bg-surface-hover font-medium text-foreground"
-                  : "text-muted hover:bg-surface-hover hover:text-foreground",
+                "hidden shrink-0 border-r border-border bg-surface-sunken transition-[width] duration-150 ease-[cubic-bezier(0.2,0,0,1)] md:sticky md:top-0 md:block md:h-dvh",
+                collapsed ? "w-[52px]" : "w-[232px]",
               )}
             >
-              <Icon className="size-4" aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
-        </nav>
-        <div className="hidden border-t border-border p-2 md:block">
-          <UserMenu />
-        </div>
-      </aside>
-      <main id="main" className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">{children}</div>
-      </main>
-    </div>
+              <SidebarContent layoutGroup="desktop" collapsed={collapsed} onToggleCollapsed={() => setSidebarCollapsed(!collapsed)} />
+            </aside>
+            <main id="main" className="min-w-0 flex-1">
+              <div className="mx-auto max-w-[1440px] px-4 py-5 md:px-6">{children}</div>
+            </main>
+          </div>
+        </CommandMenuProvider>
+      </LazyMotion>
+    </MotionConfig>
   );
 }
 
 /** Consistent page heading with optional actions on the right. */
 export function PageHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0 space-y-0.5">
-        <h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1>
-        {description ? <div className="text-sm text-muted">{description}</div> : null}
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0">
+        <h1 className="truncate text-base font-semibold leading-6 tracking-tight">{title}</h1>
+        {description ? <div className="text-[13px] text-muted">{description}</div> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }

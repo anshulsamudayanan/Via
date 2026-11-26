@@ -67,7 +67,13 @@ def test_archive_and_unarchive(client):
     assert edit.status_code == 409 and edit.json()["error"]["code"] == "project_archived"
     assert client.get("/api/v1/projects").json()["total"] == 0  # default filter: active
     assert client.get("/api/v1/projects?status=archived").json()["total"] == 1
-    assert client.get("/api/v1/projects/summary").json() == {"active": 0, "archived": 1}
+    assert client.get("/api/v1/projects/summary").json() == {
+        "active": 0,
+        "archived": 1,
+        "designs": 0,
+        "imports_7d": 0,
+        "analyses_7d": 0,
+    }
     restored = client.post(f"/api/v1/projects/{p['id']}/unarchive").json()
     assert restored["archived_at"] is None
     assert client.patch(f"/api/v1/projects/{p['id']}", json={"name": "Yes"}).status_code == 200

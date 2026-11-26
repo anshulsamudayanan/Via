@@ -229,7 +229,7 @@ export function createViaClient(options: ClientOptions = {}) {
         } = {},
         signal?: AbortSignal,
       ) => request<Page<Project>>(`/api/v1/projects${q(params)}`, { signal }),
-      summary: () => request<ProjectSummary>("/api/v1/projects/summary"),
+      summary: (signal?: AbortSignal) => request<ProjectSummary>("/api/v1/projects/summary", { signal }),
       get: (id: string, signal?: AbortSignal) => request<Project>(`/api/v1/projects/${enc(id)}`, { signal }),
       create: (body: { name: string; description?: string; organization_id?: string; visibility?: ProjectVisibility }) =>
         request<Project>("/api/v1/projects", { method: "POST", body }),
