@@ -337,3 +337,16 @@ Expanded (232 px)                    Collapsed (52 px)
   5 weights) and `motion`'s `domAnimation` feature set.
 - The Unslop and Frontend Design plugins were not available in this cloud session, so no review
   by them was run.
+
+### Follow-up: Designs page
+
+The sidebar's **Designs** entry is live at `/designs`, backed by `GET /api/v1/designs/browse`.
+The page lists every design you can access, across projects:
+- columns: last upload state (and which revision is shown when the newest failed), parsed
+  component, net and copper-layer counts, and the latest analysis;
+- filters (kept in the URL): search, status, project, sort and archived;
+- while any row on the page is importing, it refreshes every 3 s.
+
+Analysis and Components remain "Soon". Tests: `test_browse_designs_across_projects`
+(integration), `designs-browser.test.tsx` (unit) and `e2e/designs.spec.ts`. Screenshots:
+`docs/design/after/designs-*.png`.

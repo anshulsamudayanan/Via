@@ -248,6 +248,34 @@ export interface Design {
   latest_revision: Revision | null;
 }
 
+export interface RevisionBrief {
+  id: string;
+  revision_number: number;
+  status: RevisionStatus;
+  object_counts: Partial<Record<"component_count" | "net_count" | "layer_count" | "copper_layer_count", number>> & Record<string, unknown>;
+  created_at: string;
+}
+
+/** A design in the cross-project list (GET /designs/browse). */
+export interface DesignListItem {
+  id: string;
+  name: string;
+  description: string;
+  project: { id: string; name: string };
+  my_role: ProjectRole;
+  project_archived: boolean;
+  revision_count: number;
+  created_at: string;
+  updated_at: string;
+  current_revision: RevisionBrief | null;
+  /** Most recent upload, whatever its status. */
+  latest_revision: RevisionBrief | null;
+  latest_analysis: { status: AnalysisStatus; at: string; revision_number: number; finding_count: number | null } | null;
+}
+
+export type DesignSort = "updated" | "created" | "name";
+export type DesignStatusFilter = "all" | "ready" | "processing" | "failed";
+
 export interface DesignDetail extends Design {
   revisions: Revision[];
 }

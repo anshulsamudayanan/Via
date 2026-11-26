@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from via_api.models.enums import DesignFileKind, RevisionStatus
+from via_api.models.enums import AnalysisStatus, DesignFileKind, ProjectRole, RevisionStatus
 from via_api.schemas.common import APIModel, Name
-from via_api.schemas.projects import UserRef
+from via_api.schemas.projects import ProjectRef, UserRef
 
 
 class FileOut(APIModel):
@@ -157,3 +158,53 @@ class LayerOut(APIModel):
     side: str
     source_type: str | None
     user_name: str | None
+
+
+class RevisionBrief(BaseModel):
+    """The few revision fields a list row needs."""
+
+    id: uuid.UUID
+    revision_number: int
+    status: RevisionStatus
+    object_counts: dict[str, Any]
+    created_at: datetime
+
+
+class DesignAnalysisBrief(BaseModel):
+    status: AnalysisStatus
+    at: datetime
+    revision_number: int
+    #: Only for succeeded runs.
+    finding_count: int | None = None
+
+
+class DesignListItem(BaseModel):
+    """A design in the cross-project list (GET /designs/browse)."""
+
+    id: uuid.UUID
+    name: str
+    description: str
+    project: ProjectRef
+    my_role: ProjectRole
+    project_archived: bool
+    revision_count: int
+    created_at: datetime
+    updated_at: datetime
+    current_revision: RevisionBrief | None
+    latest_revision: RevisionBrief | None
+    latest_analysis: DesignAnalysisBrief | None
+
+
+class DesignSort(StrEnum):
+    UPDATED = "updated"
+    CREATED = "created"
+    NAME = "name"
+
+
+class DesignStatusFilter(StrEnum):
+    """Status of the design's most recent upload."""
+
+    ALL = "all"
+    READY = "ready"
+    PROCESSING = "processing"
+    FAILED = "failed"

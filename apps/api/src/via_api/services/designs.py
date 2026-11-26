@@ -15,15 +15,34 @@ import re
 import uuid
 from typing import Any, BinaryIO
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from via_api.errors import APIError, not_found
-from via_api.models import Design, DesignFile, DesignRevision, Project, UploadRecord, User
+from via_api.models import AnalysisRun, Design, DesignFile, DesignRevision, Project, UploadRecord, User
 from via_api.models.base import utcnow
-from via_api.models.enums import DesignFileKind, ProjectRole, RevisionStatus, UploadOutcome
-from via_api.schemas.pcb import DesignDetail, DesignOut, FileOut, RevisionOut, WarningOut
-from via_api.schemas.projects import UserRef
+from via_api.models.enums import (
+    AnalysisKind,
+    AnalysisStatus,
+    DesignFileKind,
+    ProjectRole,
+    RevisionStatus,
+    UploadOutcome,
+)
+from via_api.schemas.pcb import (
+    DesignAnalysisBrief,
+    DesignDetail,
+    DesignListItem,
+    DesignOut,
+    DesignSort,
+    DesignStatusFilter,
+    FileOut,
+    RevisionBrief,
+    RevisionOut,
+    WarningOut,
+)
+from via_api.schemas.projects import ProjectRef, UserRef
 from via_api.services import access, activity
 from via_api.services.activity import ClientInfo
 from via_api.services.auth import AuthContext
@@ -174,6 +193,136 @@ def design_detail(db: Session, design: Design) -> DesignDetail:
 def list_designs(db: Session, project_id: uuid.UUID) -> list[DesignOut]:
     designs = db.scalars(select(Design).where(Design.project_id == project_id).order_by(Design.updated_at.desc()))
     return [design_out(db, d) for d in designs]
+
+
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+_STATUS_FILTER = {
+    DesignStatusFilter.READY: [RevisionStatus.READY],
+    DesignStatusFilter.PROCESSING: [RevisionStatus.PENDING, RevisionStatus.PROCESSING],
+    DesignStatusFilter.FAILED: [RevisionStatus.FAILED],
+}
+
+
+def _brief(rev: DesignRevision | None) -> RevisionBrief | None:
+    if rev is None:
+        return None
+    return RevisionBrief(
+        id=rev.id,
+        revision_number=rev.revision_number,
+        status=rev.status,
+        object_counts=rev.object_counts,
+        created_at=rev.created_at,
+    )
+
+
+def browse_designs(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    q: str | None,
+    status: DesignStatusFilter,
+    project_id: uuid.UUID | None,
+    include_archived: bool,
+    sort: DesignSort,
+    limit: int,
+    offset: int,
+) -> tuple[list[DesignListItem], int]:
+    """Designs across every project the user can view, with a fixed number of queries per page."""
+    latest = (
+        select(DesignRevision.design_id, DesignRevision.id.label("rev_id"), DesignRevision.status)
+        .order_by(DesignRevision.design_id, DesignRevision.created_at.desc(), DesignRevision.id.desc())
+        .ext(distinct_on(DesignRevision.design_id))
+        .subquery()
+    )
+    conditions = [access.accessible_projects_clause(user_id)]
+    if not include_archived:
+        conditions.append(Project.archived_at.is_(None))
+    if project_id is not None:
+        conditions.append(Design.project_id == project_id)
+    if q:
+        pattern = f"%{_escape_like(q.strip())}%"
+        conditions.append(or_(Design.name.ilike(pattern, escape="\\"), Project.name.ilike(pattern, escape="\\")))
+    if status != DesignStatusFilter.ALL:
+        conditions.append(latest.c.status.in_(_STATUS_FILTER[status]))
+    base = (
+        select(Design, Project, latest.c.rev_id)
+        .join(Project, Project.id == Design.project_id)
+        .outerjoin(latest, latest.c.design_id == Design.id)
+        .where(*conditions)
+    )
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    order = {
+        DesignSort.UPDATED: Design.updated_at.desc(),
+        DesignSort.CREATED: Design.created_at.desc(),
+        DesignSort.NAME: func.lower(Design.name).asc(),
+    }[sort]
+    rows = db.execute(base.order_by(order, Design.id).limit(limit).offset(offset)).all()
+    if not rows:
+        return [], total
+
+    design_ids = [d.id for d, _, _ in rows]
+    wanted = {rid for _, _, rid in rows if rid} | {d.current_revision_id for d, _, _ in rows if d.current_revision_id}
+    revisions = {r.id: r for r in db.scalars(select(DesignRevision).where(DesignRevision.id.in_(wanted)))}
+    counts = dict(
+        db.execute(
+            select(DesignRevision.design_id, func.count(DesignRevision.id))
+            .where(DesignRevision.design_id.in_(design_ids))
+            .group_by(DesignRevision.design_id)
+        ).all()
+    )
+    analyses = {
+        design_id: (run, number)
+        for run, design_id, number in db.execute(
+            select(AnalysisRun, DesignRevision.design_id, DesignRevision.revision_number)
+            .join(DesignRevision, DesignRevision.id == AnalysisRun.revision_id)
+            .where(DesignRevision.design_id.in_(design_ids), AnalysisRun.kind == AnalysisKind.PCB_ANALYSIS)
+            .order_by(DesignRevision.design_id, AnalysisRun.created_at.desc(), AnalysisRun.id.desc())
+            .ext(distinct_on(DesignRevision.design_id))
+        ).all()
+    }
+    roles: dict[uuid.UUID, ProjectRole] = {}
+    items = []
+    for design, project, rev_id in rows:
+        if project.id not in roles:
+            role = access.project_role(db, user_id, project)
+            assert role is not None  # guaranteed by accessible_projects_clause
+            roles[project.id] = role
+        analysis = analyses.get(design.id)
+        items.append(
+            DesignListItem(
+                id=design.id,
+                name=design.name,
+                description=design.description,
+                project=ProjectRef.model_validate(project),
+                my_role=roles[project.id],
+                project_archived=project.archived_at is not None,
+                revision_count=counts.get(design.id, 0),
+                created_at=design.created_at,
+                updated_at=design.updated_at,
+                current_revision=_brief(revisions.get(design.current_revision_id))
+                if design.current_revision_id
+                else None,
+                latest_revision=_brief(revisions.get(rev_id)) if rev_id else None,
+                latest_analysis=(
+                    DesignAnalysisBrief(
+                        status=analysis[0].status,
+                        at=analysis[0].finished_at or analysis[0].created_at,
+                        revision_number=analysis[1],
+                        finding_count=(
+                            analysis[0].result_summary.get("finding_count")
+                            if analysis[0].status == AnalysisStatus.SUCCEEDED
+                            else None
+                        ),
+                    )
+                    if analysis
+                    else None
+                ),
+            )
+        )
+    return items, total
 
 
 # ----------------------------------------------------------------- upload

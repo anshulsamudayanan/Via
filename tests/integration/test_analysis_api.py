@@ -349,3 +349,46 @@ def test_dashboard_summary_and_latest_work(client, make_client, broken):
     assert client.get("/api/v1/projects/summary").json() == {
         "active": 0, "archived": 1, "designs": 0, "imports_7d": 0, "analyses_7d": 0,
     }  # fmt: skip
+
+
+def test_browse_designs_across_projects(client, make_client, broken):
+    """GET /designs/browse lists designs from every accessible project, with filters, and nothing else."""
+    project, design, revision = broken
+    other_project = client.post("/api/v1/projects", json={"name": "Second board"}).json()
+    upload(client, other_project["id"], REF, name="power_stage.kicad_pcb")
+    start(client, design["id"])
+
+    page = client.get("/api/v1/designs/browse").json()
+    assert page["total"] == 2
+    by_name = {item["name"]: item for item in page["items"]}
+    first = by_name[design["name"]]
+    assert first["project"] == {"id": project["id"], "name": project["name"]}
+    assert first["my_role"] == "owner" and first["revision_count"] == 1
+    assert first["current_revision"]["id"] == revision["id"]
+    assert first["latest_revision"]["status"] == "ready"
+    assert first["latest_revision"]["object_counts"]["component_count"] > 0
+    assert first["latest_analysis"]["status"] == "succeeded"
+    assert first["latest_analysis"]["finding_count"] == 3 and first["latest_analysis"]["revision_number"] == 1
+    assert by_name["power_stage"]["latest_analysis"] is None
+
+    assert [i["name"] for i in client.get("/api/v1/designs/browse?q=second").json()["items"]] == ["power_stage"]
+    assert client.get("/api/v1/designs/browse?q=100%25").json()["total"] == 0  # LIKE wildcards are literal
+    assert client.get(f"/api/v1/designs/browse?project_id={project['id']}").json()["total"] == 1
+    assert client.get("/api/v1/designs/browse?status=failed").json()["total"] == 0
+    assert client.get("/api/v1/designs/browse?status=ready").json()["total"] == 2
+    names = [i["name"] for i in client.get("/api/v1/designs/browse?sort=name").json()["items"]]
+    assert names == sorted(names, key=str.lower)
+    assert client.get("/api/v1/designs/browse?status=bogus").status_code == 422
+
+    # Archived projects are hidden unless asked for.
+    client.post(f"/api/v1/projects/{other_project['id']}/archive")
+    assert client.get("/api/v1/designs/browse").json()["total"] == 1
+    archived = client.get("/api/v1/designs/browse?include_archived=true").json()
+    assert archived["total"] == 2
+    assert {i["name"]: i["project_archived"] for i in archived["items"]}["power_stage"] is True
+
+    # Other users see nothing, and can't probe someone else's project id.
+    outsider = make_client()
+    register(outsider, "browser-outsider@example.com", "Outsider")
+    assert outsider.get("/api/v1/designs/browse?include_archived=true").json()["total"] == 0
+    assert outsider.get(f"/api/v1/designs/browse?project_id={project['id']}").status_code == 404

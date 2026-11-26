@@ -64,7 +64,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
     organizations: { list: vi.fn(), create: vi.fn() },
     projects: { list: vi.fn(), summary: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), unarchive: vi.fn(), delete: vi.fn(), members: vi.fn(), addMember: vi.fn(), updateMember: vi.fn(), removeMember: vi.fn() },
     activity: { list: vi.fn().mockResolvedValue(page([])) },
-    designs: { list: vi.fn().mockResolvedValue([]), get: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    designs: { list: vi.fn().mockResolvedValue([]), browse: vi.fn().mockResolvedValue(page([])), get: vi.fn(), update: vi.fn(), delete: vi.fn() },
     revisions: { get: vi.fn() },
     files: { list: vi.fn().mockResolvedValue([]), downloadUrl: (id: string) => `/api/v1/files/${id}/download` },
     pcb: {

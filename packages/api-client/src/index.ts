@@ -26,6 +26,9 @@ import type {
   FindingStatus,
   Design,
   DesignDetail,
+  DesignListItem,
+  DesignSort,
+  DesignStatusFilter,
   ImportResponse,
   PCBDesign,
   PcbComponent,
@@ -179,7 +182,7 @@ export function createViaClient(options: ClientOptions = {}) {
     );
   }
 
-  const q = (params: Record<string, string | number | undefined | null>) => {
+  const q = (params: Record<string, string | number | boolean | undefined | null>) => {
     const search = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") search.set(k, String(v));
     const s = search.toString();
@@ -253,6 +256,18 @@ export function createViaClient(options: ClientOptions = {}) {
     designs: {
       list: (projectId: string, signal?: AbortSignal) =>
         request<Design[]>(`/api/v1/designs${q({ project_id: projectId })}`, { signal }),
+      browse: (
+        params: {
+          q?: string;
+          status?: DesignStatusFilter;
+          project_id?: string;
+          include_archived?: boolean;
+          sort?: DesignSort;
+          limit?: number;
+          offset?: number;
+        } = {},
+        signal?: AbortSignal,
+      ) => request<Page<DesignListItem>>(`/api/v1/designs/browse${q({ ...params, include_archived: params.include_archived || undefined })}`, { signal }),
       get: (id: string, signal?: AbortSignal) => request<DesignDetail>(`/api/v1/designs/${enc(id)}`, { signal }),
       update: (id: string, body: { name?: string; description?: string }) =>
         request<DesignDetail>(`/api/v1/designs/${enc(id)}`, { method: "PATCH", body }),

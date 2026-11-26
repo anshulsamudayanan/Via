@@ -95,7 +95,8 @@ describe("AppShell", () => {
     const nav = screen.getAllByRole("navigation", { name: "Main" })[0]!;
     expect(within(nav).getByRole("link", { name: "Projects" }).getAttribute("aria-current")).toBe("page");
     expect(within(nav).getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBeNull();
-    const designs = within(nav).getByRole("link", { name: "Designs (coming soon)" });
+    expect(within(nav).getByRole("link", { name: "Designs" }).getAttribute("href")).toBe("/designs");
+    const designs = within(nav).getByRole("link", { name: "Analysis (coming soon)" });
     expect(designs.getAttribute("aria-disabled")).toBe("true");
     expect(designs.getAttribute("href")).toBeNull();
   });

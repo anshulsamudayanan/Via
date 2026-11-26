@@ -29,7 +29,7 @@ test("dashboard: real counts, search, sidebar collapse, theme and mobile navigat
   await page.reload();
   await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
   await page.getByRole("button", { name: "Expand sidebar" }).click();
-  await expect(page.getByRole("link", { name: "Designs (coming soon)" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("link", { name: "Analysis (coming soon)" })).toHaveAttribute("aria-disabled", "true");
 
   // Theme switch.
   const theme = await page.locator("html").getAttribute("data-theme");

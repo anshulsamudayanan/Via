@@ -20,7 +20,7 @@ export const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
   {
     label: "Engineering",
     items: [
-      { label: "Designs", icon: CircuitBoard, soon: "A cross-project designs list is coming soon. Open a project to see its designs." },
+      { href: "/designs", label: "Designs", icon: CircuitBoard },
       { label: "Analysis", icon: ScanSearch, soon: "A cross-project analysis view is coming soon. Each design has an Analysis tab." },
       { label: "Components", icon: Boxes, soon: "A cross-project component library is coming soon. Each design lists its components." },
     ],

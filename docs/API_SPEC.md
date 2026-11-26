@@ -117,6 +117,7 @@ Invitations and organization role management are not part of Stage 1.
 | Method | Path | Role | Description |
 |---|---|---|---|
 | GET | `/api/v1/designs?project_id=` | viewer | Designs with `current_revision` (latest parsed) and `latest_revision` (latest upload, any status) |
+| GET | `/api/v1/designs/browse` | any | Paginated designs across every project you can view (the Designs page). Query: `q` (design or project name), `status` = `all`\|`ready`\|`processing`\|`failed` (of the most recent upload), `project_id` (404 if not accessible), `include_archived` (default `false`), `sort` = `updated`\|`created`\|`name`, `limit`, `offset`. Items: `project {id, name}`, `my_role`, `project_archived`, `revision_count`, `current_revision` / `latest_revision` (`{id, revision_number, status, object_counts, created_at}`), `latest_analysis` (`{status, at, revision_number, finding_count}`). A fixed number of queries per page |
 | GET | `/api/v1/designs/{id}` | viewer | Plus all `revisions` (newest first) |
 | PATCH | `/api/v1/designs/{id}` | editor | `{name?, description?}` |
 | DELETE | `/api/v1/designs/{id}` | editor | Deletes revisions, parsed rows **and stored objects** → `204` |

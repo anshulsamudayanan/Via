@@ -3,14 +3,24 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from via_api.deps import DB, Client, CurrentAuth, Storage
 from via_api.errors import error_responses
 from via_api.models.base import utcnow
 from via_api.models.enums import ProjectRole
-from via_api.schemas.pcb import DesignDetail, DesignOut, DesignUpdate, RevisionOut
+from via_api.schemas.common import DEFAULT_LIMIT, MAX_LIMIT, Page
+from via_api.schemas.pcb import (
+    DesignDetail,
+    DesignListItem,
+    DesignOut,
+    DesignSort,
+    DesignStatusFilter,
+    DesignUpdate,
+    RevisionOut,
+)
 from via_api.services import access, activity
 from via_api.services import designs as svc
 
@@ -22,6 +32,28 @@ def list_designs(project_id: uuid.UUID, db: DB, ctx: CurrentAuth) -> list[Design
     """Designs in a project, most recently updated first."""
     access.get_project(db, ctx.user.id, project_id)
     return svc.list_designs(db, project_id)
+
+
+@router.get("/designs/browse", response_model=Page[DesignListItem], responses=error_responses(401, 404))
+def browse_designs(
+    db: DB,
+    ctx: CurrentAuth,
+    q: Annotated[str | None, Query(max_length=100, description="Search design and project names")] = None,
+    status_filter: Annotated[DesignStatusFilter, Query(alias="status")] = DesignStatusFilter.ALL,
+    project_id: uuid.UUID | None = None,
+    include_archived: bool = False,
+    sort: DesignSort = DesignSort.UPDATED,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[DesignListItem]:
+    """Designs across every project you can view. ``status`` filters on the most recent upload."""
+    if project_id is not None:
+        access.get_project(db, ctx.user.id, project_id)  # 404 if not accessible
+    items, total = svc.browse_designs(
+        db, ctx.user.id, q=q, status=status_filter, project_id=project_id, include_archived=include_archived,
+        sort=sort, limit=limit, offset=offset,
+    )  # fmt: skip
+    return Page[DesignListItem](items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/designs/{design_id}", response_model=DesignDetail, responses=error_responses(401, 404))
