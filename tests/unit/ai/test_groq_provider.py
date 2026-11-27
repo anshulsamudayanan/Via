@@ -68,6 +68,7 @@ def test_text_request_shape_and_result():
     url, headers, body = t.calls[0]
     assert url == API_URL
     assert headers["Authorization"] == "Bearer gsk_test"
+    assert headers["User-Agent"].startswith("via-ai-engine/")  # not the blocked Python-urllib default
     assert body["model"] == "openai/gpt-oss-120b"
     assert body["messages"] == [{"role": "system", "content": "Be brief."}, {"role": "user", "content": "hi"}]
     assert body["reasoning_effort"] == "high"

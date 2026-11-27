@@ -51,6 +51,7 @@ from via_ai.providers.base import (
 from via_ai.routing import AIConfig
 
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
+USER_AGENT = "via-ai-engine/0.1 (+https://github.com/anshulsamudayanan/Via)"
 TIMEOUT_SECONDS = 120
 #: VIA effort -> Groq reasoning_effort (gpt-oss models accept low | medium | high).
 REASONING_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high", "max": "high"}
@@ -66,13 +67,27 @@ def _http_post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
         with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:  # noqa: S310
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
+        raw = ""
+        with contextlib.suppress(OSError, UnicodeDecodeError):
+            raw = exc.read().decode()
         detail = ""
         with contextlib.suppress(ValueError, AttributeError):
-            detail = json.loads(exc.read().decode()).get("error", {}).get("message", "")
+            detail = json.loads(raw).get("error", {}).get("message", "")
+        if not detail and raw and not raw.lstrip().startswith("<"):
+            # Plain-text replies from the edge, e.g. Cloudflare's "error code: 1010".
+            detail = " ".join(raw.split())[:160]
         if exc.code == 401:
             raise AIError("Groq rejected the API key. Check GROQ_API_KEY.") from None
         if exc.code == 429:
             raise AIError("Groq's rate limit was reached. Try again in a minute.") from None
+        if exc.code == 403:
+            # Cloudflare in front of Groq answers 403 to blocked clients; Groq itself uses it for
+            # keys or organisations without access to a model, or unsupported regions.
+            reason = detail or "access denied"
+            raise AIError(
+                f"Groq refused the request (HTTP 403): {reason}. Check that the key's organisation can use the "
+                "configured model and that Groq is available where this server runs."
+            ) from None
         if exc.code == 404:
             raise AIError(f"Groq doesn't offer the configured model. {detail}".strip()) from None
         if exc.code == 400 and detail:
@@ -136,6 +151,8 @@ class GroqProvider(AIProvider):
             "Authorization": f"Bearer {self._key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            # A real client name: Groq's edge rejects the default "Python-urllib" agent with 403.
+            "User-Agent": USER_AGENT,
         }
         return self._post(API_URL, headers, body)
 
