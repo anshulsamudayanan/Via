@@ -13,9 +13,14 @@ Behaviour:
 * Effort maps to Groq's ``reasoning_effort`` for the reasoning models that accept
   it (the ``openai/gpt-oss-*`` family): low -> low, medium -> medium, and
   high / xhigh / max -> high. Other models get no effort parameter.
-* Structured output asks for ``response_format: json_schema`` built from the
-  Pydantic schema, then validates the reply with that schema. Anything that does
-  not validate raises :class:`AIError`; partial or repaired output is never returned.
+* Structured output: on models with Groq's strict structured outputs (the
+  ``openai/gpt-oss-*`` family) VIA sends ``json_schema`` with ``strict: true``, so
+  decoding is constrained to the schema. Strict mode needs every property required,
+  no ``$ref`` and no length/default keywords, so :func:`strict_schema` derives that
+  shape from the Pydantic schema. Other models get JSON mode plus the schema in the
+  system prompt, with one retry if Groq's own JSON check fails. Either way the
+  reply is then validated by the full Pydantic schema; anything that does not
+  validate raises :class:`AIError`, and partial or repaired output is never returned.
 * A model refusal (``message.refusal`` set, or ``finish_reason == "content_filter"``)
   raises :class:`AIRefusedError`; output is never invented.
 * Embeddings: Groq has no embeddings endpoint, so ``embed`` raises
@@ -115,6 +120,51 @@ def _first_choice(response: dict[str, Any]) -> dict[str, Any]:
     return choice
 
 
+#: JSON Schema keywords Groq's strict mode doesn't accept; Pydantic still enforces them afterwards.
+_STRICT_DROP = {
+    "default",
+    "title",
+    "maxItems",
+    "minItems",
+    "maxLength",
+    "minLength",
+    "pattern",
+    "format",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "examples",
+}
+
+
+def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """A strict-mode copy of a Pydantic JSON schema: ``$ref`` inlined, every object closed
+    (``additionalProperties: false``) with all its properties required, unsupported keywords dropped."""
+    defs: dict[str, Any] = schema.get("$defs", {})
+
+    def walk(node: Any) -> Any:
+        if isinstance(node, list):
+            return [walk(n) for n in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node:
+            target = defs[node["$ref"].rsplit("/", 1)[-1]]
+            merged = {**target, **{k: v for k, v in node.items() if k != "$ref"}}
+            return walk(merged)
+        out = {k: walk(v) for k, v in node.items() if k not in _STRICT_DROP and k != "$defs"}
+        if out.get("type") == "object" or "properties" in out:
+            out["additionalProperties"] = False
+            out["required"] = list(out.get("properties", {}).keys())
+        return out
+
+    return walk(schema)
+
+
+def _supports_strict(model: str) -> bool:
+    return model.startswith("openai/gpt-oss")
+
+
 def _schema_name(schema: type[BaseModel]) -> str:
     name = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in schema.__name__)
     return name[:64] or "result"
@@ -169,11 +219,37 @@ class GroqProvider(AIProvider):
 
     def generate_structured[T: BaseModel](self, request: TextRequest, schema: type[T]) -> StructuredResult[T]:
         body = self._body(request)
-        body["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {"name": _schema_name(schema), "schema": schema.model_json_schema()},
-        }
-        response = self._call(body)
+        if _supports_strict(body["model"]):
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": _schema_name(schema),
+                    "strict": True,
+                    "schema": strict_schema(schema.model_json_schema()),
+                },
+            }
+            attempts = 1
+        else:
+            # JSON mode: the schema goes in the system prompt; Groq checks the reply is JSON.
+            spec = json.dumps(schema.model_json_schema())
+            instruction = (
+                f"Reply with a single JSON object that matches this JSON Schema exactly, and nothing else:\n{spec}"
+            )
+            messages = body["messages"]
+            if messages and messages[0]["role"] == "system":
+                messages[0] = {"role": "system", "content": f"{messages[0]['content']}\n\n{instruction}"}
+            else:
+                messages.insert(0, {"role": "system", "content": instruction})
+            body["response_format"] = {"type": "json_object"}
+            attempts = 2
+        for attempt in range(attempts):
+            try:
+                response = self._call(body)
+                break
+            except AIError as exc:
+                if attempt + 1 < attempts and "Failed to validate JSON" in str(exc):
+                    continue
+                raise
         choice = _first_choice(response)
         content = (choice.get("message") or {}).get("content") or ""
         try:

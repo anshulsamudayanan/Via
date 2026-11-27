@@ -97,7 +97,9 @@ def test_structured_output_is_validated_against_the_schema():
     p, t = provider(reply(json.dumps({"verdict": "ok", "issues": ["a"]})))
     result = p.generate_structured(REQUEST, Review)
     fmt = t.calls[0][2]["response_format"]
-    assert fmt["type"] == "json_schema" and fmt["json_schema"]["name"] == "Review"
+    assert (
+        fmt["type"] == "json_schema" and fmt["json_schema"]["name"] == "Review" and fmt["json_schema"]["strict"] is True
+    )
     assert fmt["json_schema"]["schema"]["properties"]["verdict"]["type"] == "string"
     assert result.value == Review(verdict="ok", issues=["a"])
 
@@ -138,3 +140,50 @@ def test_config_from_env_uses_the_groq_default_model():
     )
     with pytest.raises(ValueError, match="groq"):
         AIConfig.from_env({"VIA_AI_PROVIDER": "openai"})
+
+
+def test_strict_schema_inlines_refs_requires_every_property_and_drops_unsupported_keywords():
+    from via_ai.providers.groq import strict_schema
+    from via_ai.schemas import DesignReview
+
+    out = strict_schema(DesignReview.model_json_schema())
+    text = json.dumps(out)
+    assert "$ref" not in text and "$defs" not in text
+    for bad in ('"default"', '"maxItems"', '"title"'):
+        assert bad not in text
+
+    def check(node):
+        if isinstance(node, dict):
+            if "properties" in node:
+                assert node["additionalProperties"] is False
+                assert set(node["required"]) == set(node["properties"])
+            for v in node.values():
+                check(v)
+        elif isinstance(node, list):
+            for v in node:
+                check(v)
+
+    check(out)
+
+
+def test_models_without_strict_mode_use_json_mode_with_the_schema_in_the_prompt():
+    p, t = provider(reply(json.dumps({"verdict": "ok", "issues": []})), model="llama-3.3-70b-versatile")
+    p.generate_structured(REQUEST, Review)
+    body = t.calls[0][2]
+    assert body["response_format"] == {"type": "json_object"}
+    assert body["messages"][0]["role"] == "system" and '"verdict"' in body["messages"][0]["content"]
+    assert body["messages"][0]["content"].startswith("Be brief.")
+
+
+def test_json_mode_retries_once_when_groq_rejects_the_json():
+    calls = []
+
+    def flaky(url, headers, body):
+        calls.append(body)
+        if len(calls) == 1:
+            raise AIError("Groq couldn't process the request: Failed to validate JSON.")
+        return reply(json.dumps({"verdict": "ok", "issues": []}))
+
+    config = AIConfig(provider="groq", routing=ModelRouting(default_model="llama-3.3-70b-versatile"))
+    result = GroqProvider(config, api_key="k", transport=flaky).generate_structured(REQUEST, Review)
+    assert result.value.verdict == "ok" and len(calls) == 2
