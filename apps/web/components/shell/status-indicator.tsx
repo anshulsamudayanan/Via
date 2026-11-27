@@ -49,8 +49,8 @@ export function StatusIndicator({ collapsed = false, onNavigate }: { collapsed?:
       onClick={onNavigate}
       aria-label={collapsed ? `System status: ${health.label}` : undefined}
       className={cn(
-        "flex h-7 items-center gap-2 rounded-md text-xs text-muted hover:bg-surface-hover hover:text-foreground",
-        collapsed ? "w-8 justify-center" : "px-2",
+        "flex h-8 items-center gap-2 rounded-full text-xs text-muted hover:bg-surface-hover hover:text-foreground",
+        collapsed ? "w-9 justify-center" : "px-2.5",
       )}
     >
       <StatusDot tone={health.tone} />

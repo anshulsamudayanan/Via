@@ -1,24 +1,65 @@
-# VIA design system
+# VIA design system: Black Glass
 
-Status: **implemented** (tokens in `packages/ui/src/styles.css`, primitives in `packages/ui`). Approved
-choices: self-hosted IBM Plex, purple accent, unbuilt navigation shown disabled with "Soon".
+Status: **implemented** (tokens in `packages/ui/src/styles.css`, primitives and motion tokens in
+`packages/ui`). The current direction is **Black Glass**: deep black, frosted translucent layers, soft
+light and depth, iOS / visionOS in spirit, used by the landing page and the signed-in app alike. It
+replaces the earlier flat "graphite" direction; sections further down that describe exact hex values,
+2–6 px radii or IBM Plex Sans are historical and superseded by this section where they disagree.
 
-## Principles
+## Black Glass
 
-VIA is a tool engineers keep open all day next to KiCad. Every decision follows from that:
+**Base and light.** Near-black base (`#030305`; light theme `#F2F2F7`). One fixed `Ambient` layer
+behind every page: three radial colour fields (muted violet from the accent, indigo, a hint of blue)
+that drift slowly (60–90 s loops) with gentle scroll parallax, plus film grain from an inline SVG.
+Radial gradients, not filter blur, so it costs almost nothing to composite.
 
-1. **Density over decoration.** Rows, not cards of cards. A 32 px row height is the default unit.
-2. **Precision.** Hairline borders, a 4 px grid, restrained radii (2–6 px), tabular numbers,
-   monospace for engineering identifiers.
-3. **One accent.** Purple is VIA's identity colour. It marks primary actions, active navigation,
-   selection and focus, and nothing else. It never fills a background or a gradient.
-4. **Honest states.** Loading, empty, error, unavailable and coming soon each look different and say
-   what is true. Nothing is shown that the API didn't return.
-5. **Quiet motion.** Motion only explains a change of state (something opened, moved or arrived).
-   It is short (120–200 ms) and turns off under `prefers-reduced-motion`.
+**Glass recipe** (`.glass-thin` / `.glass-regular` / `.glass-thick`, or `<Glass variant sheen>`):
+translucent fill (white 4% / 6%; thick is a denser 72% dark tint for overlays), `backdrop-filter:
+blur(20 / 28 / 40px) saturate(180%)`, a 1px hairline (white 10%), a top inner highlight
+(`inset 0 1px 0 rgb(255 255 255 / .08)`) and a soft deep shadow. `sheen` adds a cursor-following
+specular highlight on hover-capable devices. Without `backdrop-filter` support glass falls back to a
+solid fill. The glass classes live in `@layer components` so utilities can override them.
 
-Not allowed: gradients, glows, glass effects, decorative orbs or patterns, illustrations, pill-shaped
-cards, oversized headings, and statistics that exist only to fill space.
+**Blur budget.** At most about four blurred layers on screen. Rows, list items, chips and secondary
+buttons inside a glass panel use tinted fills (`bg-surface`, hairline, top highlight), never their own
+blur. Nested `backdrop-filter` can't see siblings under it, so overlays inside glass (the hero's DRC
+callouts) use a dense fill instead.
+
+**Text.** White with 62% (`muted`) and 54% (`subtle`) tiers; light theme 64% / 58%. These are the
+brief's 60 / 40 tiers nudged so small text stays above 4.5:1 on glass, measured including the violet
+light under it (dark: muted 5.9, subtle 4.9; light: muted 5.8, subtle 4.7). Accent text `#AD9BE4`
+(5.1:1). Text-heavy glass gets `--via-scrim` behind it (the example finding's values).
+
+**Colour.** Purple is the single accent: primary actions, active and selected states, focus, and
+finding highlights. Status uses iOS system colours: green `#30D158` ok, amber `#FFB340` medium, red
+`#FF453A` high and critical; low and info are neutral grey. The light theme uses Apple's accessible
+variants (`#248A3D`, `#B25000`, `#D70015`).
+
+**Radii.** Continuous and large: panels and cards 24–28px (`rounded-3xl`), dropzone and toasts 22px,
+inputs 14px (`rounded-lg`), chips 10px, buttons, badges and the segmented control fully rounded.
+
+**Type.** `-apple-system` / SF Pro on Apple devices (system font, never bundled), Inter elsewhere
+(`@fontsource/inter`, OFL). Headlines 600 with tight tracking (−0.025 to −0.035em); body 15–17px on
+the landing page with 1.6+ line height; 13–14px in the app. IBM Plex Mono stays for engineering
+values only (net names, file types, measurements, revisions, check ids).
+
+**Buttons.** `primary` is a glowing purple pill (`shadow-glow`); `secondary` a clear pill (tinted
+fill, hairline, highlight). Both press down to 0.97 on a spring (`whileTap`).
+
+**Motion** (Motion for React, `motion/react`; tokens in `@via/ui`: `SPRING`, `SPRING_SOFT`,
+`SPRING_PRESS`, `enter`, `enterReduced`, `stagger`):
+- Springs only (`stiffness` 300–500, `damping` 30, low bounce). Animate transform, opacity and filter.
+- Entrances: fade + `blur(8px)` → 0 + 12px rise, staggered, `whileInView` once.
+- Shared layout: the sidebar's active pill, the segmented control's thumb and the ⌘K highlight slide
+  between items (`layoutId`); the sidebar collapse and project lists use `layout`.
+- `LazyMotion` with `domMax` (needed for layout animations), `strict`, in the root `Providers`.
+- `MotionConfig reducedMotion="user"` stops transform animations; components also check
+  `useReducedMotion()` to turn off parallax, tilt, loops, count-ups and the skeleton shimmer, leaving
+  short fades.
+
+**Honesty still applies.** Nothing decorative is presented as data. Illustrations are labelled as
+such, the example finding says "Example", and counters only animate real values (they show the real
+value until they count up, so nothing reads as a false zero).
 
 ## Colour
 

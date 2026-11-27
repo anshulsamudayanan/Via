@@ -1,9 +1,22 @@
-import { Button } from "@via/ui";
+"use client";
+
+import { Button, enter, enterReduced, stagger } from "@via/ui";
+import { m, useReducedMotion } from "motion/react";
 import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** A bare two-layer board: outline, mounting holes, an IC and passives, routed traces and vias. Decorative. */
+/** A bare two-layer board: outline, mounting holes, an IC and passives, routed traces and vias. Decorative.
+ * The front-layer traces softly re-route on a slow loop (off with reduced motion). */
 function BoardIllustration() {
+  const reduce = useReducedMotion();
+  const trace = (i: number) =>
+    reduce
+      ? {}
+      : {
+          initial: { pathLength: 0.15, opacity: 0.4 },
+          animate: { pathLength: [0.15, 1, 1, 0.15], opacity: [0.4, 0.95, 0.95, 0.4] },
+          transition: { duration: 6, times: [0, 0.4, 0.8, 1], repeat: Infinity, ease: "easeInOut" as const, delay: i * 0.5 },
+        };
   return (
     <svg viewBox="0 0 240 160" aria-hidden="true" className="h-auto w-full max-w-[380px]" fill="none">
       <defs>
@@ -13,7 +26,7 @@ function BoardIllustration() {
       </defs>
       <rect x="0.5" y="0.5" width="239" height="159" fill="url(#fr-grid)" opacity="0.7" />
       {/* Board outline (Edge.Cuts) */}
-      <rect x="30" y="22" width="180" height="116" rx="6" fill="var(--via-surface-raised)" stroke="var(--via-border-strong)" />
+      <rect x="30" y="22" width="180" height="116" rx="10" fill="var(--via-surface-raised)" stroke="var(--via-border-strong)" />
       {[
         [40, 32],
         [200, 32],
@@ -29,11 +42,9 @@ function BoardIllustration() {
       </g>
       {/* Front-layer traces in the accent */}
       <g stroke="var(--via-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.9">
-        <path d="M100 62H78L70 54H58" />
-        <path d="M100 70H84V88H62" />
-        <path d="M140 62H160V52" />
-        <path d="M140 78H150V100" />
-        <path d="M120 90V112H96" />
+        {["M100 62H78L70 54H58", "M100 70H84V88H62", "M140 62H160V52", "M140 78H150V100", "M120 90V112H96"].map((d, i) => (
+          <m.path key={d} d={d} {...trace(i)} />
+        ))}
       </g>
       {/* IC: body + pads */}
       <rect x="100" y="54" width="40" height="36" rx="2" fill="var(--via-surface-sunken)" stroke="var(--via-border-strong)" />
@@ -74,10 +85,10 @@ function BoardIllustration() {
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border-strong font-mono text-[10px] text-muted">{n}</span>
+      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft font-mono text-[11px] text-accent ring-1 ring-accent-border">{n}</span>
       <div className="min-w-0">
-        <p className="text-[13px] font-medium text-foreground">{title}</p>
-        <p className="text-xs leading-relaxed text-muted">{children}</p>
+        <p className="text-[14px] font-medium text-foreground">{title}</p>
+        <p className="text-[13px] leading-relaxed text-muted">{children}</p>
       </div>
     </li>
   );
@@ -85,15 +96,22 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 /** First-run state for an account with no projects: what VIA needs, in order, and the one action that starts it. */
 export function FirstRun({ newProject }: { newProject: (trigger: ReactNode) => ReactNode }) {
+  const reduce = useReducedMotion();
   return (
-    <section aria-labelledby="first-run-title" className="overflow-hidden rounded-lg border border-border bg-surface">
+    <m.section
+      aria-labelledby="first-run-title"
+      initial="hidden"
+      animate="show"
+      variants={stagger(0.08)}
+      className="glass-regular overflow-hidden rounded-[28px]"
+    >
       <div className="grid items-center gap-8 px-6 py-8 md:grid-cols-[minmax(0,1fr)_minmax(0,400px)] md:px-10 md:py-12">
-        <div className="max-w-md">
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-subtle">No projects yet</p>
-          <h2 id="first-run-title" className="mt-2 font-display text-[2rem] leading-[1.1] text-foreground">
+        <m.div variants={reduce ? enterReduced : enter} className="max-w-md">
+          <p className="text-[13px] font-semibold tracking-tight text-accent">No projects yet</p>
+          <h2 id="first-run-title" className="mt-2 font-display text-[2.2rem] font-semibold leading-[1.05] tracking-[-0.03em] text-foreground">
             Start with a board.
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             Projects are private by default: only you and the people you invite can see them.
           </p>
           <ol className="mt-6 space-y-4">
@@ -115,11 +133,11 @@ export function FirstRun({ newProject }: { newProject: (trigger: ReactNode) => R
               </Button>,
             )}
           </div>
-        </div>
-        <div className="flex justify-center md:justify-end">
+        </m.div>
+        <m.div variants={reduce ? enterReduced : enter} className="flex justify-center md:justify-end">
           <BoardIllustration />
-        </div>
+        </m.div>
       </div>
-    </section>
+    </m.section>
   );
 }

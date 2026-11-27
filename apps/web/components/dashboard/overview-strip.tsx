@@ -1,5 +1,5 @@
 import type { ProjectSummary } from "@via/types";
-import { Button, ErrorState, Skeleton } from "@via/ui";
+import { Button, CountUp, ErrorState, Skeleton } from "@via/ui";
 import Link from "next/link";
 
 import { errorMessage } from "@/lib/errors";
@@ -34,7 +34,7 @@ export function OverviewStrip({ data, error, onRetry }: { data: ProjectSummary |
     );
   }
   return (
-    <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-surface lg:grid-cols-4">
+    <dl className="glass-regular grid grid-cols-2 overflow-hidden rounded-3xl lg:grid-cols-4">
       {CELLS.map((cell, i) => (
         <div
           key={cell.label}
@@ -45,10 +45,10 @@ export function OverviewStrip({ data, error, onRetry }: { data: ProjectSummary |
             i === 2 ? "lg:border-l" : "",
           ].join(" ")}
         >
-          <Link href={cell.href} title={cell.hint} className="flex h-full flex-col gap-0.5 px-4 py-2.5 transition-colors duration-100 hover:bg-surface-hover">
-            <dt className="text-xs text-muted">{cell.label}</dt>
-            <dd className="font-mono text-lg font-medium leading-7 tabular-nums text-foreground">
-              {data ? cell.value(data) : <Skeleton className="my-1 h-5 w-10" />}
+          <Link href={cell.href} title={cell.hint} className="flex h-full flex-col gap-1 px-5 py-3.5 transition-colors duration-150 hover:bg-surface-hover">
+            <dt className="text-xs font-medium text-muted">{cell.label}</dt>
+            <dd className="font-display text-[26px] font-semibold leading-8 tracking-[-0.02em] tabular-nums text-foreground">
+              {data ? <CountUp value={cell.value(data)} /> : <Skeleton className="my-1.5 h-6 w-12" />}
             </dd>
           </Link>
         </div>

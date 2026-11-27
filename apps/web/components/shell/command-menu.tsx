@@ -1,8 +1,9 @@
 "use client";
 
 import type { Project } from "@via/types";
-import { Dialog, DialogContent, Kbd, Mono, Spinner } from "@via/ui";
+import { Dialog, Kbd, Mono, MotionDialogContent, SPRING, Spinner } from "@via/ui";
 import { CornerDownLeft, FolderKanban, Moon, Search } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
 
@@ -12,6 +13,12 @@ import { setTheme, useTheme } from "@/lib/use-theme";
 import { NAV_LINKS } from "./nav";
 
 const CommandMenuContext = createContext<() => void>(() => {});
+
+/*
+ * Global ⌘K search. Pattern from the 21st.dev "Command Palette" by Caliper UI (@sarmaasis): a frosted
+ * panel over the app, grouped results, and a highlight that glides between rows (shared layoutId).
+ * Opens and closes through AnimatePresence (scale 0.96 -> 1 with a blur).
+ */
 
 /** Opens the global search (also bound to ⌘K / Ctrl+K). */
 export function useOpenCommandMenu() {
@@ -35,7 +42,7 @@ export function CommandMenuProvider({ children }: { children: ReactNode }) {
     <CommandMenuContext.Provider value={show}>
       {children}
       <Dialog open={open} onOpenChange={setOpen}>
-        {open ? <CommandMenu onDone={() => setOpen(false)} /> : null}
+        <AnimatePresence>{open ? <CommandMenu key="command-menu" onDone={() => setOpen(false)} /> : null}</AnimatePresence>
       </Dialog>
     </CommandMenuContext.Provider>
   );
@@ -138,8 +145,8 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
 
   let lastGroup = "";
   return (
-    <DialogContent bare title="Search" className="top-[14vh] max-w-xl">
-      <div className="flex items-center gap-2 border-b border-border px-3">
+    <MotionDialogContent title="Search" className="top-[14vh] max-w-xl">
+      <div className="flex items-center gap-2.5 border-b border-border px-4">
         <Search className="size-4 text-subtle" aria-hidden="true" />
         <input
           autoFocus
@@ -155,11 +162,11 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
             setActive(0);
           }}
           onKeyDown={onKeyDown}
-          className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle"
+          className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-subtle"
         />
         {projects.loading ? <Spinner label="Searching" /> : null}
       </div>
-      <ul id={listId} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto p-1">
+      <ul id={listId} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto p-2">
         {items.length === 0 && !projects.loading ? (
           <li className="px-3 py-6 text-center text-sm text-muted">
             {projects.error ? "Couldn't search projects. Check your connection and try again." : `No matches for “${query}”.`}
@@ -170,15 +177,16 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
           lastGroup = item.group;
           return (
             <li key={item.id} role="presentation">
-              {header ? <div className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle">{header}</div> : null}
+              {header ? <div className="px-3 pb-1 pt-2 text-[11px] font-semibold tracking-tight text-subtle">{header}</div> : null}
               <div
                 id={`${listId}-${item.id}`}
                 role="option"
                 aria-selected={i === current}
                 onMouseMove={() => setActive(i)}
                 onClick={item.run}
-                className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-sm text-foreground aria-selected:bg-accent-soft [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-subtle"
+                className="relative isolate flex h-10 cursor-pointer items-center gap-2.5 rounded-xl px-3 text-sm text-foreground [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-subtle"
               >
+                {i === current ? <m.span layoutId="command-highlight" transition={SPRING} aria-hidden="true" className="absolute inset-0 -z-10 rounded-xl bg-accent-soft ring-1 ring-accent-border" /> : null}
                 {item.icon}
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 {item.hint}
@@ -188,7 +196,7 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
           );
         })}
       </ul>
-      <div className="flex items-center gap-3 border-t border-border px-3 py-2 text-[11px] text-subtle">
+      <div className="flex items-center gap-3 border-t border-border px-4 py-2.5 text-[11px] text-subtle">
         <span className="flex items-center gap-1">
           <Kbd>↑</Kbd>
           <Kbd>↓</Kbd> navigate
@@ -200,6 +208,6 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
           <Kbd>esc</Kbd> close
         </span>
       </div>
-    </DialogContent>
+    </MotionDialogContent>
   );
 }

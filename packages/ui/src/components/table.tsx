@@ -12,7 +12,7 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function THead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("border-b border-border bg-surface-sunken text-left text-xs text-muted", className)} {...props} />;
+  return <thead className={cn("border-b border-border bg-surface-sunken/60 text-left text-xs text-muted", className)} {...props} />;
 }
 
 export function TBody(props: HTMLAttributes<HTMLTableSectionElement>) {
@@ -20,7 +20,7 @@ export function TBody(props: HTMLAttributes<HTMLTableSectionElement>) {
 }
 
 export function TR({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("border-b border-border last:border-0", className)} {...props} />;
+  return <tr className={cn("border-b border-border transition-colors last:border-0 hover:bg-surface-hover", className)} {...props} />;
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {

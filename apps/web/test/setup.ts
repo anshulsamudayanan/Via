@@ -38,3 +38,20 @@ globalThis.Path2D ??= Path2DStub as unknown as typeof Path2D;
 
 // Canvas has no 2D context in jsdom; return null quietly (the viewer then skips drawing).
 HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement["getContext"];
+
+// jsdom has no IntersectionObserver (Motion's whileInView / useInView use it): report every
+// observed element as visible straight away, so in-view animations settle in tests.
+class ImmediateIntersectionObserver {
+  constructor(private readonly cb: IntersectionObserverCallback) {}
+  observe(target: Element) {
+    this.cb([{ isIntersecting: true, intersectionRatio: 1, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+  }
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+if (!("IntersectionObserver" in globalThis)) {
+  (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = ImmediateIntersectionObserver;
+}

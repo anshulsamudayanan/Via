@@ -1,8 +1,9 @@
 "use client";
 
 import type { Project, ProjectSort } from "@via/types";
-import { Button, cn, EmptyState, ErrorState, Kbd, Mono, Panel, Skeleton } from "@via/ui";
+import { Button, cn, EmptyState, ErrorState, Kbd, Mono, Panel, SegmentedControl, Skeleton, SPRING_SOFT } from "@via/ui";
 import { ArrowDown, ArrowRight, ArrowUp, Building2, FolderKanban, LayoutGrid, Lock, Rows3, Search } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import Link from "next/link";
 import { type KeyboardEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -83,30 +84,17 @@ function SortHeader({ label, sort, current, onSort, className }: { label: string
 }
 
 function ViewToggle({ view }: { view: View }) {
-  const opts: [View, string, typeof Rows3][] = [
-    ["table", "Table", Rows3],
-    ["cards", "Cards", LayoutGrid],
-  ];
   return (
-    <div role="radiogroup" aria-label="Project view" className="flex h-7 rounded-md border border-border bg-surface-sunken p-0.5">
-      {opts.map(([v, label, Icon]) => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={view === v}
-          aria-label={label}
-          title={label}
-          onClick={() => setView(v)}
-          className={cn(
-            "flex w-7 items-center justify-center rounded-sm text-subtle hover:text-foreground [&>svg]:size-3.5",
-            view === v && "bg-surface-raised text-foreground shadow-[0_0_0_1px_var(--via-border)]",
-          )}
-        >
-          <Icon aria-hidden="true" />
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      aria-label="Project view"
+      iconOnly
+      value={view}
+      onChange={setView}
+      segments={[
+        { value: "table", label: "Table", icon: <Rows3 aria-hidden="true" /> },
+        { value: "cards", label: "Cards", icon: <LayoutGrid aria-hidden="true" /> },
+      ]}
+    />
   );
 }
 
@@ -138,14 +126,14 @@ function ProjectTable({ items, sort, onSort, dim }: { items: Project[]; sort: Pr
     <table className={cn("w-full table-fixed text-[13px] transition-opacity", dim && "opacity-60")}>
       <colgroup>
         <col />
-        <col className="w-[20%]" />
-        <col className="hidden w-[108px] lg:table-column" />
-        <col className="w-[236px]" />
+        <col className="w-[19%]" />
+        <col className="hidden w-[104px] lg:table-column" />
+        <col className="w-[272px]" />
         <col className="hidden w-[112px] 2xl:table-column" />
       </colgroup>
-      <thead className="border-b border-border bg-surface-sunken text-left text-xs text-muted">
+      <thead className="border-b border-border bg-surface-sunken/60 text-left text-xs text-muted">
         <tr>
-          <SortHeader label="Project" sort="name" current={sort} onSort={onSort} className="pl-4" />
+          <SortHeader label="Project" sort="name" current={sort} onSort={onSort} className="pl-5" />
           <th scope="col" className="h-8 px-3 font-medium">Last revision</th>
           <th scope="col" className="hidden h-8 px-3 font-medium lg:table-cell">Analysed</th>
           <th scope="col" className="h-8 px-3 font-medium">Findings</th>
@@ -154,8 +142,15 @@ function ProjectTable({ items, sort, onSort, dim }: { items: Project[]; sort: Pr
       </thead>
       <tbody>
         {items.map((p) => (
-          <tr key={p.id} className="border-b border-border transition-colors duration-100 last:border-0 hover:bg-surface-hover">
-            <td className="py-2 pl-4 pr-3">
+          <m.tr
+            key={p.id}
+            layout="position"
+            transition={SPRING_SOFT}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="border-b border-border transition-colors duration-150 last:border-0 hover:bg-surface-hover"
+          >
+            <td className="py-2.5 pl-5 pr-3">
               <Link data-project-link href={`/projects/${p.id}`} className="block truncate rounded-sm font-medium text-foreground hover:underline">
                 {p.name}
               </Link>
@@ -177,7 +172,7 @@ function ProjectTable({ items, sort, onSort, dim }: { items: Project[]; sort: Pr
             <td className="hidden pl-3 pr-4 text-right 2xl:table-cell">
               <Updated at={p.updated_at} />
             </td>
-          </tr>
+          </m.tr>
         ))}
       </tbody>
     </table>
@@ -186,9 +181,19 @@ function ProjectTable({ items, sort, onSort, dim }: { items: Project[]; sort: Pr
 
 function ProjectCards({ items, dim, forceCompact }: { items: Project[]; dim: boolean; forceCompact?: boolean }) {
   return (
-    <ul aria-label="Projects" className={cn("grid gap-px bg-border transition-opacity", !forceCompact && "sm:grid-cols-2", dim && "opacity-60")}>
+    <ul aria-label="Projects" className={cn("grid gap-3 p-3 transition-opacity", !forceCompact && "sm:grid-cols-2", dim && "opacity-60")}>
+      <AnimatePresence initial={false} mode="popLayout">
       {items.map((p) => (
-        <li key={p.id} className="group/card relative flex min-w-0 flex-col gap-2.5 bg-surface px-4 py-3 transition-colors duration-100 hover:bg-surface-hover">
+        <m.li
+          key={p.id}
+          layout
+          transition={SPRING_SOFT}
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          whileHover={{ y: -2 }}
+          className="group/card relative flex min-w-0 flex-col gap-3 rounded-[20px] border border-border bg-surface px-4 py-3.5 shadow-[inset_0_1px_0_var(--via-glass-highlight)] transition-colors duration-150 hover:border-border-strong hover:bg-surface-hover"
+        >
           <div className="flex min-w-0 items-start gap-2">
             <div className="min-w-0 flex-1">
               <Link
@@ -224,8 +229,9 @@ function ProjectCards({ items, dim, forceCompact }: { items: Project[]; dim: boo
               <Mono>{p.design_count}</Mono> {p.design_count === 1 ? "design" : "designs"}
             </span>
           </div>
-        </li>
+        </m.li>
       ))}
+      </AnimatePresence>
     </ul>
   );
 }
@@ -247,9 +253,9 @@ function LoadingRows({ view }: { view: View }) {
       ))}
     </div>
   ) : (
-    <div aria-busy="true" aria-label="Loading projects" className="grid gap-px bg-border sm:grid-cols-2">
+    <div aria-busy="true" aria-label="Loading projects" className="grid gap-3 p-3 sm:grid-cols-2">
       {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className="h-[154px] space-y-2 bg-surface px-4 py-3">
+        <div key={i} className="h-[160px] space-y-2 rounded-[20px] border border-border bg-surface px-4 py-3.5">
           <Skeleton className="h-4 w-36" />
           <Skeleton className="h-3 w-48 max-w-full" />
           <Skeleton className="mt-4 h-3 w-40" />
@@ -301,10 +307,10 @@ export function ProjectsPanel() {
         ) : undefined
       }
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-        <label className="relative min-w-0 flex-1 sm:max-w-72">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+        <label className="relative min-w-0 basis-full sm:max-w-72 sm:flex-1 sm:basis-auto">
           <span className="sr-only">Filter projects</span>
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
           <input
             ref={searchRef}
             type="search"
@@ -318,16 +324,16 @@ export function ProjectsPanel() {
             }}
             placeholder="Filter projects"
             aria-keyshortcuts="/"
-            className="h-7 w-full rounded-md border border-border bg-surface-sunken pl-7 pr-8 text-xs text-foreground outline-none placeholder:text-subtle focus:border-border-strong"
+            className="h-8 w-full rounded-full border border-border bg-surface-sunken pl-8 pr-9 text-xs text-foreground shadow-[inset_0_1px_0_var(--via-glass-highlight)] outline-none placeholder:text-subtle focus:border-accent-border"
           />
-          <Kbd className="pointer-events-none absolute right-1.5 top-1/2 hidden -translate-y-1/2 sm:inline-flex">/</Kbd>
+          <Kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 sm:inline-flex">/</Kbd>
         </label>
         <label className="ml-auto flex items-center gap-1.5 text-xs text-subtle">
           <span className="sr-only sm:not-sr-only">Sort</span>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as ProjectSort)}
-            className="h-7 cursor-pointer rounded-md border border-border bg-surface-sunken px-1.5 text-xs text-foreground outline-none focus:border-border-strong"
+            className="h-8 cursor-pointer rounded-full border border-border bg-surface-sunken px-3 text-xs text-foreground outline-none focus:border-accent-border"
           >
             {(Object.keys(SORT_LABEL) as ProjectSort[]).map((s) => (
               <option key={s} value={s}>

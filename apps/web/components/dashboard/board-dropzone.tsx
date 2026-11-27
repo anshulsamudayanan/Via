@@ -9,8 +9,9 @@
 
 import { ApiError } from "@via/api-client";
 import type { ImportResponse, UploadLimits } from "@via/types";
-import { cn, Skeleton, useToast } from "@via/ui";
+import { cn, Skeleton, SPRING, useToast } from "@via/ui";
 import { ArrowUp, Check, RotateCw, X } from "lucide-react";
+import { m, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { type DragEvent, forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
@@ -50,6 +51,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const [drag, setDrag] = useState<"idle" | "accept" | "reject">("idle");
   const [announce, setAnnounce] = useState("");
+  const reduce = useReducedMotion();
   const depth = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -135,11 +137,11 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
   const over = drag !== "idle";
   const reject = drag === "reject";
 
-  if (!projects.data) return <Skeleton className="h-[172px] w-full" />;
+  if (!projects.data) return <Skeleton className="h-[188px] w-full rounded-[22px]" />;
 
   if (writable.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border-strong px-4 py-6 text-center text-xs text-muted">
+      <div className="rounded-[22px] border border-dashed border-border-strong px-4 py-6 text-center text-xs text-muted">
         You can&apos;t upload to any active project. Create one, or ask a project owner for editor access.
       </div>
     );
@@ -153,7 +155,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
           value={projectId}
           onChange={(e) => setChoice(e.target.value)}
           disabled={stage.kind === "uploading"}
-          className="h-7 min-w-0 flex-1 cursor-pointer truncate rounded-md border border-border bg-surface-sunken px-1.5 text-xs text-foreground outline-none focus:border-border-strong disabled:opacity-60"
+          className="h-8 min-w-0 flex-1 cursor-pointer truncate rounded-full border border-border bg-surface-sunken px-3 text-xs text-foreground outline-none focus:border-accent-border disabled:opacity-60"
         >
           {writable.map((p) => (
             <option key={p.id} value={p.id}>
@@ -177,8 +179,10 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
           if (file) void start(file);
         }}
       />
-      <div
+      <m.div
         id="board-dropzone"
+        animate={reduce ? undefined : { scale: over && !reject ? 1.015 : 1 }}
+        transition={SPRING}
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled || undefined}
@@ -219,7 +223,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
           void start(files[0]!);
         }}
         className={cn(
-          "group/drop relative isolate flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 overflow-hidden rounded-lg px-4 py-6 text-center outline-none transition-colors duration-150",
+          "group/drop relative isolate flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 overflow-hidden rounded-[22px] px-4 py-7 text-center outline-none transition-colors duration-150",
           !over && "hover:bg-surface-hover",
           over && !reject && "bg-accent-soft",
           reject && "bg-danger-soft",
@@ -231,7 +235,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
           <rect
             width="100%"
             height="100%"
-            rx="5.5"
+            rx="21.5"
             fill="none"
             strokeWidth="1"
             strokeDasharray="6 5"
@@ -242,18 +246,20 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
             )}
           />
         </svg>
-        <span
+        <m.span
+          animate={reduce ? undefined : { y: over && !reject ? -3 : 0, scale: over && !reject ? 1.08 : 1 }}
+          transition={SPRING}
           className={cn(
-            "grid size-9 place-items-center rounded-md border transition-[transform,background-color,border-color,color] duration-200 motion-reduce:transition-none [&>svg]:size-4",
+            "grid size-10 place-items-center rounded-full border transition-[background-color,border-color,color,box-shadow] duration-200 [&>svg]:size-4",
             reject
               ? "border-danger/40 bg-surface text-danger"
               : over
-                ? "-translate-y-0.5 border-accent bg-accent text-accent-foreground"
-                : "border-border bg-surface-raised text-muted group-hover/drop:text-foreground",
+                ? "border-accent bg-accent text-accent-foreground shadow-glow"
+                : "border-border bg-surface-raised text-muted shadow-[inset_0_1px_0_var(--via-glass-highlight)] group-hover/drop:text-foreground",
           )}
         >
           {reject ? <X aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
-        </span>
+        </m.span>
         <div className="space-y-0.5">
           <p className="text-[13px] font-medium text-foreground">{reject ? "One board at a time" : over ? "Release to upload" : "Drop a KiCad board"}</p>
           <p className="text-xs text-muted">
@@ -263,7 +269,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
             {hint}
           </p>
         </div>
-      </div>
+      </m.div>
 
       {stage.kind !== "idle" ? (
         <FileRow
@@ -286,11 +292,11 @@ function FileRow({ stage, onCancel, onRetry, onRemove }: { stage: Exclude<Stage,
   return (
     <div
       className={cn(
-        "relative flex animate-fade-in items-center gap-3 overflow-hidden rounded-lg border bg-surface p-2.5 pr-2 motion-reduce:animate-none",
+        "relative flex animate-fade-in items-center gap-3 overflow-hidden rounded-2xl border bg-surface p-2.5 pr-2 shadow-[inset_0_1px_0_var(--via-glass-highlight)] motion-reduce:animate-none",
         error ? "border-danger/40" : "border-border",
       )}
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface-sunken font-mono text-[9px] font-semibold tracking-[0.04em] text-muted">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface-sunken font-mono text-[9px] font-semibold tracking-[0.04em] text-muted">
         {extOf(stage.file.name)}
       </span>
       <div className="min-w-0 flex-1">
@@ -328,7 +334,7 @@ function FileRow({ stage, onCancel, onRetry, onRemove }: { stage: Exclude<Stage,
         </p>
       </div>
       {onRetry ? (
-        <button type="button" onClick={onRetry} aria-label={`Retry ${stage.file.name}`} className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground">
+        <button type="button" onClick={onRetry} aria-label={`Retry ${stage.file.name}`} className="grid size-7 place-items-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground">
           <RotateCw className="size-3.5" aria-hidden="true" />
         </button>
       ) : null}
@@ -336,7 +342,7 @@ function FileRow({ stage, onCancel, onRetry, onRemove }: { stage: Exclude<Stage,
         type="button"
         onClick={stage.kind === "uploading" ? onCancel : onRemove}
         aria-label={stage.kind === "uploading" ? "Cancel upload" : `Dismiss ${stage.file.name}`}
-        className="grid size-7 place-items-center rounded-md text-subtle hover:bg-surface-hover hover:text-foreground"
+        className="grid size-7 place-items-center rounded-full text-subtle hover:bg-surface-hover hover:text-foreground"
       >
         <X className="size-3.5" aria-hidden="true" />
       </button>
@@ -349,7 +355,7 @@ function FileRow({ stage, onCancel, onRetry, onRemove }: { stage: Exclude<Stage,
           aria-valuenow={pct}
           className="absolute inset-x-0 bottom-0 h-0.5 bg-surface-hover"
         >
-          <span className="block h-full origin-left bg-accent transition-transform duration-200" style={{ transform: `scaleX(${pct / 100})` }} />
+          <m.span className="block h-full origin-left bg-accent" initial={false} animate={{ scaleX: pct / 100 }} transition={SPRING} />
         </span>
       ) : null}
     </div>

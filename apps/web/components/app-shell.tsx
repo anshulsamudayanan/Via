@@ -1,8 +1,8 @@
 "use client";
 
-import { cn, Sheet, SheetContent, SheetTrigger } from "@via/ui";
+import { cn, Sheet, SheetContent, SheetTrigger, SPRING_SOFT } from "@via/ui";
+import { m } from "motion/react";
 import { Menu, Search } from "lucide-react";
-import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -20,11 +20,11 @@ function MobileTopBar() {
   const [open, setOpen] = useState(false);
   const openSearch = useOpenCommandMenu();
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-1 border-b border-border bg-surface-sunken px-2 md:hidden">
+    <header className="glass-regular sticky top-2 z-30 mx-2 mt-2 flex h-12 items-center gap-1 rounded-full px-1.5 md:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           aria-label="Open navigation"
-          className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
+          className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
         >
           <Menu aria-hidden="true" />
         </SheetTrigger>
@@ -39,7 +39,7 @@ function MobileTopBar() {
         type="button"
         onClick={openSearch}
         aria-label="Search"
-        className="ml-auto flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
+        className="ml-auto flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-5"
       >
         <Search aria-hidden="true" />
       </button>
@@ -58,37 +58,35 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [collapsed]);
 
   return (
-    <MotionConfig reducedMotion="user">
-      <LazyMotion features={domAnimation} strict>
         <CommandMenuProvider>
           <div className="flex min-h-dvh flex-col md:flex-row">
             <MobileTopBar />
-            <aside
+            {/* Floating glass sidebar; collapsing is a Motion layout animation. */}
+            <m.aside
+              layout
+              transition={SPRING_SOFT}
               aria-label="Sidebar"
-              className={cn(
-                "hidden shrink-0 border-r border-border bg-surface-sunken transition-[width] duration-150 ease-[cubic-bezier(0.2,0,0,1)] md:sticky md:top-0 md:block md:h-dvh",
-                collapsed ? "w-[52px]" : "w-[232px]",
-              )}
+              className={cn("hidden shrink-0 p-3 pr-0 md:sticky md:top-0 md:block md:h-dvh", collapsed ? "w-[76px]" : "w-[260px]")}
             >
-              <SidebarContent layoutGroup="desktop" collapsed={collapsed} onToggleCollapsed={() => setSidebarCollapsed(!collapsed)} />
-            </aside>
+              <m.div layout transition={SPRING_SOFT} className="glass-regular h-full overflow-hidden rounded-[26px]">
+                <SidebarContent layoutGroup="desktop" collapsed={collapsed} onToggleCollapsed={() => setSidebarCollapsed(!collapsed)} />
+              </m.div>
+            </m.aside>
             <main id="main" className="min-w-0 flex-1">
-              <div className="mx-auto max-w-[1440px] px-4 py-5 md:px-6">{children}</div>
+              <div className="mx-auto max-w-[1440px] px-4 py-5 md:px-7 md:py-6">{children}</div>
             </main>
           </div>
         </CommandMenuProvider>
-      </LazyMotion>
-    </MotionConfig>
   );
 }
 
 /** Consistent page heading with optional actions on the right. */
 export function PageHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h1 className="truncate text-base font-semibold leading-6 tracking-tight">{title}</h1>
-        {description ? <div className="text-[13px] text-muted">{description}</div> : null}
+        <h1 className="truncate font-display text-[26px] font-semibold leading-8 tracking-[-0.025em]">{title}</h1>
+        {description ? <div className="mt-0.5 text-[14px] text-muted">{description}</div> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

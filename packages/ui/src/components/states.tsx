@@ -4,7 +4,7 @@ import { cn } from "../cn";
 
 /** Placeholder block shown while content loads. Hidden from assistive tech. */
 export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div aria-hidden="true" className={cn("animate-pulse rounded-md bg-surface-hover", className)} {...props} />;
+  return <div aria-hidden="true" className={cn("via-shimmer rounded-lg bg-surface-hover", className)} {...props} />;
 }
 
 export function Spinner({ className, label = "Loading" }: { className?: string; label?: string }) {
@@ -45,7 +45,7 @@ export function ErrorState({ icon, title, description, action, className }: Stat
     <div
       role="alert"
       className={cn(
-        "flex items-start gap-3 rounded-md border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm",
+        "flex items-start gap-3 rounded-2xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm",
         className,
       )}
     >

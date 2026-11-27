@@ -1,90 +1,16 @@
 /*
- * Landing page only. The product UI stays flat (docs/DESIGN_SYSTEM.md); the marketing page may use
- * soft accent glows, a grid and trace motif and film grain, all derived from the theme tokens so
- * the light theme follows automatically.
+ * Landing page only: the board illustration's colours. Everything else (glass, ambient light, grain,
+ * type, motion) comes from the shared design-system tokens in packages/ui/src/styles.css.
  */
 
 .landing {
-  --landing-grid: color-mix(in oklab, var(--via-foreground) 5%, transparent);
-  --landing-grid-strong: color-mix(in oklab, var(--via-foreground) 9%, transparent);
-  --landing-glow: color-mix(in oklab, var(--via-accent) 32%, transparent);
-  --landing-glow-soft: color-mix(in oklab, var(--via-accent) 14%, transparent);
-  --landing-copper: color-mix(in oklab, #c8875a 70%, var(--via-foreground));
-  --landing-board: color-mix(in oklab, var(--via-surface) 88%, var(--via-accent));
+  --landing-grid: color-mix(in oklab, var(--via-foreground) 6%, transparent);
+  --landing-copper: #d9965f;
+  --landing-board: color-mix(in oklab, #0b0b10 82%, var(--via-accent));
+  --landing-glow: var(--via-accent-glow);
 }
 
 [data-theme="light"] .landing {
-  --landing-glow: color-mix(in oklab, var(--via-accent) 18%, transparent);
-  --landing-glow-soft: color-mix(in oklab, var(--via-accent) 8%, transparent);
-  --landing-copper: #a8673c;
-  --landing-board: color-mix(in oklab, #ffffff 92%, var(--via-accent));
-}
-
-/* 1.27 mm (50 mil) feels right: the grid every PCB engineer has stared at. */
-.landing-grid {
-  background-image:
-    linear-gradient(var(--landing-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--landing-grid) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
-}
-
-.landing-glow {
-  background:
-    radial-gradient(ellipse 50% 40% at 70% 10%, var(--landing-glow), transparent 70%),
-    radial-gradient(ellipse 40% 35% at 10% 30%, var(--landing-glow-soft), transparent 70%);
-}
-
-/* Film grain from an inline SVG turbulence filter: no image request. */
-.landing-grain {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.55'/></svg>");
-  opacity: 0.06;
-  mix-blend-mode: overlay;
-}
-[data-theme="light"] .landing-grain {
-  opacity: 0.04;
-  mix-blend-mode: multiply;
-}
-
-/* `font-display` itself is a design-system token (packages/ui/src/styles.css). */
-.landing .font-display {
-  letter-spacing: -0.01em;
-}
-
-/* Hero: a DRC scan line sweeping the board. Off under reduced motion (global rule zeroes it, and
-   the element is hidden as well so no static line remains). */
-@keyframes landing-scan {
-  0% {
-    transform: translateY(-10%);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(1000%);
-    opacity: 0;
-  }
-}
-.landing-scan {
-  animation: landing-scan 5.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .landing-scan {
-    display: none;
-  }
-}
-
-/* How it works: marching dashes on the connector (adapted from the 21st "How It Works" path). */
-@keyframes landing-march {
-  to {
-    stroke-dashoffset: -28;
-  }
-}
-.landing-march {
-  stroke-dasharray: 6 8;
-  animation: landing-march 1.6s linear infinite;
+  --landing-copper: #b06a35;
+  --landing-board: color-mix(in oklab, #ffffff 90%, var(--via-accent));
 }

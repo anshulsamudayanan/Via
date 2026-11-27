@@ -4,22 +4,22 @@ import { useId } from "react";
 import { cn } from "../cn";
 
 const control =
-  "w-full rounded-md border border-border-strong bg-surface px-2.5 text-sm text-foreground " +
+  "w-full rounded-lg border border-border bg-surface-sunken px-3 text-sm text-foreground shadow-[inset_0_1px_0_var(--via-glass-highlight)] " +
   "placeholder:text-subtle transition-colors hover:border-subtle " +
   "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-ring " +
   "disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger";
 
 export function Input({ className, ref, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
-  return <input ref={ref} className={cn(control, "h-8", className)} {...props} />;
+  return <input ref={ref} className={cn(control, "h-9", className)} {...props} />;
 }
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(control, "min-h-20 py-1.5 leading-relaxed", className)} {...props} />;
+  return <textarea className={cn(control, "min-h-20 py-2 leading-relaxed", className)} {...props} />;
 }
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, "h-8 cursor-pointer pr-7", className)} {...props}>
+    <select className={cn(control, "h-9 cursor-pointer pr-7", className)} {...props}>
       {children}
     </select>
   );

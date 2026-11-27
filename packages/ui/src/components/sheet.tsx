@@ -20,14 +20,14 @@ interface SheetContentProps extends ComponentProps<typeof DialogPrimitive.Conten
 export function SheetContent({ title, side = "left", className, children, ...props }: SheetContentProps) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60 data-[state=open]:animate-fade-in" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/50 data-[state=open]:animate-fade-in" />
       <DialogPrimitive.Content
         aria-describedby={undefined}
         className={cn(
-          "fixed inset-y-0 z-50 flex w-[min(18rem,85vw)] flex-col border-border bg-surface-sunken shadow-overlay focus-visible:outline-none",
+          "glass-thick fixed inset-y-2 z-50 flex w-[min(18rem,85vw)] flex-col rounded-3xl focus-visible:outline-none",
           side === "left"
-            ? "left-0 border-r data-[state=open]:animate-[via-sheet-in-left_180ms_cubic-bezier(0.2,0,0,1)]"
-            : "right-0 border-l data-[state=open]:animate-[via-sheet-in-right_180ms_cubic-bezier(0.2,0,0,1)]",
+            ? "left-2 data-[state=open]:animate-[via-sheet-in-left_180ms_cubic-bezier(0.2,0,0,1)]"
+            : "right-2 data-[state=open]:animate-[via-sheet-in-right_180ms_cubic-bezier(0.2,0,0,1)]",
           className,
         )}
         {...props}

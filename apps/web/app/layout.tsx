@@ -1,18 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import { ToastProvider, TooltipProvider } from "@via/ui";
+import { Providers } from "@/components/providers";
 import { themeInitScript } from "@/lib/theme";
 
-// IBM Plex, self-hosted (OFL): Latin subset, only the weights the design system uses.
-import "@fontsource/ibm-plex-sans/latin-400.css";
-import "@fontsource/ibm-plex-sans/latin-500.css";
-import "@fontsource/ibm-plex-sans/latin-600.css";
+// Inter (OFL) is the non-Apple fallback for the SF Pro system font; IBM Plex Mono for engineering values.
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/ibm-plex-mono/latin-500.css";
-// Display serif for the landing page and the app's first-run state; the browser fetches it only where used.
-import "@fontsource/instrument-serif/latin-400.css";
-import "@fontsource/instrument-serif/latin-400-italic.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,8 +20,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#111214" },
-    { media: "(prefers-color-scheme: light)", color: "#f4f4f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#030305" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
   ],
 };
 
@@ -36,13 +34,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-dvh">
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface-raised focus:px-3 focus:py-2"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:bg-surface-raised focus:px-4 focus:py-2"
         >
           Skip to content
         </a>
-        <TooltipProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </TooltipProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

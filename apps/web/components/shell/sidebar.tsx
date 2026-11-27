@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Kbd,
+  SPRING,
   Tooltip,
 } from "@via/ui";
 import { ChevronsUpDown, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun } from "lucide-react";
@@ -47,7 +48,7 @@ function MaybeTooltip({ show, content, children }: { show: boolean; content: Rea
 }
 
 const itemBase =
-  "relative flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-[13px] whitespace-nowrap outline-none transition-colors duration-100 [&>svg]:size-4 [&>svg]:shrink-0";
+  "relative isolate flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13.5px] whitespace-nowrap outline-none transition-colors duration-150 [&>svg]:size-[17px] [&>svg]:shrink-0";
 
 function NavItem({ entry, collapsed, layoutGroup, onNavigate }: { entry: NavEntry; collapsed: boolean; layoutGroup: string; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -83,16 +84,17 @@ function NavItem({ entry, collapsed, layoutGroup, onNavigate }: { entry: NavEntr
         aria-label={collapsed ? entry.label : undefined}
         className={cn(
           itemBase,
-          active ? "bg-accent-soft font-medium text-foreground" : "text-muted hover:bg-surface-hover hover:text-foreground",
+          active ? "font-medium text-foreground" : "text-muted hover:bg-surface-hover hover:text-foreground",
           collapsed && "justify-center px-0",
         )}
       >
         {active ? (
+          // The active item is a glass pill that slides between items (shared layoutId, spring).
           <m.span
-            layoutId={`nav-marker-${layoutGroup}`}
-            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+            layoutId={`nav-pill-${layoutGroup}`}
+            transition={SPRING}
             aria-hidden="true"
-            className="absolute inset-y-1.5 -left-2 w-0.5 rounded-r-sm bg-accent"
+            className="absolute inset-0 -z-10 rounded-xl bg-[color-mix(in_oklab,var(--via-accent)_14%,var(--via-glass-regular))] shadow-[inset_0_1px_0_var(--via-glass-highlight),0_4px_14px_-6px_var(--via-accent-glow)] ring-1 ring-accent-border"
           />
         ) : null}
         <Icon aria-hidden="true" className={active ? "text-accent" : undefined} />
@@ -112,22 +114,22 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
       type="button"
       onClick={() => setTheme(next)}
       aria-label={`Switch to ${next} theme`}
-      className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
+      className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
     >
       {theme === "dark" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
     </button>
   );
   return (
-    <div className={cn("flex gap-1 border-t border-border p-2", collapsed ? "flex-col items-center" : "items-center")}>
+    <div className={cn("flex gap-1 border-t border-border p-2.5", collapsed ? "flex-col items-center" : "items-center")}>
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn(
-            "flex min-w-0 items-center gap-2 rounded-md text-left outline-none hover:bg-surface-hover",
-            collapsed ? "size-8 justify-center" : "h-10 flex-1 px-2",
+            "flex min-w-0 items-center gap-2 rounded-xl text-left outline-none hover:bg-surface-hover",
+            collapsed ? "size-9 justify-center" : "h-11 flex-1 px-2",
           )}
           aria-label="Account menu"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent ring-1 ring-accent-border">
             {initials(me.user.display_name)}
           </span>
           {collapsed ? null : (
@@ -175,7 +177,7 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
   const openSearch = useOpenCommandMenu();
   return (
     <div className="flex h-full flex-col">
-      <div className={cn("flex h-12 shrink-0 items-center gap-2 px-3", collapsed && "justify-center px-0")}>
+      <div className={cn("flex h-14 shrink-0 items-center gap-2 px-4", collapsed && "justify-center px-0")}>
         <Link href="/dashboard" onClick={onNavigate} aria-label="VIA dashboard" className="rounded-sm">
           <ViaLogo compact={collapsed} />
         </Link>
@@ -186,14 +188,14 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
             aria-label="Collapse sidebar"
             aria-expanded="true"
             title="Collapse sidebar ([)"
-            className="ml-auto flex size-7 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
+            className="ml-auto flex size-8 items-center justify-center rounded-full text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
           >
             <PanelLeftClose aria-hidden="true" />
           </button>
         ) : null}
       </div>
 
-      <div className={cn("px-2 pb-2", collapsed && "flex flex-col items-center gap-1")}>
+      <div className={cn("px-2.5 pb-2", collapsed && "flex flex-col items-center gap-1")}>
         {collapsed && onToggleCollapsed ? (
           <Tooltip content="Expand sidebar ([)" side="right">
             <button
@@ -201,7 +203,7 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
               onClick={onToggleCollapsed}
               aria-label="Expand sidebar"
               aria-expanded="false"
-              className="flex size-8 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
+              className="flex size-9 items-center justify-center rounded-full text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-4"
             >
               <PanelLeftOpen aria-hidden="true" />
             </button>
@@ -217,8 +219,8 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
             aria-label="Search"
             aria-keyshortcuts="Meta+K Control+K"
             className={cn(
-              "flex h-8 items-center gap-2 rounded-md border border-border bg-surface text-[13px] text-subtle hover:border-border-strong hover:text-muted [&>svg]:size-4",
-              collapsed ? "w-8 justify-center border-transparent bg-transparent" : "w-full px-2",
+              "flex h-9 items-center gap-2 rounded-full border border-border bg-surface-sunken text-[13px] text-subtle shadow-[inset_0_1px_0_var(--via-glass-highlight)] hover:border-border-strong hover:text-muted [&>svg]:size-4",
+              collapsed ? "w-9 justify-center border-transparent bg-transparent shadow-none" : "w-full px-3",
             )}
           >
             <Search aria-hidden="true" />
@@ -232,13 +234,13 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
         </MaybeTooltip>
       </div>
 
-      <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2">
         {NAV_GROUPS.map((group) => (
           <div key={group.label} className="pt-3 first:pt-1">
             {collapsed ? (
               <div className="mx-auto mb-1 h-px w-5 bg-border" aria-hidden="true" />
             ) : (
-              <h2 id={`${layoutGroup}-${group.label}`} className="px-2 pb-1 text-[11px] font-medium uppercase tracking-[0.06em] text-subtle">
+              <h2 id={`${layoutGroup}-${group.label}`} className="px-2.5 pb-1 text-[11px] font-semibold tracking-tight text-subtle">
                 {group.label}
               </h2>
             )}
@@ -253,7 +255,7 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
         ))}
       </nav>
 
-      <div className={cn("px-2 pb-1.5", collapsed && "flex justify-center")}>
+      <div className={cn("px-2.5 pb-1.5", collapsed && "flex justify-center")}>
         <StatusIndicator collapsed={collapsed} onNavigate={onNavigate} />
       </div>
       <AccountRow collapsed={collapsed} />

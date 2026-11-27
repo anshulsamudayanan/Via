@@ -1,9 +1,11 @@
 "use client";
 
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "../cn";
+import { SPRING } from "../motion";
 
 export type ToastTone = "info" | "success" | "error";
 
@@ -45,15 +47,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
+      {/* iOS-style: notifications drop in from the top. */}
       <section
         aria-label="Notifications"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 p-4 sm:inset-x-auto sm:right-0 sm:items-end"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex flex-col items-center gap-2 p-3 sm:inset-x-auto sm:right-0 sm:items-end sm:p-4"
       >
         {items.length ? (
-          <ol className="flex w-full flex-col gap-2 sm:w-[360px]">
-            {items.map((t) => (
-              <ToastView key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
-            ))}
+          <ol className="flex w-full flex-col gap-2 sm:w-[372px]">
+            <AnimatePresence initial={false}>
+              {items.map((t) => (
+                <ToastView key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
+              ))}
+            </AnimatePresence>
           </ol>
         ) : null}
       </section>
@@ -65,6 +70,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   const tone = toast.tone ?? "info";
   const duration = toast.duration ?? (tone === "error" ? 8000 : 5000);
   const [paused, setPaused] = useState(false);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (!duration || paused) return;
@@ -73,14 +79,19 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   }, [duration, paused, onDismiss]);
 
   return (
-    <li
+    <m.li
+      layout
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -28, scale: 0.96, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -16, scale: 0.96, filter: "blur(4px)" }}
+      transition={SPRING}
       role={tone === "error" ? "alert" : "status"}
       aria-atomic="true"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="pointer-events-auto flex animate-overlay-in gap-2.5 rounded-lg border border-border bg-surface-raised p-3 shadow-overlay motion-reduce:animate-none [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0"
+      className="glass-thick pointer-events-auto flex gap-3 rounded-[22px] p-3.5 [&>svg]:mt-px [&>svg]:size-[18px] [&>svg]:shrink-0"
     >
       {ICON[tone]}
       <div className="min-w-0 flex-1">
@@ -92,11 +103,11 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss notification"
-        className={cn("-m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-3.5")}
+        className={cn("-m-1 flex size-6 shrink-0 items-center justify-center rounded-full text-subtle hover:bg-surface-hover hover:text-foreground [&>svg]:size-3.5")}
       >
         <X aria-hidden="true" />
       </button>
-    </li>
+    </m.li>
   );
 }
 

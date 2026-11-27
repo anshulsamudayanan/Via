@@ -1,5 +1,5 @@
 import type { LatestAnalysis, LatestImport, Severity } from "@via/types";
-import { cn, Mono, StatusDot, type StatusTone } from "@via/ui";
+import { cn, CountUp, Mono, StatusDot, type StatusTone } from "@via/ui";
 import Link from "next/link";
 
 import { formatDateTime, relativeTime } from "@/lib/format";
@@ -82,8 +82,8 @@ export function SeverityCounts({ projectId, value, className }: { projectId: str
         </span>
       ) : counts.length ? (
         counts.map(([s, n]) => (
-          <span key={s} className={cn("inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-[11px] font-medium leading-4", CHIP[severityTone(s)])}>
-            <span className="font-mono tabular-nums">{n}</span>
+          <span key={s} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium leading-4", CHIP[severityTone(s)])}>
+            <CountUp value={n} className="font-mono tabular-nums" />
             <span>{s}</span>
           </span>
         ))

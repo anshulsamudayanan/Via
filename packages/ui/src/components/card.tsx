@@ -3,13 +3,13 @@ import type { HTMLAttributes } from "react";
 import { cn } from "../cn";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border bg-surface", className)} {...props} />;
+  return <div className={cn("glass-regular rounded-3xl", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex min-h-10 items-center justify-between gap-3 border-b border-border px-4 py-2", className)}
+      className={cn("flex min-h-11 items-center justify-between gap-3 border-b border-border px-5 py-2.5", className)}
       {...props}
     />
   );
