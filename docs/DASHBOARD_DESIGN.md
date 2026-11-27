@@ -371,3 +371,33 @@ The sidebar has no "Soon" entries left; the `soon` field on nav entries stays fo
   dashboard, Designs, Analysis and Components now share one account in `e2e/sidebar.spec.ts`,
   because sign-up is rate limited to 10 per hour per IP and the suite must stay under that limit
   in CI.
+
+### Follow-up: signed-in dashboard pass (calmer, denser)
+
+Same palette, fonts, radii and accent as the landing page, but flat: no glow, no entrance
+animations. Before and after screenshots (1440 and 390 px, dark and light, populated and first-run)
+are in `docs/design/dashboard-before/` and `docs/design/dashboard-after/`.
+
+- **Shell:** a live system-status row above the account menu (the real `GET /health/ready`, polled
+  each minute, linking to `/status`), a "System status" nav entry, and a theme item in the account
+  menu next to sign out.
+- **Header:** a context line built from `GET /projects/summary`; "Upload board" (opens the
+  dropzone's picker) and the primary "New project".
+- **Projects:** table or cards (toggle remembered per browser; phones always get cards). Each
+  project shows last revision (design, `rN`, import state), when it was last analysed, findings by
+  severity, and access (private/organization, plus your role when you aren't the owner). `/`
+  focuses the filter; Up/Down/Home/End move between projects. Skeletons match the loaded row height.
+- **Findings by severity:** the one API change, additive. `LatestAnalysis` gains `by_severity`,
+  copied from the analysis run's stored `result_summary` (no new query); runs that predate it show
+  the total only. Covered in `test_dashboard_summary_and_latest_work`.
+- **Dropzone:** adapted from the 21st.dev File Dropzone (@amankaushik481). One `.kicad_pcb` or
+  `.zip` into a project you can edit (viewer projects aren't offered), validated against the API's
+  own limits, real byte progress with cancel, retry on network failure, a link to an existing
+  design on a duplicate, and a toast with "Open design" when done.
+- **Toasts:** our own small provider in `@via/ui` instead of `sonner` (no new dependency).
+- **First run:** serif headline, the three real steps, one primary action, a static board SVG.
+
+Not changed: API routes, auth, data fetching paths and access control. The dropzone and the table
+use the same endpoints as before (`/projects`, `/projects/summary`, `/pcb/limits`, `/pcb/import`).
+Only one 21st component could be installed (the free tier's daily quota); the other candidates
+(toast, empty state, table) were built in-house following the same patterns.

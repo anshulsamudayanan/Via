@@ -1,6 +1,6 @@
 import type { ViaClient } from "@via/api-client";
 import type { DesignDetail, MeResponse, Page, Project, Revision } from "@via/types";
-import { TooltipProvider } from "@via/ui";
+import { ToastProvider, TooltipProvider } from "@via/ui";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
@@ -58,7 +58,7 @@ export function page<T>(items: T[], total = items.length): Page<T> {
 /** A client whose methods are all vi.fn(); override what a test needs. */
 export function mockClient(overrides: Record<string, Record<string, unknown>> = {}): ViaClient {
   const base = {
-    health: { live: vi.fn(), ready: vi.fn() },
+    health: { live: vi.fn(), ready: vi.fn().mockResolvedValue({ status: "ok", version: "test", checks: {} }) },
     auth: { register: vi.fn(), login: vi.fn(), logout: vi.fn(), me: vi.fn(), sessions: vi.fn(), revokeSession: vi.fn(), requestPasswordReset: vi.fn(), confirmPasswordReset: vi.fn() },
     users: { updateMe: vi.fn(), changePassword: vi.fn() },
     organizations: { list: vi.fn(), create: vi.fn() },
@@ -94,7 +94,7 @@ export function renderWith(ui: ReactNode, client: ViaClient, session = true) {
   return render(
     <ApiProvider client={client}>
       <TooltipProvider>
-        {session ? <SessionContext.Provider value={sessionValue}>{ui}</SessionContext.Provider> : ui}
+        <ToastProvider>{session ? <SessionContext.Provider value={sessionValue}>{ui}</SessionContext.Provider> : ui}</ToastProvider>
       </TooltipProvider>
     </ApiProvider>,
   );

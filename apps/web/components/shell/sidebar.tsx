@@ -24,6 +24,7 @@ import { setTheme, useTheme } from "@/lib/use-theme";
 
 import { useOpenCommandMenu } from "./command-menu";
 import { isActive, NAV_GROUPS, type NavEntry } from "./nav";
+import { StatusIndicator } from "./status-indicator";
 
 function initials(name: string): string {
   return name
@@ -145,6 +146,10 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
           <DropdownMenuItem onSelect={() => router.push("/settings")}>
             <Settings /> Account settings
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setTheme(next)}>
+            {theme === "dark" ? <Sun /> : <Moon />} {theme === "dark" ? "Light theme" : "Dark theme"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => void signOut()}>
             <LogOut /> Sign out
           </DropdownMenuItem>
@@ -248,6 +253,9 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
         ))}
       </nav>
 
+      <div className={cn("px-2 pb-1.5", collapsed && "flex justify-center")}>
+        <StatusIndicator collapsed={collapsed} onNavigate={onNavigate} />
+      </div>
       <AccountRow collapsed={collapsed} />
     </div>
   );

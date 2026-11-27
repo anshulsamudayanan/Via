@@ -75,6 +75,7 @@ def latest_work(
                 finding_count=(
                     run.result_summary.get("finding_count") if run.status == AnalysisStatus.SUCCEEDED else None
                 ),
+                by_severity=(run.result_summary.get("by_severity") if run.status == AnalysisStatus.SUCCEEDED else None),
             )
             for run, design_id, name in analyses
         },

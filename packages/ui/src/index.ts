@@ -18,3 +18,4 @@ export { Table, TBody, TD, TH, THead, TR } from "./components/table";
 export { Tooltip, TooltipProvider } from "./components/tooltip";
 export { Kbd, Mono, Panel } from "./components/primitives";
 export { Sheet, SheetClose, SheetContent, SheetTrigger } from "./components/sheet";
+export { type ToastOptions, ToastProvider, type ToastTone, useToast } from "./components/toast";

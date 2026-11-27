@@ -13,7 +13,7 @@ test("sidebar pages: dashboard, designs, analysis and components", async ({ page
   await register(page, "Sidebar Tester", uniqueEmail("sidebar"));
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   // A new account gets a first step, not empty tables.
-  await expect(page.getByText("Get started")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with a board." })).toBeVisible();
 
   const created = await page.request.post("/api/v1/projects", { headers: { "X-VIA-Request": "1" }, data: { name: "Dash board project" } });
   expect(created.ok()).toBeTruthy();
@@ -22,6 +22,16 @@ test("sidebar pages: dashboard, designs, analysis and components", async ({ page
   await expect(overview.getByText("Active projects")).toBeVisible();
   await expect(overview.getByText("Active projects").locator("xpath=following-sibling::dd")).toHaveText("1");
   await expect(page.getByRole("table").getByRole("link", { name: "Dash board project" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /System status: |All systems operational|Degraded service/ }).first()).toBeVisible();
+
+  // Dashboard dropzone: a wrong file is refused locally; a real board uploads and toasts a link.
+  const picker = page.locator('input[type=file][aria-label="Choose a board file"]');
+  await picker.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
+  await expect(page.getByText(/Unsupported file type/).first()).toBeVisible();
+  await picker.setInputFiles(REFERENCE_BOARD);
+  const toast = page.getByRole("status").filter({ hasText: "Board uploaded" });
+  await expect(toast).toBeVisible({ timeout: 30_000 });
+  await expect(toast.getByRole("link", { name: "Open design" })).toHaveAttribute("href", /\/projects\/[0-9a-f-]+\/designs\/[0-9a-f-]+$/);
 
   // Global search finds the project and opens it.
   await page.keyboard.press("Control+k");

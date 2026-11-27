@@ -1,4 +1,4 @@
-import { Activity, Boxes, CircuitBoard, FolderKanban, LayoutDashboard, type LucideIcon, ScanSearch, Settings } from "lucide-react";
+import { Activity, Boxes, CircuitBoard, FolderKanban, Gauge, LayoutDashboard, type LucideIcon, ScanSearch, Settings } from "lucide-react";
 
 export interface NavEntry {
   href?: string;
@@ -25,7 +25,13 @@ export const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
       { href: "/components", label: "Components", icon: Boxes },
     ],
   },
-  { label: "Platform", items: [{ href: "/settings", label: "Settings", icon: Settings }] },
+  {
+    label: "Platform",
+    items: [
+      { href: "/status", label: "System status", icon: Gauge },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 export const NAV_LINKS = NAV_GROUPS.flatMap((g) => g.items).filter((i): i is NavEntry & { href: string } => Boolean(i.href));

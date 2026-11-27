@@ -333,6 +333,8 @@ def test_dashboard_summary_and_latest_work(client, make_client, broken):
     listed = client.get("/api/v1/projects").json()["items"][0]
     assert listed["latest_analysis"]["status"] == "succeeded"
     assert listed["latest_analysis"]["finding_count"] == 3
+    by_sev = listed["latest_analysis"]["by_severity"]
+    assert sum(by_sev.values()) == 3 and by_sev["high"] == 1
     assert listed["latest_analysis"]["design_id"] == design["id"]
     assert client.get("/api/v1/projects/summary").json()["analyses_7d"] == 1
     assert client.get(f"/api/v1/analysis-runs/{run_id}").json()["revision_id"] == revision["id"]

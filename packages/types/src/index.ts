@@ -131,6 +131,8 @@ export interface LatestAnalysis {
   at: string;
   /** Only for succeeded runs. */
   finding_count: number | null;
+  /** Findings per severity; only for succeeded runs. */
+  by_severity?: Partial<Record<Severity, number>> | null;
 }
 
 export interface ProjectSummary {

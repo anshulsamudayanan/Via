@@ -86,6 +86,8 @@ class LatestAnalysis(BaseModel):
     at: datetime
     #: Only for succeeded runs.
     finding_count: int | None = None
+    #: Findings per severity (critical, high, medium, low, info); only for succeeded runs.
+    by_severity: dict[str, int] | None = None
 
 
 class ProjectOut(APIModel):

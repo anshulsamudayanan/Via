@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import { TooltipProvider } from "@via/ui";
+import { ToastProvider, TooltipProvider } from "@via/ui";
 import { themeInitScript } from "@/lib/theme";
 
 // IBM Plex, self-hosted (OFL): Latin subset, only the weights the design system uses.
@@ -10,6 +10,9 @@ import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/ibm-plex-mono/latin-500.css";
+// Display serif for the landing page and the app's first-run state; the browser fetches it only where used.
+import "@fontsource/instrument-serif/latin-400.css";
+import "@fontsource/instrument-serif/latin-400-italic.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,7 +40,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           Skip to content
         </a>
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </TooltipProvider>
       </body>
     </html>
   );

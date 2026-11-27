@@ -46,9 +46,8 @@
   mix-blend-mode: multiply;
 }
 
-.font-display {
-  font-family: "Instrument Serif", ui-serif, Georgia, serif;
-  font-weight: 400;
+/* `font-display` itself is a design-system token (packages/ui/src/styles.css). */
+.landing .font-display {
   letter-spacing: -0.01em;
 }
 

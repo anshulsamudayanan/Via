@@ -158,16 +158,23 @@ library; no second framework. Changes are restyles plus a few new primitives.
 | `CommandMenu` | **new** | Global search (projects via `q`, pages, actions) on Radix Dialog with listbox semantics. No new dependency |
 | `Sheet` | **new** | Mobile navigation drawer on Radix Dialog |
 | `NavItem` | **new (web app)** | Sidebar entry with active, disabled and "Soon" states and a collapsed tooltip |
+| `ToastProvider` / `useToast` | **new** | Our own (no dependency): bottom-right stack (bottom-centre on phones), at most three, `status` role (errors `alert`), pauses on hover or focus, 5 s (errors 8 s). Use for results of an action the user started (upload finished, project created), never for page state |
 
 ### State conventions
 
 | State | Treatment |
 |---|---|
 | Loading | Skeleton bars at the real row height (no spinners for lists) |
-| Empty | One line of what this is, one action. Icon at 16 px, `subtle`. No illustration |
+| Empty | One line of what this is, one action. Icon at 16 px, `subtle`. No illustration, except the dashboard's first-run state (below) |
 | Error | `danger` text with the API's message and a **Retry** button |
 | Unavailable | The section header stays; the body says why (for example "Requires analysis data, not exposed by the API yet") |
 | Coming soon | Nav items are disabled, `subtle`, with a "Soon" badge, `aria-disabled`, and not focusable as a link |
+
+### Dashboard first-run state
+
+The only place in the signed-in app that uses the display serif (`font-display`, Instrument Serif,
+a token in `packages/ui/src/styles.css`) and an illustration: a static, theme-token SVG of a bare
+board. No glow, no grain, no animation. Everything else in the app stays flat.
 
 ## Motion
 
