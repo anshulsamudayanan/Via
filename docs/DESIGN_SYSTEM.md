@@ -235,6 +235,48 @@ board. No glow, no grain, no animation. Everything else in the app stays flat.
 - **Reduced motion:** wrap the shell in `<MotionConfig reducedMotion="user">`. The existing global
   CSS rule already zeroes CSS durations.
 
+## Component source: shadcn/ui
+
+New components come from **shadcn/ui** (not 21st.dev). shadcn copies source into the repo, built on
+the same Radix + CVA + `cn` stack `@via/ui` already uses, so it adds no runtime dependencies.
+Existing components that credit a 21st.dev pattern in their header comment keep that credit.
+
+**Setup.** `packages/ui/components.json` (style `new-york`, Radix, Tailwind v4, lucide) writes
+components to `packages/ui/src/components/`; `apps/web/components.json` sends `ui` components
+there too, so running from either directory works. Generated files import `cn` from `@via/ui/cn`
+(a package export; `packages/ui` resolves it through its tsconfig `paths` and vitest alias).
+
+```bash
+cd packages/ui && pnpm dlx shadcn@4.23.0 add <component>   # pinned CLI; never shadcn@latest
+```
+
+Never run `shadcn init`: it would rewrite `styles.css` with its own palette. Bump the pinned CLI
+version deliberately (at least two weeks old), like any other dependency.
+
+**After every `add`**, before committing:
+
+1. Review the diff. Revert anything the CLI wrote to `styles.css` and any dependency it added
+   (justify and pin exact versions if one is genuinely needed).
+2. Translate shadcn's colour names to VIA tokens. VIA's `accent` is purple and `muted` is a *text*
+   colour, so `bg-accent` and `bg-muted` from shadcn would render wrong:
+
+   | shadcn | VIA |
+   |---|---|
+   | `bg-primary` / `text-primary-foreground` | `bg-accent` / `text-accent-foreground` (primary action only) |
+   | `bg-accent` / `text-accent-foreground` (hover, highlighted item) | `bg-surface-hover` / `text-foreground` |
+   | `bg-muted` | `bg-surface` |
+   | `text-muted-foreground` | `text-muted` (or `text-subtle` for metadata) |
+   | `bg-popover` / `bg-card` | `bg-surface-raised` / `bg-surface` (or `Glass` within the blur budget) |
+   | `bg-secondary` | `bg-surface` |
+   | `border-input` | `border-border-strong` |
+   | `bg-destructive` / `text-destructive` | `bg-danger-soft` / `text-danger` |
+   | `ring-ring/50`, `ring-offset-*` | `ring-ring` (VIA's ring token already carries its opacity) |
+
+3. Apply Black Glass: the radii above, `m.*` from `motion/react` with the `@via/ui` springs instead of
+   `tw-animate-css` classes, and `data-state` enter/exit keyframes for Radix overlays.
+4. Export it from `packages/ui/src/index.ts`, add a test in `components.test.tsx`, and add it to the
+   component table above.
+
 ## Tooling used for this proposal
 
 - **21st.dev MCP** (connected, free tier, AI generation off): searched the catalog for collapsible
