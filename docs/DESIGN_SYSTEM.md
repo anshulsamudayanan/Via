@@ -58,8 +58,9 @@ fill, hairline, highlight). Both press down to 0.97 on a spring (`whileTap`).
   short fades.
 
 **Honesty still applies.** Nothing decorative is presented as data. Illustrations are labelled as
-such, the example finding says "Example", and counters only animate real values (they show the real
-value until they count up, so nothing reads as a false zero).
+such, the example finding says "Example", and counters only animate real values (`CountUp` shows the
+real value on first render and only tweens from the previous value when it changes, never from 0, so
+nothing reads as a false zero).
 
 ## Colour
 
