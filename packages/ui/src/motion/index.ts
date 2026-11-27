@@ -9,10 +9,10 @@ export const SPRING: Transition = { type: "spring", stiffness: 380, damping: 30,
 export const SPRING_SOFT: Transition = { type: "spring", stiffness: 300, damping: 30 };
 export const SPRING_PRESS: Transition = { type: "spring", stiffness: 500, damping: 30 };
 
-/** Section entrance: fade + blur(8px -> 0) + a small rise. Use with whileInView, once. */
+/** Entrance: a short fade and an 8px rise. Once per view, for the main content only. */
 export const enter: Variants = {
-  hidden: { opacity: 0, y: 12, filter: "blur(8px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)", transition: SPRING_SOFT },
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: SPRING_SOFT },
 };
 
 /** Parent that staggers `enter` children. */
@@ -21,7 +21,7 @@ export const stagger = (gap = 0.06, delay = 0): Variants => ({
   show: { transition: { staggerChildren: gap, delayChildren: delay } },
 });
 
-/** Reduced motion: keep a plain fade, drop movement and blur. */
+/** Reduced motion: keep a plain fade, drop movement. */
 export const enterReduced: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { duration: 0.2 } },

@@ -82,11 +82,11 @@ export function MotionDialogContent({ title, className, children, ...props }: Mo
       </DialogPrimitive.Overlay>
       <DialogPrimitive.Content forceMount asChild aria-describedby={undefined} {...props}>
         <m.div
-          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, filter: "blur(8px)" }}
-          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-          exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, filter: "blur(6px)" }}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
           transition={SPRING}
-          className={cn("glass-overlay fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-[26px] focus-visible:outline-none", className)}
+          className={cn("glass-overlay fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-3xl focus-visible:outline-none", className)}
           style={{ x: "-50%" }}
         >
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>

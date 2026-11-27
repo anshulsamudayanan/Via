@@ -20,7 +20,7 @@
   --via-border: rgb(255 255 255 / 0.1);
   --via-border-strong: rgb(255 255 255 / 0.16);
   --via-foreground: #ffffff;
-  /* 62% and 54% white: the brief's 60/40 tiers, nudged so small text stays above 4.5:1 on glass, even over the violet light. */
+  /* 62% and 54% white: the brief's 60/40 tiers, nudged so small text stays above 4.5:1 on glass. */
   --via-muted: rgb(255 255 255 / 0.62);
   --via-subtle: rgb(255 255 255 / 0.54);
   --via-accent: #ad9be4;
@@ -28,7 +28,6 @@
   --via-accent-foreground: #0c0a12;
   --via-accent-soft: rgb(155 135 212 / 0.16);
   --via-accent-border: rgb(155 135 212 / 0.45);
-  --via-accent-glow: rgb(139 122 184 / 0.55);
   /* iOS system colours (dark). */
   --via-success: #30d158;
   --via-success-soft: rgb(48 209 88 / 0.14);
@@ -52,12 +51,16 @@
   --via-glass-sheen: rgb(255 255 255 / 0.1);
   --via-scrim: rgb(3 3 5 / 0.55);
 
-  /* Ambient light behind the glass. */
-  --via-blob-violet: rgb(139 122 184 / 0.28);
-  --via-blob-indigo: rgb(76 70 160 / 0.22);
-  --via-blob-blue: rgb(56 110 200 / 0.14);
-  --via-blob-teal: rgb(40 160 160 / 0.1);
+  /* Ambient light behind the glass: two static, near-neutral fields (a bench lamp, not a colour wash). */
+  --via-ambient-1: rgb(255 255 255 / 0.055);
+  --via-ambient-2: rgb(150 160 180 / 0.05);
   --via-grain-opacity: 0.05;
+  /* The board's own materials, for board renders only (never for chrome): copper, ENIG pads, soldermask. */
+  --via-copper: #d9965f;
+  --via-pad: #d8b56e;
+  --via-mask: #0f241c;
+  --via-mask-deep: #08150f;
+  --via-silk: #e9e6dc;
   /* Severity ramp for charts: one hue, ordered (low+info, medium, high, critical); brighter = more
      severe on dark. Validated with the dataviz ordinal checks against a #0c0c10 surface. */
   --via-sev-1: #8f3a34;
@@ -83,7 +86,6 @@
   --via-accent-foreground: #ffffff;
   --via-accent-soft: rgb(94 77 147 / 0.1);
   --via-accent-border: rgb(94 77 147 / 0.35);
-  --via-accent-glow: rgb(94 77 147 / 0.35);
   /* iOS system colours (light, accessible variants). */
   --via-success: #248a3d;
   --via-success-soft: rgb(36 138 61 / 0.1);
@@ -105,11 +107,14 @@
   --via-glass-sheen: rgb(255 255 255 / 0.6);
   --via-scrim: rgb(242 242 247 / 0.6);
 
-  --via-blob-violet: rgb(155 135 212 / 0.32);
-  --via-blob-indigo: rgb(120 140 230 / 0.22);
-  --via-blob-blue: rgb(120 190 255 / 0.2);
-  --via-blob-teal: rgb(90 200 190 / 0.16);
+  --via-ambient-1: rgb(255 255 255 / 0.9);
+  --via-ambient-2: rgb(120 130 150 / 0.1);
   --via-grain-opacity: 0.035;
+  --via-copper: #b06a35;
+  --via-pad: #b8913f;
+  --via-mask: #1d4a37;
+  --via-mask-deep: #133325;
+  --via-silk: #f4f2ea;
   /* Light: darker = more severe; validated against #f7f7fa. */
   --via-sev-1: #e88d84;
   --via-sev-2: #d9594d;
@@ -140,9 +145,11 @@
   --color-danger: var(--via-danger);
   --color-danger-soft: var(--via-danger-soft);
   --color-ring: var(--via-ring);
+  --color-copper: var(--via-copper);
 
   --shadow-overlay: var(--via-shadow);
-  --shadow-glow: 0 0 0 1px var(--via-accent-border), 0 8px 28px -6px var(--via-accent-glow), inset 0 1px 0 rgb(255 255 255 / 0.22);
+  /* Primary buttons: a hairline and a top highlight for depth, never a coloured glow. */
+  --shadow-primary: 0 0 0 1px var(--via-accent-border), inset 0 1px 0 rgb(255 255 255 / 0.22);
 
   /* SF Pro on Apple devices (system font, never bundled); Inter everywhere else. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;

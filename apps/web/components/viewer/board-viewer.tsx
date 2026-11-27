@@ -446,7 +446,7 @@ function LayersPanel({
         if (!layers.length) return null;
         return (
           <fieldset key={g.title} className="space-y-1">
-            <legend className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">{g.title}</legend>
+            <legend className="mb-1 text-[12px] font-medium text-subtle">{g.title}</legend>
             {layers.map((l) => (
               <label key={l.name} className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 hover:bg-surface-hover">
                 <input type="checkbox" checked={visible.has(l.name)} onChange={() => onToggle(l.name)} className="accent-[var(--color-accent)]" />
@@ -458,7 +458,7 @@ function LayersPanel({
         );
       })}
       <fieldset className="space-y-1">
-        <legend className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Objects</legend>
+        <legend className="mb-1 text-[12px] font-medium text-subtle">Objects</legend>
         {(
           [
             ["tracks", `Tracks (${model.counts.tracks})`],

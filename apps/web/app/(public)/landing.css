@@ -1,15 +1,11 @@
 /*
- * Landing page only: the board illustration's colours. Everything else (glass, ambient light, grain,
- * type, motion) comes from the shared design-system tokens in packages/ui/src/styles.css.
+ * Landing page only: aliases for the board illustrations. The board materials themselves (copper,
+ * pads, soldermask, silkscreen) are shared tokens in packages/ui/src/styles.css, so the landing
+ * boards and the dashboard board render match.
  */
 
 .landing {
   --landing-grid: color-mix(in oklab, var(--via-foreground) 6%, transparent);
-  --landing-copper: #d9965f;
-  --landing-board: color-mix(in oklab, #0b0b10 82%, var(--via-accent));
-}
-
-[data-theme="light"] .landing {
-  --landing-copper: #b06a35;
-  --landing-board: color-mix(in oklab, #ffffff 90%, var(--via-accent));
+  --landing-copper: var(--via-copper);
+  --landing-board: var(--via-mask);
 }

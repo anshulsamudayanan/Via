@@ -1,8 +1,8 @@
 "use client";
 
 import type { DesignListItem, Project } from "@via/types";
-import { Button, ErrorState, Kbd, Panel, Skeleton, useToast } from "@via/ui";
-import { ArrowRight, ChevronRight, Search, Upload } from "lucide-react";
+import { Button, ErrorState, Panel, Skeleton, useToast } from "@via/ui";
+import { ArrowRight, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useRef } from "react";
@@ -15,13 +15,9 @@ import { FindingsChart } from "@/components/dashboard/findings-chart";
 import { FirstRun } from "@/components/dashboard/first-run";
 import { ProjectsPanel } from "@/components/dashboard/projects-panel";
 import { StatCards } from "@/components/dashboard/stat-cards";
-import { GlassCta } from "@/components/glass-cta";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
-import { useOpenCommandMenu } from "@/components/shell/command-menu";
 import { errorMessage } from "@/lib/errors";
 import { useAsync } from "@/lib/use-async";
-
-const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" });
 
 /** Every design you can see (paged, 100 at a time): for the revision total and the latest board. */
 async function allDesigns(list: (offset: number, signal: AbortSignal) => Promise<{ items: DesignListItem[]; total: number }>, signal: AbortSignal) {
@@ -38,7 +34,6 @@ export default function DashboardPage() {
   const client = useApi();
   const router = useRouter();
   const { push } = useToast();
-  const openSearch = useOpenCommandMenu();
   const dropzone = useRef<BoardDropzoneHandle>(null);
 
   const summary = useAsync((s) => client.projects.summary(s), [client]);
@@ -51,34 +46,20 @@ export default function DashboardPage() {
   const lastRun = runs.data ? (runs.data.items[0] ?? null) : undefined;
   // The newest design whose current revision parsed (a failed upload has no counts to show).
   const latestBoard = designs.data ? (designs.data.find((d) => d.current_revision?.status === "ready") ?? designs.data[0] ?? null) : undefined;
-  const now = new Date();
 
   function onCreated(p: Project) {
     push({ tone: "success", title: "Project created", description: `${p.name} is private: only you can see it until you invite people.` });
     router.push(`/projects/${p.id}`);
   }
-  const newProject = (trigger?: ReactNode) => <NewProjectDialog onCreated={onCreated} trigger={trigger ?? <GlassCta label="New project" />} />;
+  const newProject = (trigger?: ReactNode) => <NewProjectDialog onCreated={onCreated} trigger={trigger ?? <Button variant="primary">New project</Button>} />;
 
   return (
     <>
-      {/* Breadcrumb + headline with a dimmed secondary part */}
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-4">
+      {/* Page title and the workspace in one line of facts */}
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-x-4 gap-y-4">
         <div className="min-w-0">
-          <nav aria-label="Breadcrumb" className="mb-2">
-            <ol className="flex items-center gap-1.5 font-mono text-[11.5px] uppercase tracking-[0.1em] text-subtle">
-              <li>Workspace</li>
-              <li aria-hidden="true">
-                <ChevronRight className="size-3" />
-              </li>
-              <li aria-current="page" className="text-muted">
-                Dashboard
-              </li>
-            </ol>
-          </nav>
-          <h1 className="font-display text-[34px] font-normal leading-[1.05] tracking-[-0.02em] text-foreground sm:text-[44px]">
-            Dashboard <span className="text-subtle">{MONTH.format(now)} {now.getFullYear()}</span>
-          </h1>
-          <p className="mt-1.5 text-[14px] text-muted">
+          <h1 className="font-display text-[32px] font-normal leading-[1.1] tracking-[-0.02em] text-foreground sm:text-[36px]">Dashboard</h1>
+          <p className="mt-2 text-[14px] text-muted">
             {summary.data ? (
               isNew ? (
                 "Upload a KiCad board to get deterministic, evidence-backed findings."
@@ -94,9 +75,6 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={openSearch} className="hidden text-muted md:inline-flex" aria-keyshortcuts="Meta+K Control+K">
-            <Search /> Search <Kbd className="ml-2">⌘K</Kbd>
-          </Button>
           {isNew ? null : (
             <Button
               variant="secondary"
@@ -128,7 +106,7 @@ export default function DashboardPage() {
             />
           ) : null}
           <StatCards summary={summary.data} findings={findings.data} revisions={revisions} lastRun={lastRun} />
-          <div className="grid gap-4 pt-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+          <div className="grid gap-4 pt-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
             <BoardHero latest={latestBoard} />
             <FindingsChart runs={runs.data?.items} />
           </div>

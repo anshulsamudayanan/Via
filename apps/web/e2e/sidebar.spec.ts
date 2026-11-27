@@ -13,7 +13,7 @@ test("sidebar pages: dashboard, designs, analysis and components", async ({ page
   await register(page, "Sidebar Tester", uniqueEmail("sidebar"));
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   // A new account gets a first step, not empty tables.
-  await expect(page.getByRole("heading", { name: "Start with a board." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with a board" })).toBeVisible();
 
   const created = await page.request.post("/api/v1/projects", { headers: { "X-VIA-Request": "1" }, data: { name: "Dash board project" } });
   expect(created.ok()).toBeTruthy();

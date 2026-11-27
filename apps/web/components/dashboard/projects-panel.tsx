@@ -191,7 +191,6 @@ function ProjectCards({ items, dim, forceCompact }: { items: Project[]; dim: boo
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}
-          whileHover={{ y: -2 }}
           className="group/card relative flex min-w-0 flex-col gap-3 rounded-[20px] border border-border bg-surface px-4 py-3.5 shadow-[inset_0_1px_0_var(--via-glass-highlight)] transition-colors duration-150 hover:border-border-strong hover:bg-surface-hover"
         >
           <div className="flex min-w-0 items-start gap-2">

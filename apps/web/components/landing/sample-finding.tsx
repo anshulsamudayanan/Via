@@ -25,11 +25,11 @@ const ROWS: { k: string; v: React.ReactNode }[] = [
 
 export function SampleFinding() {
   return (
-    <Glass as="figure" variant="regular" sheen className="overflow-hidden rounded-[28px] shadow-overlay">
+    <Glass as="figure" variant="regular" className="overflow-hidden rounded-3xl">
       <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">High</span>
+        <span className="text-[13px] font-medium text-danger">High</span>
         <span className="truncate text-[13px] font-medium text-foreground">Copper spacing below 0.150 mm: GND / SIG</span>
-        <span className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-subtle">Example</span>
+        <span className="ml-auto shrink-0 font-mono text-[12px] text-subtle">Example</span>
       </div>
       {/* A scrim under the values keeps small mono text above 4.5:1 whatever the glass shows. */}
       <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 bg-[var(--via-scrim)] px-5 py-5 font-mono text-[12px] leading-relaxed text-muted sm:grid-cols-[6.5rem_minmax(0,1fr)]">
@@ -40,7 +40,7 @@ export function SampleFinding() {
           </div>
         ))}
       </dl>
-      <figcaption className="border-t border-border px-5 py-2.5 text-[11px] text-subtle">
+      <figcaption className="border-t border-border px-5 py-3 text-[12px] text-subtle">
         Example finding with illustrative values. Every real finding names the exact objects and the measured value against the rule.
       </figcaption>
     </Glass>

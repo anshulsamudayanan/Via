@@ -14,8 +14,8 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Glowing purple glass pill.
-        primary: "bg-accent/90 text-accent-foreground shadow-glow hover:bg-accent",
+        // Solid purple pill with a hairline and a top highlight: the one primary action per view.
+        primary: "bg-accent text-accent-foreground shadow-primary hover:bg-accent-hover",
         // Clear glass pill: tinted fill, hairline, top highlight (no blur of its own: blur budget).
         secondary:
           "border border-border-strong bg-surface text-foreground shadow-[inset_0_1px_0_var(--via-glass-highlight)] hover:border-subtle/40 hover:bg-surface-hover",
@@ -29,7 +29,7 @@ export const buttonVariants = cva(
       size: {
         sm: "h-7 px-3 text-xs",
         md: "h-8 px-3.5 text-[13px]",
-        lg: "h-10 px-5 text-[15px]",
+        lg: "h-11 px-5 text-[15px]",
         icon: "size-8",
       },
     },

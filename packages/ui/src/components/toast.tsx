@@ -81,9 +81,9 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   return (
     <m.li
       layout
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -28, scale: 0.96, filter: "blur(6px)" }}
-      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -16, scale: 0.96, filter: "blur(4px)" }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
       transition={SPRING}
       role={tone === "error" ? "alert" : "status"}
       aria-atomic="true"
@@ -91,7 +91,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="glass-overlay pointer-events-auto flex gap-3 rounded-[22px] p-3.5 [&>svg]:mt-px [&>svg]:size-[18px] [&>svg]:shrink-0"
+      className="glass-overlay pointer-events-auto flex gap-3 rounded-2xl p-3.5 [&>svg]:mt-px [&>svg]:size-[18px] [&>svg]:shrink-0"
     >
       {ICON[tone]}
       <div className="min-w-0 flex-1">

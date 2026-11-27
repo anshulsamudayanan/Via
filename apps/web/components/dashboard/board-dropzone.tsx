@@ -137,11 +137,11 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
   const over = drag !== "idle";
   const reject = drag === "reject";
 
-  if (!projects.data) return <Skeleton className="h-[188px] w-full rounded-[22px]" />;
+  if (!projects.data) return <Skeleton className="h-[188px] w-full rounded-2xl" />;
 
   if (writable.length === 0) {
     return (
-      <div className="rounded-[22px] border border-dashed border-border-strong px-4 py-6 text-center text-xs text-muted">
+      <div className="rounded-2xl border border-dashed border-border-strong px-4 py-6 text-center text-xs text-muted">
         You can&apos;t upload to any active project. Create one, or ask a project owner for editor access.
       </div>
     );
@@ -223,7 +223,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
           void start(files[0]!);
         }}
         className={cn(
-          "group/drop relative isolate flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 overflow-hidden rounded-[22px] px-4 py-7 text-center outline-none transition-colors duration-150",
+          "group/drop relative isolate flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 overflow-hidden rounded-2xl px-4 py-7 text-center outline-none transition-colors duration-150",
           !over && "hover:bg-surface-hover",
           over && !reject && "bg-accent-soft",
           reject && "bg-danger-soft",
@@ -254,7 +254,7 @@ export const BoardDropzone = forwardRef<BoardDropzoneHandle>(function BoardDropz
             reject
               ? "border-danger/40 bg-surface text-danger"
               : over
-                ? "border-accent bg-accent text-accent-foreground shadow-glow"
+                ? "border-accent bg-accent text-accent-foreground shadow-primary"
                 : "border-border bg-surface-raised text-muted shadow-[inset_0_1px_0_var(--via-glass-highlight)] group-hover/drop:text-foreground",
           )}
         >
@@ -296,7 +296,7 @@ function FileRow({ stage, onCancel, onRetry, onRemove }: { stage: Exclude<Stage,
         error ? "border-danger/40" : "border-border",
       )}
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface-sunken font-mono text-[9px] font-semibold tracking-[0.04em] text-muted">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface-sunken font-mono text-[10px] font-medium text-muted">
         {extOf(stage.file.name)}
       </span>
       <div className="min-w-0 flex-1">

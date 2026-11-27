@@ -4,14 +4,14 @@
  * Findings reported by analyses, per day, over the last 30 days, split by severity. Real data only:
  * every succeeded run from GET /analysis/runs (newest 100) contributes its stored `by_severity`.
  *
- * Form (dataviz skill): change over time -> multi-line; severity is ordered -> a one-hue ramp
- * (--via-sev-1..4, validated as an ordinal ramp in both themes), 4 series, so a legend AND direct
- * end labels; crosshair + tooltip that also works from the keyboard; a table view.
- * Motion: lines draw in (pathLength), then a soft glow breathes; both off with reduced motion.
+ * Form (dataviz skill): discrete events per day -> stacked bars (a line would invent slopes between
+ * empty days); severity is ordered -> a one-hue ramp (--via-sev-1..4, validated as an ordinal ramp in
+ * both themes), most severe at the base; a legend, a hover/keyboard tooltip and a table view.
+ * Motion: one short fade in; none with reduced motion.
  */
 
 import type { RunListItem } from "@via/types";
-import { cn, LiquidGlass, SegmentedControl, Skeleton, SPRING_SOFT } from "@via/ui";
+import { cn, LiquidGlass, SegmentedControl, Skeleton } from "@via/ui";
 import { m, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, type PointerEvent, useId, useMemo, useRef, useState } from "react";
 
@@ -56,7 +56,7 @@ function niceMax(v: number) {
 
 const W = 640;
 const H = 220;
-const PAD = { l: 34, r: 76, t: 12, b: 26 };
+const PAD = { l: 34, r: 8, t: 12, b: 26 };
 
 export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
   const reduce = useReducedMotion();
@@ -66,16 +66,17 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
   const plotRef = useRef<SVGSVGElement>(null);
 
   const days = useMemo(() => (runs ? bucketRuns(runs) : []), [runs]);
-  const max = niceMax(Math.max(0, ...days.flatMap((d) => d.values)));
   const total = days.reduce((a, d) => a + d.runs, 0);
-  const x = (i: number) => PAD.l + (i / (DAYS - 1)) * (W - PAD.l - PAD.r);
+  const max = niceMax(Math.max(0, ...days.map((d) => d.values.reduce((a, v) => a + v, 0))));
+  const slot = (W - PAD.l - PAD.r) / DAYS;
+  const barW = Math.max(2, slot * 0.62);
+  const x = (i: number) => PAD.l + slot * i + slot / 2;
   const y = (v: number) => H - PAD.b - (v / max) * (H - PAD.t - PAD.b);
-  const paths = SERIES.map((_, k) => days.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(d.values[k]!).toFixed(1)}`).join(" "));
 
   function onMove(e: PointerEvent<SVGSVGElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * W;
-    setHover(Math.max(0, Math.min(DAYS - 1, Math.round(((px - PAD.l) / (W - PAD.l - PAD.r)) * (DAYS - 1)))));
+    setHover(Math.max(0, Math.min(DAYS - 1, Math.floor((px - PAD.l) / slot))));
   }
   function onKey(e: KeyboardEvent<SVGSVGElement>) {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -88,11 +89,11 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
     <LiquidGlass variant="regular" as="section" aria-labelledby={`${id}-title`} className="flex min-w-0 flex-col rounded-3xl p-5 backdrop-blur-none">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-subtle">Last {DAYS} days</p>
-          <h2 id={`${id}-title`} className="mt-1 font-display text-[22px] font-semibold tracking-[-0.02em] text-foreground">
+          <p className="text-[13px] text-muted">Last {DAYS} days</p>
+          <h2 id={`${id}-title`} className="mt-1 font-display text-[22px] font-normal tracking-[-0.02em] text-foreground">
             Findings reported
           </h2>
-          <p className="text-[12.5px] text-muted">Per day, from {total} succeeded {total === 1 ? "analysis" : "analyses"}; each run counts its own findings.</p>
+          <p className="mt-1 text-[13px] text-muted">Per day, from {total} succeeded {total === 1 ? "analysis" : "analyses"}; each run counts its own findings.</p>
         </div>
         <SegmentedControl
           aria-label="Findings view"
@@ -109,7 +110,7 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted" aria-label="Severity">
         {SERIES.map((s) => (
           <li key={s.key} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-0.5 w-3.5 rounded-full" style={{ background: s.color }} />
+            <span aria-hidden="true" className="size-2 rounded-[2px]" style={{ background: s.color }} />
             {s.label}
           </li>
         ))}
@@ -123,7 +124,7 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
         </div>
       ) : view === "table" ? (
         <div className="mt-4 max-h-[260px] overflow-auto rounded-2xl border border-border">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-[13px]">
             <caption className="sr-only">Findings reported per day by severity</caption>
             <thead className="sticky top-0 bg-surface-raised text-left text-muted">
               <tr>
@@ -161,11 +162,6 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
             onKeyDown={onKey}
             onBlur={() => setHover(null)}
           >
-            <defs>
-              <filter id={`${id}-glow`} x="-10%" y="-30%" width="120%" height="160%">
-                <feGaussianBlur stdDeviation="4" />
-              </filter>
-            </defs>
             {/* Recessive grid and y axis */}
             {[0, 0.5, 1].map((t) => (
               <g key={t}>
@@ -180,57 +176,26 @@ export function FindingsChart({ runs }: { runs: RunListItem[] | undefined }) {
                 {fmtDay.format(days[i]!.date)}
               </text>
             ))}
-            {/* Glow under each line, breathing gently */}
-            {paths.map((d, k) => (
-              <m.path
-                key={`g${k}`}
-                d={d}
-                fill="none"
-                stroke={SERIES[k]!.color}
-                strokeWidth="5"
-                filter={`url(#${id}-glow)`}
-                initial={{ opacity: 0 }}
-                animate={reduce ? { opacity: 0.35 } : { opacity: [0.25, 0.55, 0.25] }}
-                transition={reduce ? { duration: 0 } : { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1.2 + k * 0.3 }}
-              />
-            ))}
-            {/* The lines (2px) */}
-            {paths.map((d, k) => (
-              <m.path
-                key={`l${k}`}
-                d={d}
-                fill="none"
-                stroke={SERIES[k]!.color}
-                strokeWidth="2"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                initial={reduce ? false : { pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ ...SPRING_SOFT, stiffness: 60, damping: 20, delay: k * 0.08 }}
-              />
-            ))}
-            {/* Direct end labels (4 series) in text ink, keyed by a short line */}
-            {SERIES.map((s, k) => {
-              const last = days[DAYS - 1]!.values[k]!;
-              // Spread labels so they never collide.
-              const ys = SERIES.map((_, j) => y(days[DAYS - 1]!.values[j]!));
-              const order = [...ys.keys()].sort((a, b) => ys[a]! - ys[b]!);
-              const slot = order.indexOf(k);
-              const ly = Math.min(H - PAD.b - 4, Math.max(PAD.t + 6, ys[order[0]!]! + slot * 13));
-              return (
-                <g key={s.key}>
-                  <line x1={W - PAD.r + 6} x2={W - PAD.r + 14} y1={ly - 3.5} y2={ly - 3.5} stroke={s.color} strokeWidth="2" strokeLinecap="round" />
-                  <text x={W - PAD.r + 18} y={ly} fontSize="10.5" fill="var(--via-muted)">
-                    {s.label.split(" ")[0]} <tspan fontFamily="var(--font-mono)" fill="var(--via-foreground)">{last}</tspan>
-                  </text>
-                </g>
-              );
-            })}
-            {/* Crosshair */}
-            {hover !== null ? <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--via-border-strong)" /> : null}
-            {hover !== null
-              ? SERIES.map((s, k) => <circle key={s.key} cx={x(hover)} cy={y(days[hover]!.values[k]!)} r="4" fill={s.color} stroke="var(--via-background)" strokeWidth="2" />)
-              : null}
+            {/* Hovered day: a quiet column behind the bar */}
+            {hover !== null ? <rect x={PAD.l + slot * hover} y={PAD.t} width={slot} height={H - PAD.t - PAD.b} rx="3" fill="var(--via-surface-hover)" /> : null}
+            {/* Stacked bars, most severe at the base */}
+            <m.g initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+              {days.map((d, i) => {
+                let base = 0;
+                return (
+                  <g key={dayKey(d.date)} opacity={hover === null || hover === i ? 1 : 0.45}>
+                    {SERIES.map((s, k) => {
+                      const v = d.values[k]!;
+                      if (!v) return null;
+                      const top = y(base + v);
+                      const h = y(base) - top;
+                      base += v;
+                      return <rect key={s.key} x={x(i) - barW / 2} y={top} width={barW} height={Math.max(1, h - 1)} rx="1.5" fill={s.color} />;
+                    })}
+                  </g>
+                );
+              })}
+            </m.g>
           </svg>
           {active && hover !== null ? (
             <div

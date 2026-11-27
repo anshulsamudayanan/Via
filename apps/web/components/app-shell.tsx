@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-label="Sidebar"
               className={cn("hidden shrink-0 p-3 pr-0 md:sticky md:top-0 md:block md:h-dvh", collapsed ? "w-[76px]" : "w-[260px]")}
             >
-              <m.div layout transition={SPRING_SOFT} className="glass-thick h-full overflow-hidden rounded-[26px]">
+              <m.div layout transition={SPRING_SOFT} className="glass-thick h-full overflow-hidden rounded-3xl">
                 <SidebarContent layoutGroup="desktop" collapsed={collapsed} onToggleCollapsed={() => setSidebarCollapsed(!collapsed)} />
               </m.div>
             </m.aside>
@@ -85,7 +85,7 @@ export function PageHeader({ title, description, actions }: { title: ReactNode; 
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h1 className="truncate font-display text-[26px] font-semibold leading-8 tracking-[-0.025em]">{title}</h1>
+        <h1 className="truncate font-display text-[28px] font-normal leading-9 tracking-[-0.02em]">{title}</h1>
         {description ? <div className="mt-0.5 text-[14px] text-muted">{description}</div> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

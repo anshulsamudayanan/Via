@@ -17,7 +17,7 @@ export function Kbd({ className, ...props }: HTMLAttributes<HTMLElement>) {
 
 /** Engineering identifiers only: references, net names, measurements, file names, revision numbers. */
 export function Mono({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span className={cn("font-mono text-[12.5px] tabular-nums", className)} {...props} />;
+  return <span className={cn("font-mono text-[13px] tabular-nums", className)} {...props} />;
 }
 
 interface PanelProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
