@@ -47,7 +47,7 @@ export function OverviewStrip({ data, error, onRetry }: { data: ProjectSummary |
         >
           <Link href={cell.href} title={cell.hint} className="flex h-full flex-col gap-1 px-5 py-3.5 transition-colors duration-150 hover:bg-surface-hover">
             <dt className="text-xs font-medium text-muted">{cell.label}</dt>
-            <dd className="font-display text-[26px] font-semibold leading-8 tracking-[-0.02em] tabular-nums text-foreground">
+            <dd className="font-display text-[28px] font-normal leading-8 tracking-[-0.02em] tabular-nums text-foreground">
               {data ? <CountUp value={cell.value(data)} /> : <Skeleton className="my-1.5 h-6 w-12" />}
             </dd>
           </Link>

@@ -6,7 +6,7 @@ export function ViaLogo({ className, compact = false }: { className?: string; co
         <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-accent" />
         <circle cx="10" cy="10" r="3" fill="currentColor" className="text-foreground" />
       </svg>
-      {compact ? <span className="sr-only">VIA</span> : <span className="font-display text-[17px] font-bold tracking-[0.02em] text-foreground">VIA</span>}
+      {compact ? <span className="sr-only">VIA</span> : <span className="font-display text-[17px] font-semibold tracking-[0.02em] text-foreground">VIA</span>}
     </span>
   );
 }

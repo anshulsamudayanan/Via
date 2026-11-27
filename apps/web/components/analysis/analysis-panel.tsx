@@ -8,7 +8,6 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
-import { GlassCta } from "@/components/glass-cta";
 import { errorMessage } from "@/lib/errors";
 import { findingHighlight, SEVERITIES, severityTone, SOURCE_LABEL, VERIFICATION_LABEL } from "@/lib/findings";
 import { formatDateTime } from "@/lib/format";
@@ -71,7 +70,9 @@ export function AnalysisPanel({ projectId, designId, revisionId, canEdit, onHigh
             </p>
           </div>
           {canEdit ? (
-            <GlassCta label={run ? "Run again" : "Run analysis"} onClick={() => void start()} disabled={starting || Boolean(run && ACTIVE.has(run.status))} />
+            <Button variant="primary" onClick={() => void start()} disabled={starting || Boolean(run && ACTIVE.has(run.status))}>
+              {run ? "Run again" : "Run analysis"}
+            </Button>
           ) : null}
         </CardHeader>
         {startError ? <ErrorState className="mx-4 mb-3" title={startError} /> : null}
@@ -174,7 +175,7 @@ function Findings({ run, projectId, canEdit, ai, onHighlight }: { run: AnalysisR
             {(["open", "reviewed", "dismissed"] as const).map((s) => option("status", s))}
           </Select>
           <form className="min-w-40 flex-1" onSubmit={(e) => { e.preventDefault(); set("q", query.trim()); }}>
-            <Input aria-label="Search findings" placeholder="Search title, part, net… (Enter)" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input aria-label="Search findings" placeholder="Title, part or net" value={query} onChange={(e) => setQuery(e.target.value)} />
           </form>
         </div>
         {page.error ? <ErrorState className="m-3" title="Couldn't load findings" description={errorMessage(page.error)} /> : null}

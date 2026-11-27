@@ -155,7 +155,7 @@ function CommandMenu({ onDone }: { onDone: () => void }) {
           aria-controls={listId}
           aria-activedescendant={items[current] ? `${listId}-${items[current].id}` : undefined}
           aria-label="Search projects and pages"
-          placeholder="Search projects, pages and actions…"
+          placeholder="Projects, pages and actions"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

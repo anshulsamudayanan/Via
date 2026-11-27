@@ -1,7 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Badge, Button, EmptyState, ErrorState, Spinner } from "../index";
+import { Badge, Button, CountUp, EmptyState, ErrorState, Spinner } from "../index";
 
 afterEach(cleanup);
 
@@ -73,5 +73,20 @@ describe("forms and overlays", () => {
     expect(dialog.textContent).toContain("Body");
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("CountUp shows the real value on first render, never a false zero", () => {
+    render(<CountUp value={3} />);
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByText("0")).toBeNull();
+  });
+
+  it("CountUp settles on the new value when it changes, passing only between real values", async () => {
+    const { container, rerender } = render(<CountUp value={3} />);
+    rerender(<CountUp value={7} />);
+    const seen = Number(container.textContent);
+    expect(seen).toBeGreaterThanOrEqual(3);
+    expect(seen).toBeLessThanOrEqual(7);
+    await waitFor(() => expect(container.textContent).toBe("7"));
   });
 });

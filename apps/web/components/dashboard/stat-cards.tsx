@@ -9,12 +9,13 @@ import type { ReactNode } from "react";
 import { SEVERITIES } from "@/lib/findings";
 import { formatDateTime, relativeTime } from "@/lib/format";
 
-const SEV_CHIP: Record<Severity, string> = {
-  critical: "bg-danger-soft text-danger",
-  high: "bg-danger-soft text-danger",
-  medium: "bg-warning-soft text-warning",
-  low: "bg-surface-hover text-muted",
-  info: "bg-surface-hover text-muted",
+// Severity counts are quiet text; only the severities that need attention carry their status colour.
+const SEV_TEXT: Record<Severity, string> = {
+  critical: "text-danger",
+  high: "text-danger",
+  medium: "text-warning",
+  low: "text-muted",
+  info: "text-muted",
 };
 
 function Card({ label, href, children, foot }: { label: string; href: string; children: ReactNode; foot: ReactNode }) {
@@ -22,16 +23,16 @@ function Card({ label, href, children, foot }: { label: string; href: string; ch
   return (
     <m.li variants={reduce ? enterReduced : enter} className="min-w-0">
       <Link href={href} className="glass-regular group flex h-full flex-col justify-between gap-4 rounded-3xl p-5 backdrop-blur-none transition-colors hover:bg-surface-hover">
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-subtle">{label}</p>
+        <p className="text-[13px] text-muted">{label}</p>
         <div className="min-w-0">{children}</div>
-        <div className="font-mono text-[11.5px] text-muted">{foot}</div>
+        <div className="font-mono text-[12px] text-subtle">{foot}</div>
       </Link>
     </m.li>
   );
 }
 
 const Big = ({ children, dim = false }: { children: ReactNode; dim?: boolean }) => (
-  <p className={cn("font-display text-[44px] font-semibold leading-none tracking-[-0.02em] tabular-nums", dim ? "text-subtle" : "text-foreground")}>{children}</p>
+  <p className={cn("font-display text-[40px] font-normal leading-none tracking-[-0.02em] tabular-nums", dim ? "text-subtle" : "text-foreground")}>{children}</p>
 );
 
 interface Props {
@@ -60,9 +61,9 @@ export function StatCards({ summary, findings, revisions, lastRun }: Props) {
         foot={
           findings ? (
             sev.length ? (
-              <span className="flex flex-wrap gap-1">
+              <span className="flex flex-wrap gap-x-3 gap-y-1">
                 {sev.map(([s, n]) => (
-                  <span key={s} className={cn("rounded-full px-2 py-px font-sans text-[11px] font-medium", SEV_CHIP[s])}>
+                  <span key={s} className={cn("tabular-nums", SEV_TEXT[s])}>
                     {n} {s}
                   </span>
                 ))}
@@ -92,7 +93,7 @@ export function StatCards({ summary, findings, revisions, lastRun }: Props) {
         {lastRun === undefined ? (
           <Skeleton className="h-11 w-28" />
         ) : lastRun ? (
-          <p className="truncate font-display text-[32px] font-semibold leading-[44px] tracking-[-0.02em] text-foreground" title={formatDateTime(lastRun.finished_at ?? lastRun.created_at)}>
+          <p className="truncate font-display text-[32px] font-normal leading-[40px] tracking-[-0.02em] text-foreground" title={formatDateTime(lastRun.finished_at ?? lastRun.created_at)}>
             {relativeTime(lastRun.finished_at ?? lastRun.created_at)}
           </p>
         ) : (

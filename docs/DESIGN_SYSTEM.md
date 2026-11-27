@@ -8,45 +8,60 @@ and superseded where they disagree.
 
 ## Liquid Glass (current)
 
+**Direction.** Deterministic design review for KiCad boards: exact, instrument-like, unhurried. The
+world is the bench at night: copper, soldermask and silkscreen on a dark canvas. The chrome stays quiet
+(neutral glass, one purple accent); colour and detail go into the moments: the board renders and the
+findings chart. The signature is the measurement mark, a dimension line with the measured gap in mono
+(`0.118 mm`), used where a finding sits on copper.
+
 **Material** (`<LiquidGlass variant>` in `@via/ui`, CSS `.glass-thin | -regular | -thick | -overlay`):
 blur 16 / 22 / 28px + `saturate(180%) brightness(1.1)`, a 1px specular gradient rim (`::before`,
 masked to the edge, white 25% top-left fading to 5%), an inner top highlight, an inner bottom shadow,
-a soft outer shadow and an optional cursor sheen. `thick` (sidebar, navbar, mobile top bar) also
-refracts its edges through an SVG `feTurbulence` + `feDisplacementMap` filter (`#via-refraction`,
-defined once in the app providers). Refraction is opted in only on Chromium (`html[data-refraction]`),
-because one unsupported `url()` would void the whole `backdrop-filter` elsewhere. `overlay` is the
-dense variant for menus, dialogs, the ⌘K sheet and toasts. Stat and chart cards keep the rim and fill
-but drop their own blur (`backdrop-blur-none`) to stay inside the blur budget.
+a soft outer shadow and an optional cursor sheen (not used on cards). `thick` (sidebar, navbar, mobile
+top bar) also refracts its edges through an SVG `feTurbulence` + `feDisplacementMap` filter
+(`#via-refraction`, defined once in the app providers). Refraction is opted in only on Chromium
+(`html[data-refraction]`), because one unsupported `url()` would void the whole `backdrop-filter`
+elsewhere. `overlay` is the dense variant for menus, dialogs, the ⌘K sheet and toasts. Stat and chart
+cards keep the rim and fill but drop their own blur (`backdrop-blur-none`) to stay inside the blur budget.
+
+**Ambient light.** Two static, near-neutral radial fields (`--via-ambient-1/2`) and film grain behind
+everything. No colour washes, no drift, no scroll parallax.
+
+**No glow.** Nothing carries a coloured shadow or halo: not buttons, not the active nav item, not chart
+marks. Depth comes from glass steps, hairlines and the top highlight.
 
 **Type.** Array (Indian Type Foundry, ITF Free Font License) for H1/H2, section titles, big stat
-numbers and the wordmark, 400/600/700 (the only weights). It is a wide dot-matrix display face:
-tracking −0.02em at most (tighter makes the dots touch). The licence allows self-hosting but not
-redistribution through a public repository, so the files are **never committed**:
+numbers and the wordmark. Headlines and figures use weight 400; 600 only for the wordmark. It is a wide
+dot-matrix display face: tracking −0.02em at most (tighter makes the dots touch). Headlines are sentence
+case without a trailing period and never colour individual words. The licence allows self-hosting but
+not redistribution through a public repository, so the files are **never committed**:
 `scripts/fetch-fonts.mjs` downloads the official files (pinned SHA-256) into the git-ignored
 `apps/web/public/fonts/array/`, and the web image build runs it. Without them the display stack falls
-back to SF Pro / Inter. Body: SF Pro (system) then Inter. Mono (IBM Plex Mono) for labels, keycaps,
-deltas and technical values; section labels are mono, uppercase, tracked.
+back to SF Pro / Inter. Body: SF Pro (system) then Inter. Mono (IBM Plex Mono) for engineering values,
+counts and meta. Labels are sentence case at normal tracking: no uppercase tracked eyebrows.
 
-**Buttons.** Primary CTAs (Create account, New project) are Originkit's **Light Glass Button**
-through `components/glass-cta.tsx`: frosted pill, cursor-tracked purple light, gradient ring flaring
-on the nearest edge. Secondary and filter actions use the solid white pill (`Button variant="solid"`)
-and the outlined dark pill (`variant="outline"`).
+**Buttons.** One primary action per view: `Button variant="primary"`, a solid accent pill with a
+hairline and a top highlight (`shadow-primary`). Secondary actions are `secondary` (tinted fill,
+hairline) or `ghost` (text). The landing header has one button (Create account) with Sign in as a
+ghost link.
 
-**Liquid Grid.** Originkit's canvas grid (dots, faint, purple glow) behind the landing hero, the final
-CTA and the dashboard empty state, through `components/liquid-grid-background.tsx`, which runs the
-canvas only while on screen and the tab is visible, follows the theme, and draws a static grid under
-reduced motion. One live canvas per view.
+**Board materials.** `--via-copper`, `--via-pad` (ENIG), `--via-mask`, `--via-mask-deep` and
+`--via-silk` colour board renders only (landing illustrations, the dashboard's latest board, the
+first-run board), never chrome.
 
-**Charts.** The dashboard's findings chart follows the dataviz method: severity is ordered, so the
-lines use a one-hue ramp (`--via-sev-1..4`; dark `#8f3a34 #c9483e #ff6b5e #ffb0a8`, light
-`#e88d84 #d9594d #b8352b #7f1c15`), validated as an ordinal ramp in both themes; legend plus direct
-end labels; crosshair tooltip with keyboard support; a table view.
+**Charts.** The dashboard's findings chart follows the dataviz method: findings per day are discrete
+events, so they are stacked bars (a line would invent slopes across empty days). Severity is ordered,
+so the bars use a one-hue ramp (`--via-sev-1..4`; dark `#8f3a34 #c9483e #ff6b5e #ffb0a8`, light
+`#e88d84 #d9594d #b8352b #7f1c15`), most severe at the base, validated as an ordinal ramp in both
+themes; a legend, a hover/keyboard tooltip and a table view. No glow, no looping motion.
 
-**Third-party code.** `apps/web/components/originkit/` holds Originkit's plain-React exports of Light
-Glass Button and Liquid Grid, added verbatim (vendored: exempt from lint and type checks). The only
-change is a marked "VIA EDIT" block in the button that passes standard button props through and uses
-Next `<Link>` for in-app links. Originkit's site describes the library as free to copy; no separate
-licence text was published at the time of adding.
+**Motion.** One short fade and 8px rise for the main content on load (`enter`, no blur). Hover is a
+colour or surface step, press a 0.97 scale. No looping animation on things that are not live, no
+parallax, no cursor tilt on content cards, no autoplaying carousels.
+
+**Third-party code.** Third-party components are vendored verbatim under `apps/web/components/`
+with marked "VIA EDIT" blocks only. The Originkit Light Glass Button and Liquid Grid were removed in the
+unslop pass (purple cursor light and glowing grid); none are vendored at the moment.
 
 ## Black Glass
 
@@ -100,8 +115,9 @@ fill, hairline, highlight). Both press down to 0.97 on a spring (`whileTap`).
   short fades.
 
 **Honesty still applies.** Nothing decorative is presented as data. Illustrations are labelled as
-such, the example finding says "Example", and counters only animate real values (they show the real
-value until they count up, so nothing reads as a false zero).
+such, the example finding says "Example", and counters only animate real values (`CountUp` shows the
+real value on first render and only tweens from the previous value when it changes, never from 0, so
+nothing reads as a false zero).
 
 ## Colour
 
@@ -276,6 +292,48 @@ board. No glow, no grain, no animation. Everything else in the app stays flat.
   the existing spinner for an active job), parallax.
 - **Reduced motion:** wrap the shell in `<MotionConfig reducedMotion="user">`. The existing global
   CSS rule already zeroes CSS durations.
+
+## Component source: shadcn/ui
+
+New components come from **shadcn/ui** (not 21st.dev). shadcn copies source into the repo, built on
+the same Radix + CVA + `cn` stack `@via/ui` already uses, so it adds no runtime dependencies.
+Existing components that credit a 21st.dev pattern in their header comment keep that credit.
+
+**Setup.** `packages/ui/components.json` (style `new-york`, Radix, Tailwind v4, lucide) writes
+components to `packages/ui/src/components/`; `apps/web/components.json` sends `ui` components
+there too, so running from either directory works. Generated files import `cn` from `@via/ui/cn`
+(a package export; `packages/ui` resolves it through its tsconfig `paths` and vitest alias).
+
+```bash
+cd packages/ui && pnpm dlx shadcn@4.23.0 add <component>   # pinned CLI; never shadcn@latest
+```
+
+Never run `shadcn init`: it would rewrite `styles.css` with its own palette. Bump the pinned CLI
+version deliberately (at least two weeks old), like any other dependency.
+
+**After every `add`**, before committing:
+
+1. Review the diff. Revert anything the CLI wrote to `styles.css` and any dependency it added
+   (justify and pin exact versions if one is genuinely needed).
+2. Translate shadcn's colour names to VIA tokens. VIA's `accent` is purple and `muted` is a *text*
+   colour, so `bg-accent` and `bg-muted` from shadcn would render wrong:
+
+   | shadcn | VIA |
+   |---|---|
+   | `bg-primary` / `text-primary-foreground` | `bg-accent` / `text-accent-foreground` (primary action only) |
+   | `bg-accent` / `text-accent-foreground` (hover, highlighted item) | `bg-surface-hover` / `text-foreground` |
+   | `bg-muted` | `bg-surface` |
+   | `text-muted-foreground` | `text-muted` (or `text-subtle` for metadata) |
+   | `bg-popover` / `bg-card` | `bg-surface-raised` / `bg-surface` (or `Glass` within the blur budget) |
+   | `bg-secondary` | `bg-surface` |
+   | `border-input` | `border-border-strong` |
+   | `bg-destructive` / `text-destructive` | `bg-danger-soft` / `text-danger` |
+   | `ring-ring/50`, `ring-offset-*` | `ring-ring` (VIA's ring token already carries its opacity) |
+
+3. Apply Black Glass: the radii above, `m.*` from `motion/react` with the `@via/ui` springs instead of
+   `tw-animate-css` classes, and `data-state` enter/exit keyframes for Radix overlays.
+4. Export it from `packages/ui/src/index.ts`, add a test in `components.test.tsx`, and add it to the
+   component table above.
 
 ## Tooling used for this proposal
 

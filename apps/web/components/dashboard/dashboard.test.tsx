@@ -137,7 +137,7 @@ describe("Dashboard", () => {
   it("offers a first step to a new account instead of empty tables", async () => {
     const client = mockClient({ projects: { summary: vi.fn().mockResolvedValue(summary({ active: 0, archived: 0, designs: 0 })), list: vi.fn().mockResolvedValue(page([])) } });
     renderWith(<DashboardPage />, client);
-    expect(await screen.findByRole("heading", { name: "Start with a board." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Start with a board" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "New project" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("list", { name: "Overview" })).toBeNull();

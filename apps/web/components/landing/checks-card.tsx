@@ -1,6 +1,5 @@
 "use client";
 
-import { LiquidGlass } from "@via/ui";
 import { CircuitBoard, Cpu, Factory, Network, Route, ShieldCheck, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -19,31 +18,30 @@ const FAMILIES: { icon: ReactNode; name: string; detail: string; checks: number 
   { icon: <ShieldCheck />, name: "KiCad DRC", detail: "KiCad's own design rule check, run on the uploaded board", checks: 1 },
 ];
 
+/** The check families with their counts, as a plain list for the checks card in the feature grid. */
 export function ChecksCard() {
+  const total = FAMILIES.reduce((n, f) => n + f.checks, 0);
   return (
-    <LiquidGlass variant="regular" as="section" aria-labelledby="checks-card-title" className="rounded-[28px] p-5">
-      <h2 id="checks-card-title" className="font-display text-[20px] font-semibold tracking-[-0.02em] text-foreground">
-        What VIA checks
-      </h2>
-      <p className="mt-0.5 text-[12.5px] text-subtle">23 deterministic checks, each with measured evidence</p>
-      <ul className="mt-4 space-y-1">
+    <div className="w-full">
+      <p className="px-2 font-mono text-[12px] text-subtle">{total} checks in {FAMILIES.length} families</p>
+      <ul className="mt-2 space-y-0.5">
         {FAMILIES.map((f) => (
-          <li key={f.name} className="flex items-center gap-3 rounded-2xl px-1.5 py-1.5 transition-colors hover:bg-surface-hover">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-accent [&_svg]:size-4" aria-hidden="true">
+          <li key={f.name} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
+            <span className="flex size-4 shrink-0 text-muted [&_svg]:size-4" aria-hidden="true">
               {f.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-medium text-foreground">{f.name}</p>
+              <p className="text-[14px] text-foreground">{f.name}</p>
               <p className="truncate text-[12px] text-subtle" title={f.detail}>
                 {f.detail}
               </p>
             </div>
-            <span className="shrink-0 font-mono text-[11px] text-muted tabular-nums" aria-label={`${f.checks} ${f.checks === 1 ? "check" : "checks"}`}>
+            <span className="shrink-0 font-mono text-[12px] tabular-nums text-muted" aria-label={`${f.checks} ${f.checks === 1 ? "check" : "checks"}`}>
               {f.checks}
             </span>
           </li>
         ))}
       </ul>
-    </LiquidGlass>
+    </div>
   );
 }

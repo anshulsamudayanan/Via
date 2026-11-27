@@ -50,7 +50,7 @@ function MaybeTooltip({ show, content, children }: { show: boolean; content: Rea
 }
 
 const itemBase =
-  "relative isolate flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13.5px] whitespace-nowrap outline-none transition-colors duration-150 [&>svg]:size-[17px] [&>svg]:shrink-0";
+  "relative isolate flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[14px] whitespace-nowrap outline-none transition-colors duration-150 [&>svg]:size-4 [&>svg]:shrink-0";
 
 function NavItem({ entry, collapsed, layoutGroup, onNavigate, count }: { entry: NavEntry; collapsed: boolean; layoutGroup: string; onNavigate?: () => void; count?: number }) {
   const pathname = usePathname();
@@ -91,18 +91,18 @@ function NavItem({ entry, collapsed, layoutGroup, onNavigate, count }: { entry: 
         )}
       >
         {active ? (
-          // The active item is a glass pill that slides between items (shared layoutId, spring).
+          // The active item is a small surface step with a hairline that slides between items (shared layoutId).
           <m.span
             layoutId={`nav-pill-${layoutGroup}`}
             transition={SPRING}
             aria-hidden="true"
-            className="absolute inset-0 -z-10 rounded-xl bg-[color-mix(in_oklab,var(--via-accent)_14%,var(--via-glass-regular))] shadow-[inset_0_1px_0_var(--via-glass-highlight),0_4px_14px_-6px_var(--via-accent-glow)] ring-1 ring-accent-border"
+            className="absolute inset-0 -z-10 rounded-xl bg-surface-hover shadow-[inset_0_1px_0_var(--via-glass-highlight)] ring-1 ring-border"
           />
         ) : null}
         <Icon aria-hidden="true" className={active ? "text-accent" : undefined} />
         {collapsed ? null : <span className="flex-1">{entry.label}</span>}
         {!collapsed && count !== undefined ? (
-          <span className="font-mono text-[11px] tabular-nums text-subtle" aria-label={`(${count})`}>
+          <span className="font-mono text-[12px] tabular-nums text-subtle" aria-label={`(${count})`}>
             {count}
           </span>
         ) : null}
@@ -136,7 +136,7 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
           )}
           aria-label="Account menu"
         >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent ring-1 ring-accent-border">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[11px] font-medium text-muted ring-1 ring-border">
             {initials(me.user.display_name)}
           </span>
           {collapsed ? null : (
@@ -248,7 +248,7 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
             <Search aria-hidden="true" />
             {collapsed ? null : (
               <>
-                <span className="flex-1 text-left">Search…</span>
+                <span className="flex-1 text-left">Search</span>
                 <Kbd className="hidden md:inline-flex">⌘K</Kbd>
               </>
             )}
@@ -258,15 +258,15 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
 
       <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="pt-3 first:pt-1">
+          <div key={group.label} className="pt-6 first:pt-2">
             {collapsed ? (
               <div className="mx-auto mb-1 h-px w-5 bg-border" aria-hidden="true" />
             ) : (
-              <h2 id={`${layoutGroup}-${group.label}`} className="px-2.5 pb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-subtle">
+              <h2 id={`${layoutGroup}-${group.label}`} className="px-2.5 pb-2 text-[12px] font-medium text-subtle">
                 {group.label}
               </h2>
             )}
-            <ul aria-labelledby={collapsed ? undefined : `${layoutGroup}-${group.label}`} aria-label={collapsed ? group.label : undefined} className="space-y-px">
+            <ul aria-labelledby={collapsed ? undefined : `${layoutGroup}-${group.label}`} aria-label={collapsed ? group.label : undefined} className="space-y-0.5">
               {group.items.map((entry) => (
                 <li key={entry.label}>
                   <NavItem entry={entry} collapsed={collapsed} layoutGroup={layoutGroup} onNavigate={onNavigate} count={entry.href ? counts[entry.href] : undefined} />

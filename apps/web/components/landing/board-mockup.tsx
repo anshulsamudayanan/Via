@@ -1,22 +1,22 @@
 "use client";
 
-import { cn, Glass, useHoverCapable } from "@via/ui";
-import { AnimatePresence, m, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
-import { type MouseEvent, useState } from "react";
+import { cn, Glass } from "@via/ui";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
+import { useState } from "react";
 
 /*
  * A stylized board viewer, drawn in SVG, on a glass panel. It's an illustration (labelled as such for
  * assistive tech): the layer toggles work on the drawing, and the two DRC callouts show the shape of
- * real findings. Motion: a slight 3D tilt toward the cursor (motion values -> springs -> transforms),
- * traces "route" in with pathLength, and the callouts pop in one after another as glass chips.
- * Reduced motion: no tilt, no drawing, no pulse; everything is simply shown.
+ * real findings. Copper on green soldermask; the spacing finding carries a dimension mark with its
+ * measured gap, the same callout shape the viewer uses. Motion: traces route in once with pathLength
+ * and the callouts fade in after them. Reduced motion: everything is simply shown.
  */
 
 type Layer = "fcu" | "bcu" | "silk" | "edge";
 const LAYERS: { id: Layer; label: string; swatch: string }[] = [
   { id: "fcu", label: "F.Cu", swatch: "bg-[var(--landing-copper)]" },
-  { id: "bcu", label: "B.Cu", swatch: "bg-accent" },
-  { id: "silk", label: "F.Silkscreen", swatch: "bg-foreground/70" },
+  { id: "bcu", label: "B.Cu", swatch: "bg-[var(--landing-copper)] opacity-50" },
+  { id: "silk", label: "F.Silkscreen", swatch: "bg-[var(--via-silk)]" },
   { id: "edge", label: "Edge.Cuts", swatch: "bg-warning" },
 ];
 
@@ -57,93 +57,62 @@ function Callout({ x, y, title, detail, delay, severity }: { x: number; y: numbe
   const reduce = useReducedMotion();
   return (
     <m.div
-      initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 6, filter: "blur(6px)" }}
-      animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ type: "spring", stiffness: 360, damping: 24, delay }}
-      className="absolute z-10 w-[min(14rem,52%)] origin-left translate-x-3"
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30, delay: reduce ? 0 : delay }}
+      className="absolute z-10 w-[min(14rem,42%)] origin-left translate-x-3"
       style={{ left: `${(x / 400) * 100}%`, top: `${(y / 280) * 100}%` }}
     >
-      <div className={cn("rounded-2xl border border-border-strong bg-[color-mix(in_oklab,var(--via-background)_90%,transparent)] px-3 py-2 shadow-overlay", severity === "high" ? "ring-1 ring-danger/35" : "")}>
+      <div className="rounded-xl border border-border-strong bg-[color-mix(in_oklab,var(--via-background)_90%,transparent)] px-3 py-2 shadow-overlay">
         <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-          <span className={cn("rounded-full px-1.5 text-[10px] font-semibold uppercase tracking-wide", severity === "high" ? "bg-danger-soft text-danger" : "bg-surface-hover text-muted")}>{severity}</span>
+          <span className={cn("text-[11px] font-medium capitalize", severity === "high" ? "text-danger" : "text-muted")}>{severity}</span>
           {title}
         </p>
-        <p className="mt-1 font-mono text-[10.5px] leading-snug text-muted">{detail}</p>
+        <p className="mt-1 font-mono text-[11px] leading-snug text-muted">{detail}</p>
       </div>
     </m.div>
   );
 }
 
-function Marker({ cx, cy, color, delay, reduce }: { cx: number; cy: number; color: string; delay: number; reduce: boolean | null }) {
+function Marker({ cx, cy, color }: { cx: number; cy: number; color: string }) {
+  return <circle cx={cx} cy={cy} r="9" fill="none" stroke={color} strokeWidth="1.5" />;
+}
+
+/** VIA's measurement mark: extension ticks at both copper edges, a dimension line and the measured gap. */
+function Dimension({ x, y1, y2, label }: { x: number; y1: number; y2: number; label: string }) {
   return (
-    <>
-      <circle cx={cx} cy={cy} r="9" fill="none" stroke={color} strokeWidth="1.5" />
-      {reduce ? null : (
-        <m.circle
-          cx={cx}
-          cy={cy}
-          r="9"
-          fill="none"
-          stroke={color}
-          style={{ transformOrigin: `${cx}px ${cy}px`, transformBox: "view-box" }}
-          initial={{ scale: 1, opacity: 0.8 }}
-          animate={{ scale: 2.2, opacity: 0 }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut", delay }}
-        />
-      )}
-    </>
+    <g stroke="var(--via-danger)" strokeWidth="1" fill="none">
+      <line x1={x - 5} x2={x + 5} y1={y1} y2={y1} />
+      <line x1={x - 5} x2={x + 5} y1={y2} y2={y2} />
+      <line x1={x} x2={x} y1={y1} y2={y2} />
+      <path d={`M${x - 2} ${y1 + 3} L${x} ${y1} L${x + 2} ${y1 + 3} M${x - 2} ${y2 - 3} L${x} ${y2} L${x + 2} ${y2 - 3}`} />
+      <text x={x + 8} y={(y1 + y2) / 2 + 2.5} stroke="none" fill="var(--via-danger)" fontFamily="var(--font-mono)" fontSize="7.5">
+        {label}
+      </text>
+    </g>
   );
 }
 
 /** `frame="none"` renders without its own glass panel, for use inside another glass card. */
 export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = {}) {
   const reduce = useReducedMotion();
-  const canHover = useHoverCapable();
   const [visible, setVisible] = useState<Record<Layer, boolean>>({ fcu: true, bcu: true, silk: true, edge: true });
   const fade = (on: boolean) => ({ opacity: on ? 1 : 0, transition: { type: "spring" as const, stiffness: 300, damping: 30 } });
 
-  // Tilt: pointer position (-0.5..0.5) -> spring -> degrees.
-  const px = useMotionValue(0);
-  const py = useMotionValue(0);
-  const sx = useSpring(px, { stiffness: 150, damping: 20 });
-  const sy = useSpring(py, { stiffness: 150, damping: 20 });
-  const rotateY = useTransform(sx, [-0.5, 0.5], [-6, 6]);
-  const rotateX = useTransform(sy, [-0.5, 0.5], [5, -5]);
-  const tilt = canHover && !reduce;
-
-  function onMove(e: MouseEvent<HTMLDivElement>) {
-    if (!tilt) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    px.set((e.clientX - r.left) / r.width - 0.5);
-    py.set((e.clientY - r.top) / r.height - 0.5);
-  }
-
   return (
-    <div
-      className="[perspective:1400px]"
-      onMouseMove={onMove}
-      onMouseLeave={() => {
-        px.set(0);
-        py.set(0);
-      }}
-    >
-      <m.div style={tilt ? { rotateX, rotateY, transformStyle: "preserve-3d" } : undefined}>
+    <div>
+      <div>
         <Glass
           as="figure"
           variant="regular"
           aria-label="Illustration of the VIA board viewer: layer toggles and two design-rule findings on a board"
           className={cn(
-            "overflow-hidden rounded-[28px]",
-            frame === "glass" ? "shadow-[0_40px_120px_-30px_var(--landing-glow)]" : "border-0 bg-transparent shadow-none backdrop-blur-none before:hidden",
+            "overflow-hidden rounded-3xl",
+            frame === "glass" ? "" : "border-0 bg-transparent shadow-none backdrop-blur-none before:hidden",
           )}
         >
           {/* Window chrome */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
-            <span className="flex gap-1.5" aria-hidden="true">
-              <span className="size-2.5 rounded-full bg-[#ff5f57]/80" />
-              <span className="size-2.5 rounded-full bg-[#febc2e]/80" />
-              <span className="size-2.5 rounded-full bg-[#28c840]/80" />
-            </span>
             <span className="truncate font-mono text-[11px] text-muted">
               motor_driver<span className="text-subtle">.kicad_pcb</span> <span className="text-subtle">· r2</span>
             </span>
@@ -159,7 +128,7 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
               aria-label="Layers (illustration)"
               className={cn("flex gap-1 overflow-x-auto border-b border-border p-2", frame === "glass" && "sm:w-36 sm:flex-col sm:border-b-0 sm:border-r")}
             >
-              <p className={cn("hidden px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-subtle", frame === "glass" && "sm:block")}>Layers</p>
+              <p className={cn("hidden px-2 pb-1 text-[12px] text-subtle", frame === "glass" && "sm:block")}>Layers</p>
               {LAYERS.map((l) => (
                 <button
                   key={l.id}
@@ -167,7 +136,7 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
                   aria-pressed={visible[l.id]}
                   onClick={() => setVisible((v) => ({ ...v, [l.id]: !v[l.id] }))}
                   className={cn(
-                    "flex shrink-0 items-center gap-2 rounded-full px-2 py-1 text-left font-mono text-[11px] transition-colors duration-150 hover:bg-surface-hover",
+                    "flex shrink-0 items-center gap-2 rounded-md px-2 py-1 text-left font-mono text-[11px] transition-colors duration-150 hover:bg-surface-hover",
                     visible[l.id] ? "text-foreground" : "text-subtle line-through decoration-subtle/60",
                   )}
                 >
@@ -193,7 +162,7 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
                   <rect x="40" y="24" width="330" height="232" rx="12" fill="var(--landing-board)" />
 
                   <g clipPath="url(#lm-board)">
-                    <m.g animate={fade(visible.bcu)} stroke="var(--via-accent)" strokeOpacity="0.6" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <m.g animate={fade(visible.bcu)} stroke="var(--landing-copper)" strokeOpacity="0.35" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round">
                       {BCU_TRACKS.map((d, i) => (
                         <Track key={d} d={d} i={i + FCU_TRACKS.length} reduce={reduce} />
                       ))}
@@ -204,7 +173,7 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
                           <Track key={d} d={d} i={i} reduce={reduce} />
                         ))}
                       </g>
-                      <g fill="var(--landing-copper)">
+                      <g fill="var(--via-pad)">
                         <Pads x={214} y={86} n={6} pitch={8} />
                         <Pads x={239} y={86} n={6} pitch={8} />
                         <rect x={60} y={64} width={10} height={12} rx={1.5} />
@@ -220,17 +189,17 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
                     <m.g animate={fade(visible.fcu || visible.bcu)}>
                       {VIAS.map(([cx, cy]) => (
                         <g key={`${cx}-${cy}`}>
-                          <circle cx={cx} cy={cy} r="5" fill="var(--landing-copper)" />
+                          <circle cx={cx} cy={cy} r="5" fill="var(--via-pad)" />
                           <circle cx={cx} cy={cy} r="2" fill="var(--landing-board)" />
                         </g>
                       ))}
                     </m.g>
-                    <m.g animate={fade(visible.silk)} fill="none" stroke="var(--via-foreground)" strokeOpacity="0.55" strokeWidth="1">
+                    <m.g animate={fade(visible.silk)} fill="none" stroke="var(--via-silk)" strokeOpacity="0.75" strokeWidth="1">
                       <rect x="208" y="80" width="44" height="56" rx="2" />
-                      <circle cx="213" cy="85" r="1.4" fill="var(--via-foreground)" />
+                      <circle cx="213" cy="85" r="1.4" fill="var(--via-silk)" />
                       <rect x="56" y="60" width="18" height="46" rx="2" />
                       <rect x="284" y="208" width="44" height="22" rx="2" />
-                      <g fill="var(--via-foreground)" fillOpacity="0.6" stroke="none" fontFamily="var(--font-mono)" fontSize="8">
+                      <g fill="var(--via-silk)" fillOpacity="0.8" stroke="none" fontFamily="var(--font-mono)" fontSize="8">
                         <text x="216" y="146">U1</text>
                         <text x="52" y="118">R1</text>
                         <text x="96" y="222">C1</text>
@@ -241,24 +210,24 @@ export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = 
                   <m.rect animate={fade(visible.edge)} x="40" y="24" width="330" height="232" rx="12" fill="none" stroke="var(--via-warning)" strokeWidth="1.5" />
 
                   {/* Finding markers */}
-                  <Marker cx={171} cy={103} color="var(--via-danger)" delay={1.6} reduce={reduce} />
-                  <Marker cx={66} cy={96} color="var(--via-muted)" delay={2.6} reduce={reduce} />
+                  <Dimension x={178} y1={92} y2={114} label="0.118" />
+                  <Marker cx={66} cy={96} color="var(--via-muted)" />
                 </svg>
 
                 <AnimatePresence>
-                  <Callout key="a" x={184} y={40} title="Copper spacing below 0.150 mm" detail="GND / SIG · smallest gap 0.118 mm" delay={1.3} severity="high" />
-                  <Callout key="b" x={78} y={150} title="Pad without net" detail="R1 pad 2 · F.Cu · no net assigned" delay={1.7} severity="low" />
+                  <Callout key="a" x={200} y={196} title="Copper spacing below 0.150 mm" detail="GND / SIG · smallest gap 0.118 mm" delay={1.3} severity="high" />
+                  <Callout key="b" x={78} y={136} title="Pad without net" detail="R1 pad 2 · F.Cu · no net assigned" delay={1.7} severity="low" />
                 </AnimatePresence>
               </div>
             </div>
           </div>
 
-          <figcaption className={cn("flex items-center justify-between gap-3 border-t border-border px-4 py-2 font-mono text-[10.5px] text-subtle", frame === "none" && "sr-only")}>
+          <figcaption className={cn("flex items-center justify-between gap-3 border-t border-border px-4 py-2 font-mono text-[11px] text-subtle", frame === "none" && "sr-only")}>
             <span>Illustration · toggle the layers</span>
             <span className="hidden sm:inline">2 findings · 1 high · 1 low</span>
           </figcaption>
         </Glass>
-      </m.div>
+      </div>
     </div>
   );
 }
