@@ -87,8 +87,9 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
 
     # --- AI (disabled unless configured; see services/ai-engine) -------------
-    ai_provider: Literal["none", "anthropic"] = "none"
-    ai_model: str = "claude-opus-5-5"
+    ai_provider: Literal["none", "groq", "anthropic"] = "none"
+    #: Empty = the provider's default (groq: openai/gpt-oss-120b, anthropic: claude-opus-5-5).
+    ai_model: str = ""
     ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
 
     @property

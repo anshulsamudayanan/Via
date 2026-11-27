@@ -5,8 +5,19 @@ Status: Stage 2, Milestone 4. Code: `services/ai-engine/src/via_ai/` (providers,
 `apps/api/src/via_api/{ai,services/intelligence.py,routes/intelligence.py}`.
 
 **AI is off by default** (`VIA_AI_PROVIDER=none`): AI endpoints answer `503 ai_disabled`, and
-nothing fabricates an answer in its place. No API key is configured in this project's environments.
-Automated tests use a scripted provider.
+nothing fabricates an answer in its place. Automated tests use a scripted provider.
+
+## Provider: Groq
+VIA's AI runs on **Groq** (`services/ai-engine/src/via_ai/providers/groq.py`): set
+`VIA_AI_PROVIDER=groq` and `GROQ_API_KEY` in `.env` (Compose passes both to the API and worker).
+- **Transport:** Groq's OpenAI-compatible Chat Completions API (`https://api.groq.com/openai/v1`), called with the standard library; no SDK or extra dependency. The API and worker need outbound HTTPS to `api.groq.com`.
+- **Model:** `VIA_AI_MODEL` (default `openai/gpt-oss-120b`), with per-task overrides `VIA_AI_MODEL_<TASK>`. `VIA_AI_EFFORT` maps to Groq's `reasoning_effort` for the `openai/gpt-oss-*` models (low, medium, high; `xhigh` and `max` become high); other models get no effort parameter.
+- **Structured output:** `response_format: json_schema` from the Pydantic schema, then validated by that schema; a reply that doesn't validate is rejected, never repaired.
+- **Refusals** (`message.refusal`, or `finish_reason: content_filter`) become `422 ai_refused`. Groq has **no embeddings**, so features that need vectors report that the provider can't do it.
+- **Key handling:** read from the environment at startup, sent only in the `Authorization` header, never logged or shown in reprs. The parser sandbox runs with an empty environment, so uploaded files are never processed next to the key. Selecting Groq without a key leaves AI off, with a warning in the log.
+- **Data:** Groq is an external provider, so the project owner's `external_ai_processing` consent is required before any project context is sent (see Consent below).
+
+The Anthropic provider is still available (`VIA_AI_PROVIDER=anthropic`, optional SDK, `ANTHROPIC_API_KEY`) but is not the default.
 
 ## What it does
 | Feature | Endpoint | Output |

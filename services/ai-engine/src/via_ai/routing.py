@@ -1,12 +1,13 @@
 """Model selection and AI configuration (from environment variables).
 
-    VIA_AI_PROVIDER        none (default) | anthropic
-    VIA_AI_MODEL           default model id (default: claude-opus-5-5)
+    VIA_AI_PROVIDER        none (default) | groq | anthropic
+    VIA_AI_MODEL           default model id (default depends on the provider:
+                           groq -> openai/gpt-oss-120b, anthropic -> claude-opus-5-5)
     VIA_AI_MODEL_<TASK>    per-task override, e.g. VIA_AI_MODEL_DESIGN_REVIEW
     VIA_AI_EFFORT          default effort: low | medium | high | xhigh | max (default: high)
 
-API keys are not part of this config: the provider SDK reads them from the
-environment itself (for Anthropic: ANTHROPIC_API_KEY or an `ant auth` profile).
+API keys are not part of this config: each provider reads its own from the
+environment (Groq: GROQ_API_KEY; Anthropic: ANTHROPIC_API_KEY or an `ant auth` profile).
 """
 
 from __future__ import annotations
@@ -17,6 +18,15 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 DEFAULT_MODEL = "claude-opus-5-5"
+PROVIDERS = ("none", "groq", "anthropic")
+#: The model used when VIA_AI_MODEL is unset, per provider.
+DEFAULT_MODELS = {"groq": "openai/gpt-oss-120b", "anthropic": "claude-opus-5-5"}
+
+
+def default_model_for(provider: str) -> str:
+    return DEFAULT_MODELS.get(provider, DEFAULT_MODEL)
+
+
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
@@ -54,8 +64,8 @@ class AIConfig:
     def from_env(cls, env: Mapping[str, str] | None = None) -> AIConfig:
         env = os.environ if env is None else env
         provider = (env.get("VIA_AI_PROVIDER") or "none").strip().lower()
-        if provider not in {"none", "anthropic"}:
-            raise ValueError(f"Unknown VIA_AI_PROVIDER {provider!r}; expected 'none' or 'anthropic'")
+        if provider not in PROVIDERS:
+            raise ValueError(f"Unknown VIA_AI_PROVIDER {provider!r}; expected one of {', '.join(PROVIDERS)}")
         effort = (env.get("VIA_AI_EFFORT") or "high").strip().lower()
         if effort not in EFFORTS:
             raise ValueError(f"Unknown VIA_AI_EFFORT {effort!r}; expected one of {', '.join(EFFORTS)}")
@@ -64,5 +74,6 @@ class AIConfig:
             for task in Task
             if env.get(f"VIA_AI_MODEL_{task.value.upper()}", "").strip()
         }
-        routing = ModelRouting(default_model=(env.get("VIA_AI_MODEL") or DEFAULT_MODEL).strip(), by_task=by_task)
+        model = (env.get("VIA_AI_MODEL") or "").strip() or default_model_for(provider)
+        routing = ModelRouting(default_model=model, by_task=by_task)
         return cls(provider=provider, routing=routing, effort=effort)

@@ -1,0 +1,139 @@
+"""Groq provider: request shape, effort mapping, structured output, refusals and errors (fake transport)."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from pydantic import BaseModel
+
+from via_ai import (
+    AIConfig,
+    AIError,
+    AIRefusedError,
+    AIUnavailableError,
+    CapabilityNotSupportedError,
+    ChatMessage,
+    ModelRouting,
+    Task,
+    TextRequest,
+    create_provider,
+)
+from via_ai.providers.groq import API_URL, GroqProvider
+from via_ai.routing import default_model_for
+
+REQUEST = TextRequest(messages=[ChatMessage(role="user", content="hi")], system="Be brief.")
+
+
+class Review(BaseModel):
+    verdict: str
+    issues: list[str]
+
+
+class FakeTransport:
+    def __init__(self, response: dict) -> None:
+        self.response = response
+        self.calls: list[tuple[str, dict, dict]] = []
+
+    def __call__(self, url: str, headers: dict, body: dict) -> dict:
+        self.calls.append((url, headers, body))
+        return self.response
+
+
+def reply(content: str = "Hello", finish: str = "stop", **message) -> dict:
+    return {
+        "model": "openai/gpt-oss-120b",
+        "choices": [
+            {"index": 0, "finish_reason": finish, "message": {"role": "assistant", "content": content, **message}}
+        ],
+        "usage": {"prompt_tokens": 12, "completion_tokens": 3},
+    }
+
+
+def provider(
+    response: dict, model: str = "openai/gpt-oss-120b", effort: str = "high"
+) -> tuple[GroqProvider, FakeTransport]:
+    transport = FakeTransport(response)
+    config = AIConfig(
+        provider="groq",
+        routing=ModelRouting(default_model=model, by_task={Task.SUMMARIZE: "llama-3.3-70b-versatile"}),
+        effort=effort,
+    )
+    return GroqProvider(config, api_key="gsk_test", transport=transport), transport
+
+
+def test_text_request_shape_and_result():
+    p, t = provider(reply("Hello"))
+    result = p.generate_text(REQUEST)
+    url, headers, body = t.calls[0]
+    assert url == API_URL
+    assert headers["Authorization"] == "Bearer gsk_test"
+    assert body["model"] == "openai/gpt-oss-120b"
+    assert body["messages"] == [{"role": "system", "content": "Be brief."}, {"role": "user", "content": "hi"}]
+    assert body["reasoning_effort"] == "high"
+    assert result.text == "Hello" and result.stop_reason == "stop"
+    assert (result.usage.input_tokens, result.usage.output_tokens) == (12, 3)
+
+
+@pytest.mark.parametrize(
+    ("effort", "expected"), [("low", "low"), ("medium", "medium"), ("xhigh", "high"), ("max", "high")]
+)
+def test_effort_maps_to_reasoning_effort(effort, expected):
+    p, t = provider(reply(), effort=effort)
+    p.generate_text(REQUEST)
+    assert t.calls[0][2]["reasoning_effort"] == expected
+
+
+def test_non_reasoning_models_get_no_effort_and_task_routing_applies():
+    p, t = provider(reply())
+    p.generate_text(TextRequest(messages=REQUEST.messages, task=Task.SUMMARIZE))
+    body = t.calls[0][2]
+    assert body["model"] == "llama-3.3-70b-versatile"
+    assert "reasoning_effort" not in body
+
+
+def test_structured_output_is_validated_against_the_schema():
+    p, t = provider(reply(json.dumps({"verdict": "ok", "issues": ["a"]})))
+    result = p.generate_structured(REQUEST, Review)
+    fmt = t.calls[0][2]["response_format"]
+    assert fmt["type"] == "json_schema" and fmt["json_schema"]["name"] == "Review"
+    assert fmt["json_schema"]["schema"]["properties"]["verdict"]["type"] == "string"
+    assert result.value == Review(verdict="ok", issues=["a"])
+
+
+def test_structured_output_that_does_not_validate_raises_instead_of_returning_partial_data():
+    p, _ = provider(reply('{"verdict": "ok"}'))
+    with pytest.raises(AIError, match="did not match"):
+        p.generate_structured(REQUEST, Review)
+
+
+@pytest.mark.parametrize("response", [reply("", refusal="I can't help with that."), reply("", finish="content_filter")])
+def test_refusals_raise(response):
+    p, _ = provider(response)
+    with pytest.raises(AIRefusedError):
+        p.generate_text(REQUEST)
+
+
+def test_no_embeddings_and_key_never_in_repr():
+    p, _ = provider(reply())
+    with pytest.raises(CapabilityNotSupportedError):
+        p.embed(["x"])
+    assert "gsk_test" not in repr(p)
+
+
+def test_missing_key_means_ai_is_unavailable(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    with pytest.raises(AIUnavailableError, match="GROQ_API_KEY"):
+        create_provider(AIConfig(provider="groq"))
+
+
+def test_config_from_env_uses_the_groq_default_model():
+    config = AIConfig.from_env({"VIA_AI_PROVIDER": "groq"})
+    assert config.provider == "groq"
+    assert config.routing.default_model == default_model_for("groq") == "openai/gpt-oss-120b"
+    assert (
+        AIConfig.from_env({"VIA_AI_PROVIDER": "groq", "VIA_AI_MODEL": "llama-3.3-70b-versatile"}).routing.default_model
+        == "llama-3.3-70b-versatile"
+    )
+    with pytest.raises(ValueError, match="groq"):
+        AIConfig.from_env({"VIA_AI_PROVIDER": "openai"})

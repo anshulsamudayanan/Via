@@ -40,6 +40,11 @@ x-api-env: &api-env
   VIA_RATE_LIMIT_ENABLED: ${VIA_RATE_LIMIT_ENABLED:-true}
   # Only the web container (and loopback) can reach the API, so forwarded client IPs are trusted.
   VIA_FORWARDED_ALLOW_IPS: "*"
+  # AI (off unless VIA_AI_PROVIDER is set). The key stays in .env; the parser sandbox never sees it.
+  VIA_AI_PROVIDER: ${VIA_AI_PROVIDER:-none}
+  VIA_AI_MODEL: ${VIA_AI_MODEL:-}
+  VIA_AI_EFFORT: ${VIA_AI_EFFORT:-high}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
 
 services:
   postgres:

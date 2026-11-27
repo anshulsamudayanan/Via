@@ -20,6 +20,10 @@ from via_ai.routing import AIConfig
 
 def create_provider(config: AIConfig) -> AIProvider:
     """The provider for this configuration. Disabled unless explicitly configured."""
+    if config.provider == "groq":
+        from via_ai.providers.groq import GroqProvider
+
+        return GroqProvider(config)
     if config.provider == "anthropic":
         from via_ai.providers.anthropic import AnthropicProvider
 

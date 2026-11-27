@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from via_ai import AIProvider
-from via_api.ai import get_ai_provider
+from via_api.ai import ai_config, get_ai_provider
 from via_api.deps import DB, AppSettings, Client, CurrentAuth
 from via_api.errors import error_responses
 from via_api.models.enums import ConsentScope, ProjectRole
@@ -48,7 +48,7 @@ def ai_status(
         structured_output=caps.structured_output,
         embeddings=caps.embeddings,
         external=caps.external,
-        default_model=settings.ai_model if provider.name != "none" else None,
+        default_model=ai_config(settings).routing.default_model if provider.name != "none" else None,
     )
 
 
