@@ -54,8 +54,8 @@ export function HowItWorks({ steps }: { steps: Step[] }) {
               animate={{ scale: on ? 1 : 0.92 }}
               transition={SPRING}
               className={cn(
-                "relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border transition-[color,background-color,border-color,box-shadow] duration-300 md:mx-auto [&_svg]:size-[18px]",
-                on ? "border-accent-border bg-[color-mix(in_oklab,var(--via-background)_70%,var(--via-accent))] text-accent shadow-[0_0_24px_-4px_var(--via-accent-glow)]" : "border-border-strong bg-background text-subtle",
+                "relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border transition-[color,background-color,border-color] duration-300 md:mx-auto [&_svg]:size-[18px]",
+                on ? "border-accent-border bg-[color-mix(in_oklab,var(--via-background)_70%,var(--via-accent))] text-accent" : "border-border-strong bg-background text-subtle",
               )}
             >
               {s.icon}

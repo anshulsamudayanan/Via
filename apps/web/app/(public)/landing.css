@@ -7,7 +7,6 @@
   --landing-grid: color-mix(in oklab, var(--via-foreground) 6%, transparent);
   --landing-copper: #d9965f;
   --landing-board: color-mix(in oklab, #0b0b10 82%, var(--via-accent));
-  --landing-glow: var(--via-accent-glow);
 }
 
 [data-theme="light"] .landing {

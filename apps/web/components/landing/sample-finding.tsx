@@ -25,11 +25,11 @@ const ROWS: { k: string; v: React.ReactNode }[] = [
 
 export function SampleFinding() {
   return (
-    <Glass as="figure" variant="regular" sheen className="overflow-hidden rounded-[28px] shadow-[0_40px_100px_-36px_var(--landing-glow)]">
+    <Glass as="figure" variant="regular" sheen className="overflow-hidden rounded-[28px] shadow-overlay">
       <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-danger">high</span>
+        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">High</span>
         <span className="truncate text-[13px] font-medium text-foreground">Copper spacing below 0.150 mm: GND / SIG</span>
-        <span className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-subtle">Example</span>
+        <span className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-subtle">Example</span>
       </div>
       {/* A scrim under the values keeps small mono text above 4.5:1 whatever the glass shows. */}
       <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 bg-[var(--via-scrim)] px-5 py-5 font-mono text-[12px] leading-relaxed text-muted sm:grid-cols-[6.5rem_minmax(0,1fr)]">

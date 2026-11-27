@@ -49,7 +49,7 @@ function Reveal({ children, className, as = "div" }: { children: ReactNode; clas
 function SectionHeading({ eyebrow, title, body, id }: { eyebrow: string; title: ReactNode; body?: ReactNode; id: string }) {
   return (
     <Reveal className="mb-12 max-w-2xl">
-      <p className="text-[13px] font-semibold tracking-tight text-accent">{eyebrow}</p>
+      <p className="text-[13px] font-medium text-muted">{eyebrow}</p>
       <h2 id={id} className="mt-2 font-display text-[2.1rem] font-semibold leading-[1.06] tracking-[-0.03em] text-foreground sm:text-[2.9rem]">
         {title}
       </h2>
@@ -57,8 +57,6 @@ function SectionHeading({ eyebrow, title, body, id }: { eyebrow: string; title: 
     </Reveal>
   );
 }
-
-const ACCENT = "not-italic text-accent";
 
 // --------------------------------------------------------------------------- page
 
@@ -75,21 +73,15 @@ export function LandingPage() {
       <section
         ref={hero}
         aria-labelledby="hero-title"
-        className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-24 pt-10 sm:px-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:pt-16"
+        className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:pt-16"
       >
         <m.div style={{ y: copyY }} initial="hidden" animate="show" variants={stagger(0.08, 0.05)}>
           <Rise>
-            <p className="glass-thin inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium text-muted">
-              <span className="size-1.5 rounded-full bg-accent shadow-[0_0_10px_var(--via-accent-glow)]" aria-hidden="true" />
-              Engineering intelligence for PCB design
-            </p>
-          </Rise>
-          <Rise>
             <h1
               id="hero-title"
-              className="mt-6 font-display text-[2.7rem] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground sm:text-[3.6rem] xl:text-[4.1rem]"
+              className="font-display text-[2.7rem] font-semibold leading-[1.02] tracking-[-0.035em] text-foreground sm:text-[3.6rem] xl:text-[4.1rem]"
             >
-              Deterministic design review for <em className={ACCENT}>KiCad</em> PCBs.
+              Deterministic design review for KiCad PCBs
             </h1>
           </Rise>
           <Rise>
@@ -129,15 +121,11 @@ export function LandingPage() {
       </section>
 
       {/* What VIA does */}
-      <section aria-labelledby="features" className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+      <section aria-labelledby="features" className="mx-auto max-w-6xl px-4 pb-24 pt-12 sm:px-6">
         <SectionHeading
           id="features"
           eyebrow="What VIA does"
-          title={
-            <>
-              From board file to <em className={ACCENT}>verified</em> findings.
-            </>
-          }
+          title="From board file to verified findings"
           body="Every step works on the real parsed board, not on screenshots or guesses."
         />
         <BentoGrid>
@@ -149,15 +137,15 @@ export function LandingPage() {
             visual={<ImportVisual />}
             meta=".kicad_pcb · .zip with .kicad_pro / .kicad_dru rules"
           />
+          <BentoCard icon={<Layers />} title="Board viewer" description="Inspect the real parsed board: toggle layers, select components and read their properties." visual={<ViewerVisual />} />
           <BentoCard
-            rowSpan={2}
+            colSpan={2}
             icon={<ScanSearch />}
             title="Deterministic checks + KiCad DRC"
             description="Connectivity, manufacturing, placement and routing checks, plus KiCad's own DRC. Each finding names the exact objects and the measured value against the rule."
             visual={<ChecksVisual />}
             meta="source · verification · evidence on every finding"
           />
-          <BentoCard icon={<Layers />} title="Board viewer" description="Inspect the real parsed board: toggle layers, select components and read their properties." visual={<ViewerVisual />} />
           <BentoCard
             icon={<GitCompareArrows />}
             title="Validated revisions"
@@ -177,7 +165,7 @@ export function LandingPage() {
 
       {/* How it works */}
       <section aria-labelledby="how" className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
-        <SectionHeading id="how" eyebrow="How it works" title="Upload. Parse. Analyze. Revise." />
+        <SectionHeading id="how" eyebrow="How it works" title="Upload, parse, analyze, revise" />
         <HowItWorks
           steps={[
             { icon: <Upload />, title: "Upload", body: "Drop a board file or a zipped KiCad project into a private project.", detail: ".kicad_pcb · .zip" },
@@ -193,11 +181,7 @@ export function LandingPage() {
         <SectionHeading
           id="sample"
           eyebrow="Anatomy of a finding"
-          title={
-            <>
-              Evidence, not <em className={ACCENT}>opinions</em>.
-            </>
-          }
+          title="Evidence, not opinions"
           body="A finding records which check produced it, how it was verified, the objects involved, and the measured value next to the rule it breaks."
         />
         <Reveal>
@@ -221,9 +205,8 @@ export function LandingPage() {
       {/* Final CTA */}
       <Reveal as="section" className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
         <Glass variant="regular" sheen className="overflow-hidden rounded-[32px] px-6 py-16 text-center sm:px-12" aria-labelledby="cta">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 -bottom-1/2 -z-10 mx-auto h-full w-2/3 rounded-full bg-[radial-gradient(closest-side,var(--via-accent-glow),transparent)] opacity-60" />
           <h2 id="cta" className="mx-auto max-w-2xl font-display text-[2.3rem] font-semibold leading-[1.05] tracking-[-0.03em] text-foreground sm:text-[3.1rem]">
-            Review your next board with <em className={ACCENT}>evidence</em>.
+            Review your next board with evidence
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[16px] leading-relaxed text-muted">Create a private project, upload a KiCad board and run the checks.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -242,7 +225,7 @@ export function LandingPage() {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-8 text-[13px] text-subtle sm:px-6">
           <ViaLogo />
-          <span>Engineering intelligence for PCB design.</span>
+          <span>Deterministic design review for KiCad PCBs</span>
           <nav aria-label="Footer" className="ml-auto flex gap-4">
             <Link href="/status" className="rounded-full hover:text-foreground">
               System status

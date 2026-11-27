@@ -65,7 +65,7 @@ function Callout({ x, y, title, detail, delay, severity }: { x: number; y: numbe
     >
       <div className={cn("rounded-2xl border border-border-strong bg-[color-mix(in_oklab,var(--via-background)_90%,transparent)] px-3 py-2 shadow-overlay", severity === "high" ? "ring-1 ring-danger/35" : "")}>
         <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-          <span className={cn("rounded-full px-1.5 text-[10px] font-semibold uppercase tracking-wide", severity === "high" ? "bg-danger-soft text-danger" : "bg-surface-hover text-muted")}>{severity}</span>
+          <span className={cn("rounded-full px-1.5 text-[10px] font-medium", severity === "high" ? "bg-danger-soft text-danger" : "bg-surface-hover text-muted")}>{severity === "high" ? "High" : "Low"}</span>
           {title}
         </p>
         <p className="mt-1 font-mono text-[10.5px] leading-snug text-muted">{detail}</p>
@@ -131,7 +131,7 @@ export function BoardMockup() {
           as="figure"
           variant="regular"
           aria-label="Illustration of the VIA board viewer: layer toggles and two design-rule findings on a board"
-          className="overflow-hidden rounded-[28px] shadow-[0_40px_120px_-30px_var(--landing-glow)]"
+          className="overflow-hidden rounded-[28px] shadow-overlay"
         >
           {/* Window chrome */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
@@ -151,7 +151,7 @@ export function BoardMockup() {
           <div className="flex flex-col sm:flex-row">
             {/* Layer panel */}
             <div role="group" aria-label="Layers (illustration)" className="flex gap-1 overflow-x-auto border-b border-border p-2 sm:w-36 sm:flex-col sm:border-b-0 sm:border-r">
-              <p className="hidden px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-subtle sm:block">Layers</p>
+              <p className="hidden px-2 pb-1 text-[11px] font-medium text-subtle sm:block">Layers</p>
               {LAYERS.map((l) => (
                 <button
                   key={l.id}
