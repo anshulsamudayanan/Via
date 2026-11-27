@@ -91,7 +91,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="glass-thick pointer-events-auto flex gap-3 rounded-[22px] p-3.5 [&>svg]:mt-px [&>svg]:size-[18px] [&>svg]:shrink-0"
+      className="glass-overlay pointer-events-auto flex gap-3 rounded-[22px] p-3.5 [&>svg]:mt-px [&>svg]:size-[18px] [&>svg]:shrink-0"
     >
       {ICON[tone]}
       <div className="min-w-0 flex-1">

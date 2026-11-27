@@ -62,7 +62,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
     auth: { register: vi.fn(), login: vi.fn(), logout: vi.fn(), me: vi.fn(), sessions: vi.fn(), revokeSession: vi.fn(), requestPasswordReset: vi.fn(), confirmPasswordReset: vi.fn() },
     users: { updateMe: vi.fn(), changePassword: vi.fn() },
     organizations: { list: vi.fn(), create: vi.fn() },
-    projects: { list: vi.fn(), summary: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), unarchive: vi.fn(), delete: vi.fn(), members: vi.fn(), addMember: vi.fn(), updateMember: vi.fn(), removeMember: vi.fn() },
+    projects: { list: vi.fn().mockResolvedValue(page([])), summary: vi.fn().mockResolvedValue({ active: 0, archived: 0, designs: 0, imports_7d: 0, analyses_7d: 0 }), get: vi.fn(), create: vi.fn(), update: vi.fn(), archive: vi.fn(), unarchive: vi.fn(), delete: vi.fn(), members: vi.fn(), addMember: vi.fn(), updateMember: vi.fn(), removeMember: vi.fn() },
     activity: { list: vi.fn().mockResolvedValue(page([])) },
     components: { parts: vi.fn().mockResolvedValue({ ...page([]), placements: 0, designs: 0 }) },
     designs: { list: vi.fn().mockResolvedValue([]), browse: vi.fn().mockResolvedValue(page([])), get: vi.fn(), update: vi.fn(), delete: vi.fn() },

@@ -5,9 +5,9 @@ import { type HTMLAttributes, type MouseEvent, type ReactNode, useEffect, useSta
 
 import { cn } from "../cn";
 
-export type GlassVariant = "thin" | "regular" | "thick";
+export type GlassVariant = "thin" | "regular" | "thick" | "overlay";
 
-const VARIANT: Record<GlassVariant, string> = { thin: "glass-thin", regular: "glass-regular", thick: "glass-thick" };
+const VARIANT: Record<GlassVariant, string> = { thin: "glass-thin", regular: "glass-regular", thick: "glass-thick", overlay: "glass-overlay" };
 
 /** True only on devices with a real hover (no phantom hover on touch). */
 export function useHoverCapable() {
@@ -32,10 +32,12 @@ interface GlassProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * Frosted glass surface: translucent fill, backdrop blur + saturate, hairline border, top highlight,
- * deep soft shadow (the recipe lives in styles.css as .glass-thin / .glass-regular / .glass-thick).
+ * Liquid glass surface (VIA's <LiquidGlass>): translucent fill, blur + saturate + brightness,
+ * specular gradient rim, inner highlight and shadow, soft outer shadow, optional cursor sheen. The
+ * recipe lives in styles.css (.glass-thin / -regular / -thick / -overlay); thick also refracts its
+ * edges on Chromium.
  */
-export function Glass({ variant = "regular", sheen = false, as: Tag = "div", className, children, onMouseMove, ...props }: GlassProps) {
+export function LiquidGlass({ variant = "regular", sheen = false, as: Tag = "div", className, children, onMouseMove, ...props }: GlassProps) {
   const canHover = useHoverCapable();
   const reduce = useReducedMotion();
   const x = useMotionValue(-400);
@@ -64,3 +66,6 @@ export function Glass({ variant = "regular", sheen = false, as: Tag = "div", cla
     </Tag>
   );
 }
+
+/** @deprecated name kept for existing call sites; same component as LiquidGlass. */
+export const Glass = LiquidGlass;

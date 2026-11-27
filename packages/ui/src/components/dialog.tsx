@@ -27,7 +27,7 @@ export function DialogContent({ title, description, footer, bare = false, classN
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
       <DialogPrimitive.Content
         className={cn(
-          "glass-thick fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-3xl data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out",
+          "glass-overlay fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-3xl data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out",
           "focus-visible:outline-none",
           className,
         )}
@@ -86,7 +86,7 @@ export function MotionDialogContent({ title, className, children, ...props }: Mo
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, filter: "blur(6px)" }}
           transition={SPRING}
-          className={cn("glass-thick fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-[26px] focus-visible:outline-none", className)}
+          className={cn("glass-overlay fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-[26px] focus-visible:outline-none", className)}
           style={{ x: "-50%" }}
         >
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>

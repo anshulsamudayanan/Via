@@ -65,7 +65,7 @@ function Callout({ x, y, title, detail, delay, severity }: { x: number; y: numbe
     >
       <div className={cn("rounded-2xl border border-border-strong bg-[color-mix(in_oklab,var(--via-background)_90%,transparent)] px-3 py-2 shadow-overlay", severity === "high" ? "ring-1 ring-danger/35" : "")}>
         <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-          <span className={cn("rounded-full px-1.5 text-[10px] font-medium", severity === "high" ? "bg-danger-soft text-danger" : "bg-surface-hover text-muted")}>{severity === "high" ? "High" : "Low"}</span>
+          <span className={cn("rounded-full px-1.5 text-[10px] font-semibold uppercase tracking-wide", severity === "high" ? "bg-danger-soft text-danger" : "bg-surface-hover text-muted")}>{severity}</span>
           {title}
         </p>
         <p className="mt-1 font-mono text-[10.5px] leading-snug text-muted">{detail}</p>
@@ -95,7 +95,8 @@ function Marker({ cx, cy, color, delay, reduce }: { cx: number; cy: number; colo
   );
 }
 
-export function BoardMockup() {
+/** `frame="none"` renders without its own glass panel, for use inside another glass card. */
+export function BoardMockup({ frame = "glass" }: { frame?: "glass" | "none" } = {}) {
   const reduce = useReducedMotion();
   const canHover = useHoverCapable();
   const [visible, setVisible] = useState<Record<Layer, boolean>>({ fcu: true, bcu: true, silk: true, edge: true });
@@ -131,7 +132,10 @@ export function BoardMockup() {
           as="figure"
           variant="regular"
           aria-label="Illustration of the VIA board viewer: layer toggles and two design-rule findings on a board"
-          className="overflow-hidden rounded-[28px] shadow-overlay"
+          className={cn(
+            "overflow-hidden rounded-[28px]",
+            frame === "glass" ? "shadow-[0_40px_120px_-30px_var(--landing-glow)]" : "border-0 bg-transparent shadow-none backdrop-blur-none before:hidden",
+          )}
         >
           {/* Window chrome */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
@@ -148,10 +152,14 @@ export function BoardMockup() {
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row">
-            {/* Layer panel */}
-            <div role="group" aria-label="Layers (illustration)" className="flex gap-1 overflow-x-auto border-b border-border p-2 sm:w-36 sm:flex-col sm:border-b-0 sm:border-r">
-              <p className="hidden px-2 pb-1 text-[11px] font-medium text-subtle sm:block">Layers</p>
+          <div className={cn("flex flex-col", frame === "glass" && "sm:flex-row")}>
+            {/* Layer panel: a column beside the board, or a row above it when embedded in a card. */}
+            <div
+              role="group"
+              aria-label="Layers (illustration)"
+              className={cn("flex gap-1 overflow-x-auto border-b border-border p-2", frame === "glass" && "sm:w-36 sm:flex-col sm:border-b-0 sm:border-r")}
+            >
+              <p className={cn("hidden px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-subtle", frame === "glass" && "sm:block")}>Layers</p>
               {LAYERS.map((l) => (
                 <button
                   key={l.id}
@@ -170,7 +178,7 @@ export function BoardMockup() {
             </div>
 
             {/* Board */}
-            <div className="relative flex-1 p-4 sm:p-6">
+            <div className={cn("relative flex-1", frame === "glass" ? "p-4 sm:p-6" : "px-5 py-3")}>
               <div className="relative">
                 <svg viewBox="0 0 400 280" className="block h-auto w-full" aria-hidden="true">
                   <defs>
@@ -245,7 +253,7 @@ export function BoardMockup() {
             </div>
           </div>
 
-          <figcaption className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 font-mono text-[10.5px] text-subtle">
+          <figcaption className={cn("flex items-center justify-between gap-3 border-t border-border px-4 py-2 font-mono text-[10.5px] text-subtle", frame === "none" && "sr-only")}>
             <span>Illustration · toggle the layers</span>
             <span className="hidden sm:inline">2 findings · 1 high · 1 low</span>
           </figcaption>

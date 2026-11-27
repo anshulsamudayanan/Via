@@ -3,11 +3,12 @@
 import { ApiError } from "@via/api-client";
 import type { AIOutput, AIStatus, AnalysisRun, Finding, FindingDetail, FindingFilters, FindingStatus, Recommendation } from "@via/types";
 import { Badge, Button, Card, CardHeader, CardTitle, cn, EmptyState, ErrorState, Input, Select, Skeleton, Spinner, Textarea } from "@via/ui";
-import { Bot, CheckCircle2, Play, ShieldCheck, X } from "lucide-react";
+import { Bot, CheckCircle2, ShieldCheck, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
+import { GlassCta } from "@/components/glass-cta";
 import { errorMessage } from "@/lib/errors";
 import { findingHighlight, SEVERITIES, severityTone, SOURCE_LABEL, VERIFICATION_LABEL } from "@/lib/findings";
 import { formatDateTime } from "@/lib/format";
@@ -70,9 +71,7 @@ export function AnalysisPanel({ projectId, designId, revisionId, canEdit, onHigh
             </p>
           </div>
           {canEdit ? (
-            <Button size="sm" variant="primary" onClick={() => void start()} disabled={starting || Boolean(run && ACTIVE.has(run.status))}>
-              <Play /> {run ? "Run again" : "Run analysis"}
-            </Button>
+            <GlassCta label={run ? "Run again" : "Run analysis"} onClick={() => void start()} disabled={starting || Boolean(run && ACTIVE.has(run.status))} />
           ) : null}
         </CardHeader>
         {startError ? <ErrorState className="mx-4 mb-3" title={startError} /> : null}

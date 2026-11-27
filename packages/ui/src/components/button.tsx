@@ -19,6 +19,10 @@ export const buttonVariants = cva(
         // Clear glass pill: tinted fill, hairline, top highlight (no blur of its own: blur budget).
         secondary:
           "border border-border-strong bg-surface text-foreground shadow-[inset_0_1px_0_var(--via-glass-highlight)] hover:border-subtle/40 hover:bg-surface-hover",
+        // Solid white pill (secondary and filter actions on the landing page; inverts in light mode).
+        solid: "bg-foreground text-background shadow-[0_1px_0_rgb(255_255_255/0.4)_inset] hover:bg-foreground/90",
+        // Outlined dark pill.
+        outline: "border border-border-strong text-foreground hover:border-subtle/50 hover:bg-surface-hover",
         ghost: "text-muted hover:bg-surface-hover hover:text-foreground",
         danger: "border border-danger/40 bg-danger-soft text-danger hover:bg-danger hover:text-white",
       },

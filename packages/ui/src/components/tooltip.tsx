@@ -14,7 +14,7 @@ export function Tooltip({ content, children, side = "top" }: { content: ReactNod
         <TooltipPrimitive.Content
           side={side}
           sideOffset={6}
-          className="glass-thick z-50 max-w-64 rounded-xl px-2.5 py-1.5 text-xs text-foreground data-[state=delayed-open]:animate-fade-in"
+          className="glass-overlay z-50 max-w-64 rounded-xl px-2.5 py-1.5 text-xs text-foreground data-[state=delayed-open]:animate-fade-in"
         >
           {content}
         </TooltipPrimitive.Content>

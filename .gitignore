@@ -33,3 +33,6 @@ test-results/
 
 # Third-party engineering fixtures (copyleft; fetched on demand, never committed)
 tests/engineering/real/
+
+# Array font (ITF Free Font License: self-host only, no redistribution); fetched by scripts/fetch-fonts.mjs
+apps/web/public/fonts/

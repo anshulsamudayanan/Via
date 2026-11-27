@@ -21,6 +21,6 @@ export { Sheet, SheetClose, SheetContent, SheetTrigger } from "./components/shee
 export { type ToastOptions, ToastProvider, type ToastTone, useToast } from "./components/toast";
 export { Ambient } from "./components/ambient";
 export { CountUp } from "./components/count-up";
-export { Glass, type GlassVariant, useHoverCapable } from "./components/glass";
+export { Glass, type GlassVariant, LiquidGlass, useHoverCapable } from "./components/glass";
 export { type Segment, SegmentedControl } from "./components/segmented-control";
 export { enter, enterReduced, SPRING, SPRING_PRESS, SPRING_SOFT, stagger } from "./motion";

@@ -31,6 +31,12 @@ ENV VIA_API_INTERNAL_URL=${VIA_API_INTERNAL_URL}
 # The web proxy must accept request bodies at least this large (PCB uploads).
 ARG VIA_MAX_UPLOAD_BYTES=52428800
 ENV VIA_MAX_UPLOAD_BYTES=${VIA_MAX_UPLOAD_BYTES}
+# Array display font (ITF Free Font License: self-hosted, never committed). Best effort: without
+# network the site falls back to the system display font.
+COPY scripts/fetch-fonts.mjs scripts/
+RUN --mount=type=secret,id=build_ca \
+    if [ -s /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
+    NODE_USE_ENV_PROXY=1 node scripts/fetch-fonts.mjs
 RUN pnpm --filter @via/web build
 
 FROM node:22.21.1-alpine AS runtime
@@ -39,6 +45,7 @@ RUN addgroup -S via && adduser -S via -G via
 WORKDIR /app
 COPY --from=build --chown=via:via /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=via:via /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=via:via /repo/apps/web/public ./apps/web/public
 USER via
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \

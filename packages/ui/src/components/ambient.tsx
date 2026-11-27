@@ -3,8 +3,8 @@
 import { m, useReducedMotion, useScroll, useTransform } from "motion/react";
 
 /**
- * The light behind the glass: three soft colour fields (violet from the accent, indigo, a hint of
- * blue) drifting slowly, with gentle scroll parallax, plus film grain. One fixed layer for the whole
+ * The light behind the glass: soft colour fields (violet from the accent, indigo, a touch of teal
+ * and blue) drifting slowly, with gentle scroll parallax, plus film grain. One fixed layer for the whole
  * page; radial gradients rather than filter blur, so it costs almost nothing to composite.
  * Reduced motion: static.
  */
@@ -36,6 +36,11 @@ export function Ambient() {
           animate={drift(60, -50, 80)}
           className="absolute -bottom-[25%] left-[20%] size-[55vmax] rounded-full"
           style={{ background: "radial-gradient(closest-side, var(--via-blob-blue), transparent)" }}
+        />
+        <m.div
+          animate={drift(-50, -40, 100)}
+          className="absolute -bottom-[10%] -right-[10%] size-[45vmax] rounded-full"
+          style={{ background: "radial-gradient(closest-side, var(--via-blob-teal), transparent)" }}
         />
       </m.div>
       <div className="via-grain absolute inset-0" />

@@ -1,10 +1,52 @@
-# VIA design system: Black Glass
+# VIA design system: Liquid Glass
 
 Status: **implemented** (tokens in `packages/ui/src/styles.css`, primitives and motion tokens in
-`packages/ui`). The current direction is **Black Glass**: deep black, frosted translucent layers, soft
-light and depth, iOS / visionOS in spirit, used by the landing page and the signed-in app alike. It
-replaces the earlier flat "graphite" direction; sections further down that describe exact hex values,
-2–6 px radii or IBM Plex Sans are historical and superseded by this section where they disagree.
+`packages/ui`). The current direction is **Liquid Glass**: the Black Glass base below, plus a
+liquid-glass material, the Array display face, an editorial landing page and a denser, reference-led
+dashboard. Older sections further down (exact hex values, 2–6 px radii, IBM Plex Sans) are historical
+and superseded where they disagree.
+
+## Liquid Glass (current)
+
+**Material** (`<LiquidGlass variant>` in `@via/ui`, CSS `.glass-thin | -regular | -thick | -overlay`):
+blur 16 / 22 / 28px + `saturate(180%) brightness(1.1)`, a 1px specular gradient rim (`::before`,
+masked to the edge, white 25% top-left fading to 5%), an inner top highlight, an inner bottom shadow,
+a soft outer shadow and an optional cursor sheen. `thick` (sidebar, navbar, mobile top bar) also
+refracts its edges through an SVG `feTurbulence` + `feDisplacementMap` filter (`#via-refraction`,
+defined once in the app providers). Refraction is opted in only on Chromium (`html[data-refraction]`),
+because one unsupported `url()` would void the whole `backdrop-filter` elsewhere. `overlay` is the
+dense variant for menus, dialogs, the ⌘K sheet and toasts. Stat and chart cards keep the rim and fill
+but drop their own blur (`backdrop-blur-none`) to stay inside the blur budget.
+
+**Type.** Array (Indian Type Foundry, ITF Free Font License) for H1/H2, section titles, big stat
+numbers and the wordmark, 400/600/700 (the only weights). It is a wide dot-matrix display face:
+tracking −0.02em at most (tighter makes the dots touch). The licence allows self-hosting but not
+redistribution through a public repository, so the files are **never committed**:
+`scripts/fetch-fonts.mjs` downloads the official files (pinned SHA-256) into the git-ignored
+`apps/web/public/fonts/array/`, and the web image build runs it. Without them the display stack falls
+back to SF Pro / Inter. Body: SF Pro (system) then Inter. Mono (IBM Plex Mono) for labels, keycaps,
+deltas and technical values; section labels are mono, uppercase, tracked.
+
+**Buttons.** Primary CTAs (Create account, New project) are Originkit's **Light Glass Button**
+through `components/glass-cta.tsx`: frosted pill, cursor-tracked purple light, gradient ring flaring
+on the nearest edge. Secondary and filter actions use the solid white pill (`Button variant="solid"`)
+and the outlined dark pill (`variant="outline"`).
+
+**Liquid Grid.** Originkit's canvas grid (dots, faint, purple glow) behind the landing hero, the final
+CTA and the dashboard empty state, through `components/liquid-grid-background.tsx`, which runs the
+canvas only while on screen and the tab is visible, follows the theme, and draws a static grid under
+reduced motion. One live canvas per view.
+
+**Charts.** The dashboard's findings chart follows the dataviz method: severity is ordered, so the
+lines use a one-hue ramp (`--via-sev-1..4`; dark `#8f3a34 #c9483e #ff6b5e #ffb0a8`, light
+`#e88d84 #d9594d #b8352b #7f1c15`), validated as an ordinal ramp in both themes; legend plus direct
+end labels; crosshair tooltip with keyboard support; a table view.
+
+**Third-party code.** `apps/web/components/originkit/` holds Originkit's plain-React exports of Light
+Glass Button and Liquid Grid, added verbatim (vendored: exempt from lint and type checks). The only
+change is a marked "VIA EDIT" block in the button that passes standard button props through and uses
+Next `<Link>` for in-app links. Originkit's site describes the library as free to copy; no separate
+licence text was published at the time of adding.
 
 ## Black Glass
 
