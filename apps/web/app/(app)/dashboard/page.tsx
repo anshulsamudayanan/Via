@@ -1,36 +1,37 @@
 "use client";
 
-import type { Project, ProjectSummary } from "@via/types";
-import { Button, Kbd, Panel, Skeleton, useToast } from "@via/ui";
-import { ArrowRight, Search, Upload } from "lucide-react";
+import type { DesignListItem, Project } from "@via/types";
+import { Button, ErrorState, Kbd, Panel, Skeleton, useToast } from "@via/ui";
+import { ArrowRight, ChevronRight, Search, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useRef } from "react";
 
 import { ActivityList } from "@/components/activity-list";
 import { useApi } from "@/components/api-context";
-import { PageHeader } from "@/components/app-shell";
 import { BoardDropzone, type BoardDropzoneHandle } from "@/components/dashboard/board-dropzone";
+import { BoardHero } from "@/components/dashboard/board-hero";
+import { FindingsChart } from "@/components/dashboard/findings-chart";
 import { FirstRun } from "@/components/dashboard/first-run";
-import { OverviewStrip } from "@/components/dashboard/overview-strip";
 import { ProjectsPanel } from "@/components/dashboard/projects-panel";
+import { StatCards } from "@/components/dashboard/stat-cards";
+import { GlassCta } from "@/components/glass-cta";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
 import { useOpenCommandMenu } from "@/components/shell/command-menu";
+import { errorMessage } from "@/lib/errors";
 import { useAsync } from "@/lib/use-async";
 
-function plural(n: number, one: string, many = `${one}s`) {
-  return `${n} ${n === 1 ? one : many}`;
-}
+const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" });
 
-/** One line of real context under the title; a fixed-height skeleton until the summary arrives. */
-function ContextLine({ data }: { data: ProjectSummary | undefined }) {
-  if (!data) return <Skeleton className="mt-1 h-4 w-72 max-w-full" />;
-  if (data.active + data.archived === 0) return <>Upload a KiCad board to get deterministic, evidence-backed findings.</>;
-  return (
-    <>
-      {plural(data.active, "active project")} · {plural(data.designs, "PCB design")} · {plural(data.analyses_7d, "analysis", "analyses")} in the last 7 days
-    </>
-  );
+/** Every design you can see (paged, 100 at a time): for the revision total and the latest board. */
+async function allDesigns(list: (offset: number, signal: AbortSignal) => Promise<{ items: DesignListItem[]; total: number }>, signal: AbortSignal) {
+  const items: DesignListItem[] = [];
+  for (let offset = 0; offset < 1000; offset += 100) {
+    const page = await list(offset, signal);
+    items.push(...page.items);
+    if (items.length >= page.total || page.items.length === 0) break;
+  }
+  return items;
 }
 
 export default function DashboardPage() {
@@ -39,46 +40,98 @@ export default function DashboardPage() {
   const { push } = useToast();
   const openSearch = useOpenCommandMenu();
   const dropzone = useRef<BoardDropzoneHandle>(null);
+
   const summary = useAsync((s) => client.projects.summary(s), [client]);
   const isNew = summary.data !== undefined && summary.data.active + summary.data.archived === 0;
+  const findings = useAsync((s) => client.analysis.browseFindings({ status: "open", limit: 1 }, s), [client]);
+  const runs = useAsync((s) => client.analysis.browseRuns({ limit: 100 }, s), [client]);
+  const designs = useAsync((s) => allDesigns((offset, sig) => client.designs.browse({ sort: "updated", limit: 100, offset }, sig), s), [client]);
+
+  const revisions = designs.data?.reduce((n, d) => n + d.revision_count, 0);
+  const lastRun = runs.data ? (runs.data.items[0] ?? null) : undefined;
+  // The newest design whose current revision parsed (a failed upload has no counts to show).
+  const latestBoard = designs.data ? (designs.data.find((d) => d.current_revision?.status === "ready") ?? designs.data[0] ?? null) : undefined;
+  const now = new Date();
 
   function onCreated(p: Project) {
     push({ tone: "success", title: "Project created", description: `${p.name} is private: only you can see it until you invite people.` });
     router.push(`/projects/${p.id}`);
   }
-  const newProject = (trigger?: ReactNode) => <NewProjectDialog onCreated={onCreated} trigger={trigger} />;
+  const newProject = (trigger?: ReactNode) => <NewProjectDialog onCreated={onCreated} trigger={trigger ?? <GlassCta label="New project" />} />;
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={<ContextLine data={summary.data} />}
-        actions={
-          <>
-            <Button variant="secondary" onClick={openSearch} className="hidden text-muted md:inline-flex" aria-keyshortcuts="Meta+K Control+K">
-              <Search /> Search <Kbd className="ml-2">⌘K</Kbd>
-            </Button>
-            {isNew ? null : (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  document.getElementById("board-dropzone")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-                  dropzone.current?.browse();
-                }}
-              >
-                <Upload /> Upload board
-              </Button>
+      {/* Breadcrumb + headline with a dimmed secondary part */}
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-4">
+        <div className="min-w-0">
+          <nav aria-label="Breadcrumb" className="mb-2">
+            <ol className="flex items-center gap-1.5 font-mono text-[11.5px] uppercase tracking-[0.1em] text-subtle">
+              <li>Workspace</li>
+              <li aria-hidden="true">
+                <ChevronRight className="size-3" />
+              </li>
+              <li aria-current="page" className="text-muted">
+                Dashboard
+              </li>
+            </ol>
+          </nav>
+          <h1 className="font-display text-[34px] font-normal leading-[1.05] tracking-[-0.02em] text-foreground sm:text-[44px]">
+            Dashboard <span className="text-subtle">{MONTH.format(now)} {now.getFullYear()}</span>
+          </h1>
+          <p className="mt-1.5 text-[14px] text-muted">
+            {summary.data ? (
+              isNew ? (
+                "Upload a KiCad board to get deterministic, evidence-backed findings."
+              ) : (
+                <>
+                  {summary.data.active} active {summary.data.active === 1 ? "project" : "projects"} · {summary.data.designs} PCB {summary.data.designs === 1 ? "design" : "designs"} ·{" "}
+                  {summary.data.analyses_7d} {summary.data.analyses_7d === 1 ? "analysis" : "analyses"} in the last 7 days
+                </>
+              )
+            ) : (
+              <Skeleton className="inline-block h-4 w-72 max-w-full align-middle" />
             )}
-            {newProject()}
-          </>
-        }
-      />
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={openSearch} className="hidden text-muted md:inline-flex" aria-keyshortcuts="Meta+K Control+K">
+            <Search /> Search <Kbd className="ml-2">⌘K</Kbd>
+          </Button>
+          {isNew ? null : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                document.getElementById("board-dropzone")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                dropzone.current?.browse();
+              }}
+            >
+              <Upload /> Upload board
+            </Button>
+          )}
+          {newProject()}
+        </div>
+      </div>
 
       {isNew ? (
-        <FirstRun newProject={newProject} />
+        <FirstRun newProject={(trigger) => newProject(trigger)} />
       ) : (
         <div className="space-y-4">
-          <OverviewStrip data={summary.data} error={summary.error} onRetry={summary.reload} />
+          {summary.error ? (
+            <ErrorState
+              title="Couldn't load the overview"
+              description={errorMessage(summary.error)}
+              action={
+                <Button size="sm" onClick={summary.reload}>
+                  Retry
+                </Button>
+              }
+            />
+          ) : null}
+          <StatCards summary={summary.data} findings={findings.data} revisions={revisions} lastRun={lastRun} />
+          <div className="grid gap-4 pt-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+            <BoardHero latest={latestBoard} />
+            <FindingsChart runs={runs.data?.items} />
+          </div>
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <ProjectsPanel />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">

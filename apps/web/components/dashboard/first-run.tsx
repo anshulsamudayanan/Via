@@ -1,9 +1,11 @@
 "use client";
 
-import { Button, enter, enterReduced, stagger } from "@via/ui";
+import { enter, enterReduced, stagger } from "@via/ui";
 import { m, useReducedMotion } from "motion/react";
-import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { GlassCta } from "@/components/glass-cta";
+import { LiquidGridBackground } from "@/components/liquid-grid-background";
 
 /** A bare two-layer board: outline, mounting holes, an IC and passives, routed traces and vias. Decorative.
  * The front-layer traces softly re-route on a slow loop (off with reduced motion). */
@@ -18,13 +20,7 @@ function BoardIllustration() {
           transition: { duration: 6, times: [0, 0.4, 0.8, 1], repeat: Infinity, ease: "easeInOut" as const, delay: i * 0.5 },
         };
   return (
-    <svg viewBox="0 0 240 160" aria-hidden="true" className="h-auto w-full max-w-[380px]" fill="none">
-      <defs>
-        <pattern id="fr-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-          <path d="M10 0H0V10" stroke="var(--via-border)" strokeWidth="0.5" />
-        </pattern>
-      </defs>
-      <rect x="0.5" y="0.5" width="239" height="159" fill="url(#fr-grid)" opacity="0.7" />
+    <svg viewBox="0 0 240 160" aria-hidden="true" className="relative h-auto w-full max-w-[380px]" fill="none">
       {/* Board outline (Edge.Cuts) */}
       <rect x="30" y="22" width="180" height="116" rx="10" fill="var(--via-surface-raised)" stroke="var(--via-border-strong)" />
       {[
@@ -107,8 +103,8 @@ export function FirstRun({ newProject }: { newProject: (trigger: ReactNode) => R
     >
       <div className="grid items-center gap-8 px-6 py-8 md:grid-cols-[minmax(0,1fr)_minmax(0,400px)] md:px-10 md:py-12">
         <m.div variants={reduce ? enterReduced : enter} className="max-w-md">
-          <p className="text-[13px] font-semibold tracking-tight text-accent">No projects yet</p>
-          <h2 id="first-run-title" className="mt-2 font-display text-[2.2rem] font-semibold leading-[1.05] tracking-[-0.03em] text-foreground">
+          <p className="font-mono text-[11.5px] uppercase tracking-[0.14em] text-accent">No projects yet</p>
+          <h2 id="first-run-title" className="mt-2 font-display text-[2.4rem] font-bold leading-[1.05] tracking-[-0.02em] text-foreground">
             Start with a board.
           </h2>
           <p className="mt-3 text-[14px] leading-relaxed text-muted">
@@ -126,15 +122,11 @@ export function FirstRun({ newProject }: { newProject: (trigger: ReactNode) => R
               Deterministic checks that name the exact objects, the measured value and the rule.
             </Step>
           </ol>
-          <div className="mt-6">
-            {newProject(
-              <Button variant="primary">
-                <Plus /> New project
-              </Button>,
-            )}
-          </div>
+          <div className="mt-7">{newProject(<GlassCta size="lg" label="New project" />)}</div>
         </m.div>
-        <m.div variants={reduce ? enterReduced : enter} className="flex justify-center md:justify-end">
+        <m.div variants={reduce ? enterReduced : enter} className="relative flex justify-center md:justify-end">
+          {/* The illustration floats on Originkit's Liquid Grid (paused off-screen, static with reduced motion). */}
+          <LiquidGridBackground className="-inset-10 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_30%,transparent_75%)]" cellSize={20} />
           <BoardIllustration />
         </m.div>
       </div>

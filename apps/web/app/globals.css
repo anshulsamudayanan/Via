@@ -3,3 +3,31 @@
 
 /* Tailwind only scans this app by default; include the shared design system. */
 @source "../../../packages/ui/src";
+
+/*
+ * Array (Indian Type Foundry, ITF Free Font License), self-hosted from /fonts/array/. The files are
+ * fetched at build time by scripts/fetch-fonts.mjs and never committed (the licence forbids
+ * redistribution through a public repository). If they are missing, --font-display falls back to
+ * the system display stack.
+ */
+@font-face {
+  font-family: "Array";
+  src: url("/fonts/array/Array-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Array";
+  src: url("/fonts/array/Array-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Array";
+  src: url("/fonts/array/Array-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

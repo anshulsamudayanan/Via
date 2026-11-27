@@ -18,9 +18,10 @@ test("sidebar pages: dashboard, designs, analysis and components", async ({ page
   const created = await page.request.post("/api/v1/projects", { headers: { "X-VIA-Request": "1" }, data: { name: "Dash board project" } });
   expect(created.ok()).toBeTruthy();
   await page.reload();
-  const overview = page.locator("dl");
-  await expect(overview.getByText("Active projects")).toBeVisible();
-  await expect(overview.getByText("Active projects").locator("xpath=following-sibling::dd")).toHaveText("1");
+  await expect(page.getByText(/1 active project · 0 PCB designs/)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Overview" }).getByText("Boards analysed")).toBeVisible();
+  // Sidebar count beside Projects is the real number of active projects.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /Projects/ })).toContainText("1");
   await expect(page.getByRole("table").getByRole("link", { name: "Dash board project" })).toBeVisible();
   await expect(page.getByRole("link", { name: /System status: |All systems operational|Degraded service/ }).first()).toBeVisible();
 

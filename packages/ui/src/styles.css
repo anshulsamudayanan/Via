@@ -1,6 +1,6 @@
 /*
- * VIA design tokens: "Black Glass".
- * Near-black base, frosted translucent layers, soft light. Dark-first: the dark palette applies by
+ * VIA design tokens: "Liquid Glass".
+ * Near-black base, liquid glass layers (blur, specular rim, edge refraction on Chromium), soft light. Dark-first: the dark palette applies by
  * default and for [data-theme="dark"]; [data-theme="light"] is the matching "white glass". Components
  * use only the semantic utilities below (bg-surface, text-muted, glass-regular, ...), never raw colours.
  * docs/DESIGN_SYSTEM.md explains the recipe and the blur budget.
@@ -11,7 +11,7 @@
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --via-background: #030305;
+  --via-background: #030304;
   /* Surfaces are translucent so the ambient light shows through; overlays are denser. */
   --via-surface-sunken: rgb(0 0 0 / 0.32);
   --via-surface: rgb(255 255 255 / 0.045);
@@ -42,17 +42,28 @@
   /* Glass recipe. */
   --via-glass-thin: rgb(255 255 255 / 0.04);
   --via-glass-regular: rgb(255 255 255 / 0.06);
-  --via-glass-thick: rgb(28 28 34 / 0.72);
+  --via-glass-thick: rgb(255 255 255 / 0.075);
+  --via-glass-overlay: rgb(24 24 30 / 0.78);
   --via-glass-border: rgb(255 255 255 / 0.1);
-  --via-glass-highlight: rgb(255 255 255 / 0.08);
+  --via-glass-highlight: rgb(255 255 255 / 0.1);
+  --via-glass-lowlight: rgb(0 0 0 / 0.35);
+  /* 1px specular rim: bright at the top-left, fading round the edge. */
+  --via-glass-rim: linear-gradient(135deg, rgb(255 255 255 / 0.25), rgb(255 255 255 / 0.06) 40%, rgb(255 255 255 / 0.05) 70%, rgb(255 255 255 / 0.14));
   --via-glass-sheen: rgb(255 255 255 / 0.1);
   --via-scrim: rgb(3 3 5 / 0.55);
 
   /* Ambient light behind the glass. */
   --via-blob-violet: rgb(139 122 184 / 0.28);
   --via-blob-indigo: rgb(76 70 160 / 0.22);
-  --via-blob-blue: rgb(56 110 200 / 0.16);
+  --via-blob-blue: rgb(56 110 200 / 0.14);
+  --via-blob-teal: rgb(40 160 160 / 0.1);
   --via-grain-opacity: 0.05;
+  /* Severity ramp for charts: one hue, ordered (low+info, medium, high, critical); brighter = more
+     severe on dark. Validated with the dataviz ordinal checks against a #0c0c10 surface. */
+  --via-sev-1: #8f3a34;
+  --via-sev-2: #c9483e;
+  --via-sev-3: #ff6b5e;
+  --via-sev-4: #ffb0a8;
 }
 
 [data-theme="light"] {
@@ -85,16 +96,25 @@
 
   --via-glass-thin: rgb(255 255 255 / 0.5);
   --via-glass-regular: rgb(255 255 255 / 0.62);
-  --via-glass-thick: rgb(255 255 255 / 0.8);
+  --via-glass-thick: rgb(255 255 255 / 0.7);
+  --via-glass-overlay: rgb(255 255 255 / 0.86);
   --via-glass-border: rgb(255 255 255 / 0.7);
   --via-glass-highlight: rgb(255 255 255 / 0.9);
+  --via-glass-lowlight: rgb(20 20 40 / 0.06);
+  --via-glass-rim: linear-gradient(135deg, rgb(255 255 255 / 1), rgb(255 255 255 / 0.5) 45%, rgb(0 0 0 / 0.06) 75%, rgb(255 255 255 / 0.7));
   --via-glass-sheen: rgb(255 255 255 / 0.6);
   --via-scrim: rgb(242 242 247 / 0.6);
 
   --via-blob-violet: rgb(155 135 212 / 0.32);
   --via-blob-indigo: rgb(120 140 230 / 0.22);
   --via-blob-blue: rgb(120 190 255 / 0.2);
+  --via-blob-teal: rgb(90 200 190 / 0.16);
   --via-grain-opacity: 0.035;
+  /* Light: darker = more severe; validated against #f7f7fa. */
+  --via-sev-1: #e88d84;
+  --via-sev-2: #d9594d;
+  --via-sev-3: #b8352b;
+  --via-sev-4: #7f1c15;
 }
 
 @theme inline {
@@ -126,7 +146,8 @@
 
   /* SF Pro on Apple devices (system font, never bundled); Inter everywhere else. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Array (Indian Type Foundry, self-hosted by the web app) for headlines, stat numbers and the wordmark. */
+  --font-display: Array, -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* Continuous, iOS-like radii. Cards and panels use rounded-3xl (24px). */
@@ -146,44 +167,80 @@
 /* ------------------------------------------------------------------ glass */
 
 /*
- * The recipe: translucent fill, backdrop blur + saturate, a hairline border, a top inner highlight
- * and a soft deep shadow. Blur budget: at most about four blurred layers on screen; rows and list
- * items inside a glass panel use plain tinted fills, never their own blur.
+ * Liquid glass: translucent fill, backdrop blur + saturate + brightness, a 1px specular gradient
+ * rim (::before, masked to the edge), an inner top highlight and inner bottom shadow, and a soft
+ * outer shadow. Variants: thick (sidebar, navbar; edge refraction on Chromium), regular (cards),
+ * thin (chips, inputs), overlay (menus, dialogs, toasts: denser so text reads over anything).
+ *
+ * Blur budget: at most about four blurred layers on screen and only the thick variant refracts.
+ * Rows, list items, chips and secondary buttons inside a glass panel use tinted fills, never their
+ * own blur. These classes sit in the components layer so utilities (fixed, sticky, bg-*) win.
  */
 @layer components {
-.glass-thin,
-.glass-regular,
-.glass-thick {
-  background-color: var(--glass-fill);
-  border: 1px solid var(--via-glass-border);
-  box-shadow: inset 0 1px 0 var(--via-glass-highlight), var(--via-shadow);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-}
-.glass-thin {
-  --glass-fill: var(--via-glass-thin);
-  --glass-blur: 20px;
-  box-shadow: inset 0 1px 0 var(--via-glass-highlight);
-}
-.glass-regular {
-  --glass-fill: var(--via-glass-regular);
-  --glass-blur: 28px;
-}
-.glass-thick {
-  --glass-fill: var(--via-glass-thick);
-  --glass-blur: 40px;
-}
-[data-theme="light"] :is(.glass-thin, .glass-regular, .glass-thick) {
-  border-color: rgb(0 0 0 / 0.07);
+  .glass-thin,
+  .glass-regular,
+  .glass-thick,
+  .glass-overlay {
+    position: relative;
+    background-color: var(--glass-fill);
+    border: 1px solid transparent;
+    box-shadow:
+      inset 0 1px 0 var(--via-glass-highlight),
+      inset 0 -1px 0 var(--via-glass-lowlight),
+      var(--via-shadow);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  }
+  .glass-thin::before,
+  .glass-regular::before,
+  .glass-thick::before,
+  .glass-overlay::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--via-glass-rim);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
+  .glass-thin {
+    --glass-fill: var(--via-glass-thin);
+    --glass-blur: 16px;
+    box-shadow:
+      inset 0 1px 0 var(--via-glass-highlight),
+      inset 0 -1px 0 var(--via-glass-lowlight);
+  }
+  .glass-regular {
+    --glass-fill: var(--via-glass-regular);
+    --glass-blur: 22px;
+  }
+  .glass-thick {
+    --glass-fill: var(--via-glass-thick);
+    --glass-blur: 28px;
+  }
+  .glass-overlay {
+    --glass-fill: var(--via-glass-overlay);
+    --glass-blur: 28px;
+  }
+  /* Edge refraction (SVG feTurbulence + feDisplacementMap, defined once in the app's providers).
+     Chromium only: one unsupported url() would invalidate the whole backdrop-filter elsewhere,
+     so it is opted in by a data attribute the app sets after detecting Chromium. */
+  :root[data-refraction] .glass-thick {
+    -webkit-backdrop-filter: url(#via-refraction) blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+    backdrop-filter: url(#via-refraction) blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  }
 }
 /* Without backdrop-filter, glass becomes solid so text keeps its contrast. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-thin,
   .glass-regular,
-  .glass-thick {
+  .glass-thick,
+  .glass-overlay {
     background-color: var(--via-surface-raised);
   }
-}
 }
 
 /* Loading shimmer: a light band across a skeleton (static under reduced motion). */

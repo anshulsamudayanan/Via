@@ -14,7 +14,7 @@ export function DropdownMenuContent({ className, ...props }: ComponentProps<type
       <Menu.Content
         sideOffset={6}
         align="end"
-        className={cn("glass-thick z-50 min-w-48 rounded-2xl p-1.5 data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out", className)}
+        className={cn("glass-overlay z-50 min-w-48 rounded-2xl p-1.5 data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out", className)}
         {...props}
       />
     </Menu.Portal>

@@ -20,7 +20,7 @@ function MobileTopBar() {
   const [open, setOpen] = useState(false);
   const openSearch = useOpenCommandMenu();
   return (
-    <header className="glass-regular sticky top-2 z-30 mx-2 mt-2 flex h-12 items-center gap-1 rounded-full px-1.5 md:hidden">
+    <header className="glass-thick sticky top-2 z-30 mx-2 mt-2 flex h-12 items-center gap-1 rounded-full px-1.5 md:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           aria-label="Open navigation"
@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-label="Sidebar"
               className={cn("hidden shrink-0 p-3 pr-0 md:sticky md:top-0 md:block md:h-dvh", collapsed ? "w-[76px]" : "w-[260px]")}
             >
-              <m.div layout transition={SPRING_SOFT} className="glass-regular h-full overflow-hidden rounded-[26px]">
+              <m.div layout transition={SPRING_SOFT} className="glass-thick h-full overflow-hidden rounded-[26px]">
                 <SidebarContent layoutGroup="desktop" collapsed={collapsed} onToggleCollapsed={() => setSidebarCollapsed(!collapsed)} />
               </m.div>
             </m.aside>

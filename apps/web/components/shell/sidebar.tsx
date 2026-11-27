@@ -19,7 +19,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { useApi } from "@/components/api-context";
 import { useSession } from "@/components/session";
+import { useAsync } from "@/lib/use-async";
 import { ViaLogo } from "@/components/via-logo";
 import { setTheme, useTheme } from "@/lib/use-theme";
 
@@ -50,7 +52,7 @@ function MaybeTooltip({ show, content, children }: { show: boolean; content: Rea
 const itemBase =
   "relative isolate flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13.5px] whitespace-nowrap outline-none transition-colors duration-150 [&>svg]:size-[17px] [&>svg]:shrink-0";
 
-function NavItem({ entry, collapsed, layoutGroup, onNavigate }: { entry: NavEntry; collapsed: boolean; layoutGroup: string; onNavigate?: () => void }) {
+function NavItem({ entry, collapsed, layoutGroup, onNavigate, count }: { entry: NavEntry; collapsed: boolean; layoutGroup: string; onNavigate?: () => void; count?: number }) {
   const pathname = usePathname();
   const Icon = entry.icon;
   if (!entry.href) {
@@ -98,7 +100,12 @@ function NavItem({ entry, collapsed, layoutGroup, onNavigate }: { entry: NavEntr
           />
         ) : null}
         <Icon aria-hidden="true" className={active ? "text-accent" : undefined} />
-        {collapsed ? null : entry.label}
+        {collapsed ? null : <span className="flex-1">{entry.label}</span>}
+        {!collapsed && count !== undefined ? (
+          <span className="font-mono text-[11px] tabular-nums text-subtle" aria-label={`(${count})`}>
+            {count}
+          </span>
+        ) : null}
       </Link>
     </MaybeTooltip>
   );
@@ -173,8 +180,23 @@ interface SidebarProps {
 }
 
 /** Sidebar body, shared by the desktop rail and the mobile sheet. */
+/** Real counts beside the nav items: active projects, designs, and open findings in the latest runs. */
+function useNavCounts(): Record<string, number> {
+  const client = useApi();
+  const summary = useAsync((s) => client.projects.summary(s), [client]);
+  const findings = useAsync((s) => client.analysis.browseFindings({ status: "open", limit: 1 }, s), [client]);
+  const out: Record<string, number> = {};
+  if (summary.data) {
+    out["/projects"] = summary.data.active;
+    out["/designs"] = summary.data.designs;
+  }
+  if (findings.data) out["/analysis"] = findings.data.total;
+  return out;
+}
+
 export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigate, layoutGroup }: SidebarProps) {
   const openSearch = useOpenCommandMenu();
+  const counts = useNavCounts();
   return (
     <div className="flex h-full flex-col">
       <div className={cn("flex h-14 shrink-0 items-center gap-2 px-4", collapsed && "justify-center px-0")}>
@@ -240,14 +262,14 @@ export function SidebarContent({ collapsed = false, onToggleCollapsed, onNavigat
             {collapsed ? (
               <div className="mx-auto mb-1 h-px w-5 bg-border" aria-hidden="true" />
             ) : (
-              <h2 id={`${layoutGroup}-${group.label}`} className="px-2.5 pb-1 text-[11px] font-semibold tracking-tight text-subtle">
+              <h2 id={`${layoutGroup}-${group.label}`} className="px-2.5 pb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-subtle">
                 {group.label}
               </h2>
             )}
             <ul aria-labelledby={collapsed ? undefined : `${layoutGroup}-${group.label}`} aria-label={collapsed ? group.label : undefined} className="space-y-px">
               {group.items.map((entry) => (
                 <li key={entry.label}>
-                  <NavItem entry={entry} collapsed={collapsed} layoutGroup={layoutGroup} onNavigate={onNavigate} />
+                  <NavItem entry={entry} collapsed={collapsed} layoutGroup={layoutGroup} onNavigate={onNavigate} count={entry.href ? counts[entry.href] : undefined} />
                 </li>
               ))}
             </ul>

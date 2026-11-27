@@ -44,8 +44,9 @@ describe("Dashboard", () => {
     renderWith(<DashboardPage />, dashboardClient());
 
     expect(await screen.findByText(/2 active projects · 3 PCB designs · 5 analyses in the last 7 days/)).toBeTruthy();
-    const overview = screen.getByText("PCB designs");
-    expect(within(overview.closest("dl")!).getByText("3")).toBeTruthy();
+    const overview = screen.getByRole("list", { name: "Overview" });
+    expect(within(overview).getByText("Revisions")).toBeTruthy();
+    expect(within(overview).getByText("+4 in the last 7 days")).toBeTruthy();
 
     const table = await screen.findByRole("table");
     const row = within(table).getByRole("link", { name: "Motor Controller" }).closest("tr")!;
@@ -139,7 +140,7 @@ describe("Dashboard", () => {
     expect(await screen.findByRole("heading", { name: "Start with a board." })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "New project" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByText("PCB designs")).toBeNull();
+    expect(screen.queryByRole("list", { name: "Overview" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Upload board/ })).toBeNull();
   });
 
@@ -150,8 +151,9 @@ describe("Dashboard", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Couldn't load the overview");
     await userEvent.click(within(alert).getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("PCB designs")).toBeTruthy();
-    expect(summaryFn).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByText("Couldn't load the overview")).toBeNull());
+    // The page and the sidebar both read the summary: the retry is one more call.
+    expect(summaryFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
 

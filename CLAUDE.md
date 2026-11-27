@@ -17,6 +17,7 @@ checkpoints; do not build features from later checkpoints or stages early.
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy services/pcb-engine/src services/ai-engine/src services/eda-runner/src services/optimization/src apps/api/src
 .venv/bin/python scripts/fetch_real_fixtures.py    # real KiCad boards (CC BY-SA, never commit them)
+NODE_USE_ENV_PROXY=1 node scripts/fetch-fonts.mjs   # Array display font (ITF FFL: self-host only, never commit it)
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm --filter @via/web e2e                        # Playwright; needs the Compose stack running
 docker compose config --quiet                      # after editing compose or .env.example
@@ -27,7 +28,7 @@ cd apps/api && alembic revision --autogenerate -m "..."   # review by hand; `ale
 - Database: UUID PKs, timestamptz, VARCHAR+CHECK enums, deterministic constraint names. Every schema change ships with a migration; `tests/integration/test_migrations.py` enforces model/migration parity.
 - API: everything under `/api/v1`; errors use the envelope in `via_api/errors.py`; project-scoped data returns 404 when the caller lacks access.
 - Organization and project membership are independent; never infer project access from organization roles (see docs/DATABASE.md).
-- Frontend: only semantic design tokens (`bg-surface`, `text-muted`, `glass-regular`...), never raw colours. Follow docs/DESIGN_SYSTEM.md ("Black Glass"): purple `accent` only for primary action, active and selected states, focus and finding highlights; `Panel`/`Glass` for regions within the blur budget; `Mono` only for engineering identifiers; text on glass must keep 4.5:1. Browser code talks only to same-origin `/api/*`.
+- Frontend: only semantic design tokens (`bg-surface`, `text-muted`, `glass-regular`...), never raw colours. Follow docs/DESIGN_SYSTEM.md ("Liquid Glass"): purple `accent` only for primary action, active and selected states, focus and finding highlights; `Panel`/`LiquidGlass` for regions within the blur budget; third-party components stay verbatim in `components/originkit/` with marked edits only; `Mono` only for engineering identifiers; text on glass must keep 4.5:1. Browser code talks only to same-origin `/api/*`.
 - Animation: use Motion (`import { m } from "motion/react"`; `LazyMotion strict` is global, so `m.*`, never `motion.*`), springs from `@via/ui` (`SPRING`...), transform/opacity/filter only, and respect `prefers-reduced-motion` (`useReducedMotion` for loops, tilt and parallax).
 - Pin JS versions that are at least two weeks old; Python deps are locked in `apps/api/requirements.lock`.
 

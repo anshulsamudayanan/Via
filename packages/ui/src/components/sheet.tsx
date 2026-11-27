@@ -24,7 +24,7 @@ export function SheetContent({ title, side = "left", className, children, ...pro
       <DialogPrimitive.Content
         aria-describedby={undefined}
         className={cn(
-          "glass-thick fixed inset-y-2 z-50 flex w-[min(18rem,85vw)] flex-col rounded-3xl focus-visible:outline-none",
+          "glass-overlay fixed inset-y-2 z-50 flex w-[min(18rem,85vw)] flex-col rounded-3xl focus-visible:outline-none",
           side === "left"
             ? "left-2 data-[state=open]:animate-[via-sheet-in-left_180ms_cubic-bezier(0.2,0,0,1)]"
             : "right-2 data-[state=open]:animate-[via-sheet-in-right_180ms_cubic-bezier(0.2,0,0,1)]",
