@@ -80,6 +80,8 @@ class StructuredResult[T: BaseModel]:
 class AIProvider(ABC):
     name: str
     capabilities: Capabilities
+    #: Largest prompt (estimated tokens) the provider accepts per request; None means no limit set.
+    input_token_budget: int | None = None
 
     @abstractmethod
     def generate_text(self, request: TextRequest) -> TextResult:

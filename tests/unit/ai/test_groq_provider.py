@@ -204,7 +204,8 @@ def sequence(*responses):
             raise item
         return item
 
-    return GroqProvider(AIConfig(provider="groq"), api_key="k", transport=transport), bodies
+    config = AIConfig(provider="groq", routing=ModelRouting(default_model="openai/gpt-oss-120b"))
+    return GroqProvider(config, api_key="k", transport=transport), bodies
 
 
 def test_json_wrapped_in_a_code_fence_or_prose_is_still_read_and_validated():
@@ -213,10 +214,11 @@ def test_json_wrapped_in_a_code_fence_or_prose_is_still_read_and_validated():
         assert p.generate_structured(REQUEST, Review).value.verdict == "ok"
 
 
-def test_a_reply_cut_off_by_the_token_limit_is_retried_with_a_bigger_budget():
+def test_a_reply_cut_off_by_the_token_limit_is_retried_thinking_less_not_asking_for_more_tokens():
     p, bodies = sequence(reply('{"verdict": "ok", "issu', finish="length"), reply(GOOD))
     assert p.generate_structured(REQUEST, Review).value.verdict == "ok"
-    assert bodies[1]["max_completion_tokens"] > bodies[0]["max_completion_tokens"]
+    assert bodies[1]["reasoning_effort"] == "low"
+    assert bodies[1]["max_completion_tokens"] == bodies[0]["max_completion_tokens"]
 
 
 def test_a_reply_that_is_always_cut_off_says_so_instead_of_a_generic_error():
@@ -262,3 +264,34 @@ def test_an_unreadable_or_dropped_http_reply_becomes_a_plain_ai_error(monkeypatc
         monkeypatch.setattr(groq.urllib.request, "urlopen", opener)
         with pytest.raises(AIError):
             groq._http_post("https://api.groq.com/x", {}, {})
+
+
+def test_output_budget_is_capped_by_config_so_the_request_fits_the_accounts_limit():
+    config = AIConfig(provider="groq", max_output_tokens=1234)
+    t = FakeTransport(reply(GOOD))
+    GroqProvider(config, api_key="k", transport=t).generate_structured(REQUEST, Review)
+    assert t.calls[0][2]["max_completion_tokens"] == 1234
+
+
+def test_413_says_what_groq_said_and_how_to_fix_it(monkeypatch):
+    import io
+    import urllib.error
+
+    from via_ai.providers import groq
+
+    body = json.dumps(
+        {"error": {"message": "Request too large ... tokens per minute (TPM): Limit 8000, Requested 12000"}}
+    )
+
+    def opener(*a, **k):
+        raise urllib.error.HTTPError("u", 413, "x", {}, io.BytesIO(body.encode()))
+
+    monkeypatch.setattr(groq.urllib.request, "urlopen", opener)
+    with pytest.raises(AIError, match=r"Limit 8000, Requested 12000.*VIA_AI_MAX_INPUT_TOKENS"):
+        groq._http_post("https://api.groq.com/x", {}, {})
+
+
+def test_token_budgets_come_from_the_environment_and_are_validated():
+    assert AIConfig.from_env({"VIA_AI_PROVIDER": "groq", "VIA_AI_MAX_INPUT_TOKENS": "9000"}).max_input_tokens == 9000
+    with pytest.raises(ValueError, match="VIA_AI_MAX_OUTPUT_TOKENS"):
+        AIConfig.from_env({"VIA_AI_PROVIDER": "groq", "VIA_AI_MAX_OUTPUT_TOKENS": "10"})

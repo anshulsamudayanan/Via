@@ -59,8 +59,6 @@ from via_ai.routing import AIConfig
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 USER_AGENT = "via-ai-engine/0.1 (+https://github.com/anshulsamudayanan/Via)"
 TIMEOUT_SECONDS = 120
-#: Largest completion budget VIA will ask for when a structured reply is cut off.
-MAX_COMPLETION_TOKENS = 32000
 #: VIA effort -> Groq reasoning_effort (gpt-oss models accept low | medium | high).
 REASONING_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high", "max": "high"}
 
@@ -86,8 +84,13 @@ def _http_post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
             detail = " ".join(raw.split())[:160]
         if exc.code == 401:
             raise AIError("Groq rejected the API key. Check GROQ_API_KEY.") from None
+        if exc.code == 413:
+            raise AIError(
+                f"Groq says this request is too large for the account's limit ({detail or 'HTTP 413'}). "
+                "Lower VIA_AI_MAX_INPUT_TOKENS / VIA_AI_MAX_OUTPUT_TOKENS or use a plan with a higher limit."
+            ) from None
         if exc.code == 429:
-            raise AIError("Groq's rate limit was reached. Try again in a minute.") from None
+            raise AIError(f"Groq's rate limit was reached ({detail or 'HTTP 429'}). Try again in a minute.") from None
         if exc.code == 403:
             # Cloudflare in front of Groq answers 403 to blocked clients; Groq itself uses it for
             # keys or organisations without access to a model, or unsupported regions.
@@ -202,6 +205,7 @@ class GroqProvider(AIProvider):
             raise AIUnavailableError("VIA_AI_PROVIDER=groq needs a GROQ_API_KEY in the environment.")
         self._key = key.strip()
         self._post = transport or _http_post
+        self.input_token_budget = config.max_input_tokens
 
     def __repr__(self) -> str:  # never show the key
         return f"GroqProvider(model={self.config.routing.default_model!r})"
@@ -212,7 +216,11 @@ class GroqProvider(AIProvider):
         if request.system:
             messages.append({"role": "system", "content": request.system})
         messages += [{"role": m.role, "content": m.content} for m in request.messages]
-        body: dict[str, Any] = {"model": model, "messages": messages, "max_completion_tokens": request.max_tokens}
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "max_completion_tokens": min(request.max_tokens, self.config.max_output_tokens),
+        }
         if model.startswith("openai/gpt-oss"):
             body["reasoning_effort"] = REASONING_EFFORT.get(request.effort or self.config.effort, "medium")
         return body
@@ -263,7 +271,6 @@ class GroqProvider(AIProvider):
                 messages.insert(0, {"role": "system", "content": instruction})
             body["response_format"] = {"type": "json_object"}
             attempts = 2
-        budget = body["max_completion_tokens"]
         last: AIError | None = None
         for _ in range(attempts):
             try:
@@ -271,8 +278,9 @@ class GroqProvider(AIProvider):
                 choice = _first_choice(response)
                 if choice.get("finish_reason") == "length":
                     # Reasoning models spend the same budget on thinking, so a long answer can be cut off.
-                    budget = min(budget * 2, MAX_COMPLETION_TOKENS)
-                    body["max_completion_tokens"] = budget
+                    # Think less on the retry instead of asking for more tokens (which counts against the limit).
+                    if body.get("reasoning_effort") not in (None, "low"):
+                        body["reasoning_effort"] = "low"
                     raise AIError("The model ran out of room before finishing its answer. Try again.")
                 content = (choice.get("message") or {}).get("content") or ""
                 value = schema.model_validate_json(_json_text(content))

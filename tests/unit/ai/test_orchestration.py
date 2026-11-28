@@ -109,3 +109,40 @@ def test_numbers_inside_identifiers_do_not_ground_an_answer():
 
     ctx = context().model_copy(update={"design_id": uuid.UUID("0000127e-3abc-4000-8000-000000000000")})
     assert all(abs(n - 0.127) > 1e-9 for n in context_numbers(ctx))
+
+
+def test_a_big_context_is_trimmed_to_the_input_budget_and_the_trim_is_recorded():
+    from via_ai.orchestration import fit_context
+    from via_ai.prompts import review_messages
+
+    big = context().model_copy(
+        update={
+            "net_names": [f"NET{i}" for i in range(3000)],
+            "components": [
+                ContextComponent(reference=f"R{i}", value="10k", footprint="R_0603", side="top") for i in range(800)
+            ],
+        }
+    )
+    provider = ScriptedProvider([])
+    provider.input_token_budget = 3000
+    fitted = fit_context(provider, big, lambda c: sum(map(len, review_messages(c))))
+    assert sum(map(len, review_messages(fitted))) // 3 <= 3000
+    assert fitted.truncated["net_names"] > 0 and fitted.truncated["components"] > 0
+    assert fitted.findings == big.findings  # the findings are what the review is about: kept while room remains
+
+
+def test_a_context_that_cannot_fit_even_when_emptied_is_refused_not_sent():
+    from via_ai import AIError
+    from via_ai.orchestration import fit_context
+
+    provider = ScriptedProvider([])
+    provider.input_token_budget = 10
+    with pytest.raises(AIError, match="too large"):
+        fit_context(provider, context(), lambda c: 100000)
+
+
+def test_no_budget_means_the_context_is_untouched():
+    from via_ai.orchestration import fit_context
+
+    c = context()
+    assert fit_context(ScriptedProvider([]), c, lambda c: 10**9) is c

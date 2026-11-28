@@ -55,6 +55,10 @@ class AIConfig:
     provider: str = "none"
     routing: ModelRouting = field(default_factory=ModelRouting)
     effort: str = "high"
+    #: Per-request token budgets. Groq counts prompt + reserved answer against the plan's tokens-per-minute
+    #: limit, so the defaults suit its free tier; raise them on a paid plan.
+    max_input_tokens: int = 4500
+    max_output_tokens: int = 4000
 
     @property
     def enabled(self) -> bool:
@@ -76,4 +80,14 @@ class AIConfig:
         }
         model = (env.get("VIA_AI_MODEL") or "").strip() or default_model_for(provider)
         routing = ModelRouting(default_model=model, by_task=by_task)
-        return cls(provider=provider, routing=routing, effort=effort)
+        budgets = {}
+        for key, name in (
+            ("max_input_tokens", "VIA_AI_MAX_INPUT_TOKENS"),
+            ("max_output_tokens", "VIA_AI_MAX_OUTPUT_TOKENS"),
+        ):
+            raw = (env.get(name) or "").strip()
+            if raw:
+                if not raw.isdigit() or int(raw) < 500:
+                    raise ValueError(f"{name} must be a whole number of at least 500")
+                budgets[key] = int(raw)
+        return cls(provider=provider, routing=routing, effort=effort, **budgets)
