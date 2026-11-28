@@ -101,3 +101,11 @@ def test_ai_provider_outage_and_refusal_are_reported_not_hidden(client, design, 
     # No answer, no recommendation was invented in place of the failed calls.
     assert db.scalar(select(func.count(AIOutput.id))) == 0
     assert db.scalar(select(func.count(RecommendationRow.id))) == 0
+
+
+def test_an_unexpected_error_inside_the_ai_call_is_a_503_with_a_cause_not_a_bare_500(client, design, provider):
+    _, d = design
+    provider(ValueError("boom"))
+    r = client.post(f"/api/v1/designs/{d['id']}/ai/explain", json={"question": "Why?"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "ai_unavailable"
+    assert "ValueError" in r.json()["error"]["message"]

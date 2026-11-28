@@ -8,6 +8,7 @@ structured model output → verification against that context → stored as an `
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -28,6 +29,9 @@ AI_REVIEWED = "ai.reviewed"
 def _require(provider: AIProvider) -> None:
     if not provider.capabilities.structured_output:
         raise APIError(503, "ai_disabled", "AI features are turned off on this server.")
+
+
+logger = logging.getLogger("via_api.ai")
 
 
 def _store(db: Session, ctx: AuthContext, provider: AIProvider, kind: str, context: Any, result: AIResult[Any],
@@ -55,6 +59,11 @@ def _call(fn: Any, *args: Any) -> Any:
         raise APIError(422, "ai_refused", "The AI model declined to answer this request.") from exc
     except AIError as exc:
         raise APIError(503, "ai_unavailable", str(exc) or "The AI provider is unavailable.") from exc
+    except Exception as exc:  # a provider or parsing bug must not surface as an opaque HTTP 500
+        logger.exception("AI call failed unexpectedly")
+        raise APIError(
+            503, "ai_unavailable", f"The AI request failed unexpectedly ({type(exc).__name__}). See the API log."
+        ) from exc
 
 
 def _reject_if_needed(db: Session, row: AIOutput, result: AIResult[Any]) -> None:

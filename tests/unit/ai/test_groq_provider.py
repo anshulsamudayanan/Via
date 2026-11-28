@@ -239,3 +239,26 @@ def test_a_reply_that_does_not_fit_the_schema_is_retried_once_then_names_the_fie
     with pytest.raises(AIError, match="issues"):
         p.generate_structured(REQUEST, Review)
     assert len(bodies) == 2
+
+
+def test_an_unreadable_or_dropped_http_reply_becomes_a_plain_ai_error(monkeypatch):
+    import http.client
+    import io
+
+    from via_ai.providers import groq
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    for opener in (
+        lambda *a, **k: Resp(b"<html>gateway</html>"),  # not JSON
+        lambda *a, **k: (_ for _ in ()).throw(http.client.IncompleteRead(b"x")),
+        lambda *a, **k: (_ for _ in ()).throw(ConnectionResetError("reset")),
+    ):
+        monkeypatch.setattr(groq.urllib.request, "urlopen", opener)
+        with pytest.raises(AIError):
+            groq._http_post("https://api.groq.com/x", {}, {})

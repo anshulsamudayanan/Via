@@ -32,6 +32,7 @@ Behaviour:
 from __future__ import annotations
 
 import contextlib
+import http.client
 import json
 import os
 import urllib.error
@@ -100,8 +101,10 @@ def _http_post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
         if exc.code == 400 and detail:
             raise AIError(f"Groq couldn't process the request: {detail}") from None
         raise AIError(f"Groq returned an error (HTTP {exc.code}). Try again later.") from None
-    except (urllib.error.URLError, TimeoutError) as exc:
+    except (urllib.error.URLError, TimeoutError, http.client.HTTPException, OSError) as exc:
         raise AIError("Couldn't reach Groq. Check the server's internet connection.") from exc
+    except ValueError as exc:  # json.JSONDecodeError and bad UTF-8: a gateway page or a cut-off body
+        raise AIError("Groq sent a reply VIA couldn't read. Try again.") from exc
 
 
 def _json_text(content: str) -> str:
