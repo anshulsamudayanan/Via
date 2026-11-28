@@ -210,5 +210,6 @@ Stage 1 is built to run locally. A public deployment additionally needs, at mini
 - [docs/PCB_ANALYSIS.md](docs/PCB_ANALYSIS.md): analysis checks and what they do and don't cover
 - [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md): AI features, grounding verification, consent, audit
 - [docs/OPTIMIZATION_ENGINE.md](docs/OPTIMIZATION_ENGINE.md): objectives, constraints, candidates, validation, Pareto comparison
+- [docs/OPTIMIZATION_CONSTRAINTS.md](docs/OPTIMIZATION_CONSTRAINTS.md): hard constraints, declared requirements, weighted preference, lifecycle
 - [docs/STAGE_2_ACCEPTANCE.md](docs/STAGE_2_ACCEPTANCE.md): the 14 Stage 2 acceptance criteria mapped to tests, measurements and limits
 - [docs/CHANGE_MANAGEMENT.md](docs/CHANGE_MANAGEMENT.md): change sets, in-place export and its verification, lineage, rollback, comparison

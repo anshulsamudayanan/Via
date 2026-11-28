@@ -7,9 +7,19 @@ import re
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from via_pcb.analysis.checks.placement import CONNECTOR_REF, extent
-from via_pcb.analysis.shapes import point_in_polygon
+from via_pcb.analysis.checks.placement import CONNECTOR_REF
 from via_pcb.models import BoundingBox, Component, PCBDesign
+
+
+class Requirement(BaseModel):
+    """An engineering requirement the engineer declares. VIA only evaluates kinds it has an evaluator for;
+    every other kind is recorded as ``unverified`` and never treated as satisfied."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1, max_length=64, description="e.g. 'impedance', 'length_matching', 'enclosure_fit'")
+    description: str = Field(default="", max_length=300)
+    hard: bool = Field(default=True, description="A hard requirement that can't be verified blocks validation")
 
 
 class Constraints(BaseModel):
@@ -23,6 +33,7 @@ class Constraints(BaseModel):
     component_gap_mm: float = Field(default=0.25, ge=0, le=20, description="Minimum gap between component extents")
     max_board_width_mm: float | None = Field(default=None, gt=0)
     max_board_height_mm: float | None = Field(default=None, gt=0)
+    requirements: list[Requirement] = Field(default_factory=list, max_length=50)
 
 
 _MOUNTING = re.compile(r"^(H|MH|MK|FID)\d", re.I)
@@ -48,38 +59,3 @@ def keepout_polygons(design: PCBDesign) -> list[list[tuple[float, float]]]:
     """Keep-out zones that forbid footprints."""
     return [[(p.x, p.y) for p in z.outline] for z in design.zones
             if z.keepout and z.keepout_rules is not None and z.keepout_rules.footprints is False]  # fmt: skip
-
-
-def violations(before: PCBDesign, after: PCBDesign, cons: Constraints) -> list[str]:
-    out: list[str] = []
-    old = {c.id: c for c in before.components if c.id}
-    for c in after.components:
-        o = old.get(c.id or "")
-        moved = o is not None and (abs(o.position.x - c.position.x) > 1e-6 or abs(o.position.y - c.position.y) > 1e-6
-                                   or abs(o.rotation - c.rotation) > 1e-6)  # fmt: skip
-        if moved and o is not None and is_fixed(o, cons):
-            out.append(f"{c.reference} is fixed but would move")
-        if moved:
-            e = extent(c)
-            ob = after.outline.bbox
-            if (
-                e is not None
-                and ob is not None
-                and (e.min_x < ob.min_x or e.min_y < ob.min_y or e.max_x > ob.max_x or e.max_y > ob.max_y)
-            ):
-                out.append(f"{c.reference} would extend past the board outline")
-            for poly in keepout_polygons(after):
-                if e is not None and any(
-                    point_in_polygon(p, poly)
-                    for p in ((e.min_x, e.min_y), (e.max_x, e.max_y), (c.position.x, c.position.y))
-                ):
-                    out.append(f"{c.reference} would enter a keep-out zone")
-    ob = after.outline.bbox
-    if ob is not None:
-        if cons.max_board_width_mm and ob.width > cons.max_board_width_mm + 1e-6:
-            out.append(f"Board width {ob.width:.2f} mm exceeds the {cons.max_board_width_mm:g} mm limit")
-        if cons.max_board_height_mm and ob.height > cons.max_board_height_mm + 1e-6:
-            out.append(f"Board height {ob.height:.2f} mm exceeds the {cons.max_board_height_mm:g} mm limit")
-    if cons.outline_fixed and before.outline.bbox != after.outline.bbox:
-        out.append("The outline is fixed but would change")
-    return out

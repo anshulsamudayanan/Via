@@ -7,6 +7,8 @@ VIA Optimize proposes **explicit, measured, validated change sets**. It never ed
 design. Accepting a candidate records a decision; a change set (docs/CHANGE_MANAGEMENT.md) turns
 accepted, exportable changes into a new revision and an exported KiCad file.
 
+> Constraint results, the weighted preference, the candidate lifecycle and module declarations (optimizer 1.1.0) are in [OPTIMIZATION_CONSTRAINTS.md](OPTIMIZATION_CONSTRAINTS.md).
+
 ## Pipeline
 1. **Baseline metrics** for the parsed design.
 2. **Generators** for the requested objectives produce change sets that respect the constraints.
@@ -58,10 +60,11 @@ Each change records:
 ## API
 | Method | Path | Role |
 |---|---|---|
-| POST | `/designs/{id}/optimization-runs` `{objectives[], constraints?, options?}` → 202 (identical active run → 200) | editor, 60/h |
+| POST | `/designs/{id}/optimization-runs` `{objectives[], constraints?, options?, weights?}` → 202 (identical active run → 200) | editor, 60/h |
 | GET | `/designs/{id}/optimization-runs`, `/optimization-runs/{id}` (config, baseline, Pareto keys, notes) | viewer |
 | GET | `/optimization-runs/{id}/candidates`, `/optimization-candidates/{id}` (with changes) | viewer |
 | GET | `/optimization-runs/{id}/compare?candidates=` (metrics, deltas vs baseline, Pareto front, dominance) | viewer |
+| GET | `/optimization-modules` | what each module understands, requires, can't evaluate and preserves | any signed-in user |
 | POST | `/optimization-candidates/{id}/decision` `{status: accepted\|rejected, reason?}` (`409 not_validated`, `422 reason_required`) | editor |
 
 Runs are `analysis_runs` with `kind = pcb_optimization`. They share the worker lifecycle (heartbeat, reaper, retries, `worker_lost`) and snapshot their profile.

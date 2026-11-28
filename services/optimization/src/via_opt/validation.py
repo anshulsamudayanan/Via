@@ -10,26 +10,14 @@ from __future__ import annotations
 from typing import Any
 
 from via_opt.candidates import Validation, ValidationStatus
-from via_opt.changes import Change, ChangeKind, apply
-from via_opt.constraints import Constraints, violations
+from via_opt.changes import Change, apply
+from via_opt.constraints import Constraints
+from via_opt.rules import ConstraintStatus, evaluate
 from via_pcb.analysis import default_engine
 from via_pcb.analysis.checks.manufacturing import MANUFACTURING_CHECKS
 from via_pcb.models import PCBDesign
 
 CHECKS = {c.id for c in MANUFACTURING_CHECKS} | {"copper_islands", "board_outline", "board_space"}
-
-
-def routed_moves(design: PCBDesign, changes: list[Change]) -> list[str]:
-    """References of moved/rotated components whose pads have tracks on their nets."""
-    routed_nets = {t.net for t in design.tracks if t.net}
-    comps = {c.id: c for c in design.components}
-    out = []
-    for ch in changes:
-        if ch.kind in (ChangeKind.MOVE_COMPONENT, ChangeKind.ROTATE_COMPONENT):
-            c = comps.get(ch.target.id)
-            if c is not None and any(p.net in routed_nets for p in c.pads):
-                out.append(c.reference)
-    return out
 
 
 def validate(
@@ -41,13 +29,16 @@ def validate(
             notes=["Includes changes VIA can't apply automatically; make them in KiCad."],
         ), None
     after = apply(design, changes)
-    broken = violations(design, after, cons)
+    results = evaluate(design, after, changes, cons)
+    hard = [r for r in results if r.kind == "hard"]
+    broken = [v for r in hard if r.status == ConstraintStatus.VIOLATED for v in r.violations]
+    rerouting = any(r.id == "routed_connectivity" and r.status == ConstraintStatus.UNVERIFIED for r in results)
+    unverified = [r for r in hard if r.status == ConstraintStatus.UNVERIFIED and r.id != "routed_connectivity"]
     before = default_engine().run(design, options=options, only=CHECKS)
     result = default_engine().run(after, options=options, only=CHECKS)
     old = {f.fingerprint for f in before.findings}
     new = [f for f in result.findings if f.fingerprint not in old and f.severity.rank <= 2]
     resolved = len(old - {f.fingerprint for f in result.findings})
-    rerouting = routed_moves(design, changes)
     notes = []
     if broken:
         status = ValidationStatus.FAILED
@@ -61,10 +52,10 @@ def validate(
             )
     elif new:
         status = ValidationStatus.FAILED
+    elif unverified:
+        status = ValidationStatus.UNVERIFIED
     else:
         status = ValidationStatus.PASSED
-    if rerouting:
-        notes.append(f"Moves routed components ({', '.join(rerouting[:10])}{'...' if len(rerouting) > 10 else ''}): "
-                     "their tracks must be re-routed, so connectivity can't be validated until then.")  # fmt: skip
+    notes += [r.detail for r in results if r.status == ConstraintStatus.UNVERIFIED]
     return Validation(status=status, checks_run=sorted(CHECKS), new_problems=[f"{f.title}: {f.description}"[:300] for f in new[:20]],
-                      resolved_problems=resolved, constraint_violations=broken, notes=notes), after  # fmt: skip
+                      resolved_problems=resolved, constraint_violations=broken, constraints=results, notes=notes), after  # fmt: skip

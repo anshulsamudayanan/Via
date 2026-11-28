@@ -116,3 +116,68 @@ def test_stale_optimization_run_is_requeued(client, design, job_queue, db, setti
     report = jobs.reap_analyses(db, job_queue, settings)
     assert report.requeued == [run_id] and job_queue.optimizations[-1] == (run_id, 2)
     assert db.get(AnalysisRun, run_id).job_id == f"optimization-{run_id}-a2"
+
+
+def test_candidates_carry_the_full_record(client, design):
+    run = start(client, design["id"], objectives=["area"]).json()
+    run = client.get(f"/api/v1/optimization-runs/{run['id']}").json()
+    assert run["summary"]["baseline"]  # the live "phase" is replaced by the final summary
+    (c,) = client.get(f"/api/v1/optimization-runs/{run['id']}/candidates").json()
+    assert c["lifecycle"] == "validated" and len(c["candidate_hash"]) == 64
+    assert c["score"] is None and c["execution"]["deterministic"] is True
+    assert any("KiCad DRC" in s for s in c["limitations"])
+    by_id = {r["id"]: r["status"] for r in c["constraints_evaluated"]}
+    assert by_id["component_identity"] == "satisfied" and by_id["net_connectivity"] == "satisfied"
+    assert by_id["component_overlap"] == "not_applicable"
+
+
+def test_weights_rank_but_are_validated_against_the_objectives(client, design):
+    run = start(
+        client, design["id"], objectives=["area", "manufacturability"], weights={"area": 2, "manufacturability": 1}
+    ).json()
+    run = client.get(f"/api/v1/optimization-runs/{run['id']}").json()
+    assert run["config"]["weights"] == {"area": 2.0, "manufacturability": 1.0}
+    cands = {c["key"]: c for c in client.get(f"/api/v1/optimization-runs/{run['id']}/candidates").json()}
+    assert {c["score"]["rank"] for c in cands.values()} == {1, 2}
+    assert all(c["status"] == "validated" for c in cands.values())  # weights never change validation
+    assert start(client, design["id"], objectives=["area"], weights={"placement": 1}).status_code == 422
+    assert start(client, design["id"], objectives=["area"], weights={"area": -1}).status_code == 422
+
+
+def test_declared_requirements_block_acceptance(client, design):
+    cons = {"requirements": [{"kind": "impedance_targets", "description": "50 ohm"}]}
+    run = start(client, design["id"], objectives=["area"], constraints=cons).json()
+    (c,) = client.get(f"/api/v1/optimization-runs/{run['id']}/candidates").json()
+    assert c["lifecycle"] == "needs_review" and c["validation"]["status"] == "unverified"
+    assert any(
+        r["id"] == "requirement:impedance_targets" and r["status"] == "unverified" for r in c["constraints_evaluated"]
+    )
+    resp = client.post(f"/api/v1/optimization-candidates/{c['id']}/decision", json={"status": "accepted"})
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "not_validated"
+
+
+def test_lifecycle_follows_the_decision(client, design):
+    run = start(client, design["id"], objectives=["area"]).json()
+    (c,) = client.get(f"/api/v1/optimization-runs/{run['id']}/candidates").json()
+    accepted = client.post(f"/api/v1/optimization-candidates/{c['id']}/decision", json={"status": "accepted"}).json()
+    assert accepted["lifecycle"] == "accepted"
+
+
+def test_module_declarations_need_a_session_and_classify_every_capability(client, make_client):
+    assert make_client().get("/api/v1/optimization-modules").status_code == 401
+    register(client, "modules@example.com")
+    mods = {m["key"]: m for m in client.get("/api/v1/optimization-modules").json()}
+    assert mods["outline_fit"]["status"] == "implemented" and "net_connectivity" in mods["outline_fit"]["preserves"]
+    assert mods["bom_cost"]["status"] == "planned" and mods["rerouting"]["status"] == "unsupported"
+    assert "impedance_targets" in mods["placement_ratsnest"]["cannot_evaluate"]
+
+
+def test_another_user_cannot_see_runs_or_candidates(client, make_client, design):
+    run = start(client, design["id"], objectives=["area"]).json()
+    (c,) = client.get(f"/api/v1/optimization-runs/{run['id']}/candidates").json()
+    stranger = make_client()
+    register(stranger, "optstranger@example.com")
+    assert stranger.get(f"/api/v1/optimization-runs/{run['id']}").status_code == 404
+    assert stranger.get(f"/api/v1/optimization-runs/{run['id']}/candidates").status_code == 404
+    assert stranger.get(f"/api/v1/optimization-candidates/{c['id']}").status_code == 404
+    assert start(stranger, design["id"], objectives=["area"]).status_code == 404

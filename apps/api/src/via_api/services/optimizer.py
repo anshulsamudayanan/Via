@@ -45,6 +45,7 @@ def start(
     constraints: Constraints,
     options: dict[str, Any] | None,
     client: ClientInfo,
+    weights: dict[Objective, float] | None = None,
 ) -> tuple[AnalysisRun, bool]:
     design, project, _ = design_svc.get_design(
         db, ctx.user.id, design_id, ProjectRole.EDITOR, action="run optimizations"
@@ -58,6 +59,8 @@ def start(
         "constraints": constraints.model_dump(),
         "options": run_options,
     }
+    if weights:  # only when given, so runs without weights keep their old config shape
+        config["weights"] = {o.value: w for o, w in sorted(weights.items(), key=lambda kv: kv[0].value)}
     # Serialize starts on this revision so identical concurrent requests share one run.
     db.execute(select(DesignRevision.id).where(DesignRevision.id == revision.id).with_for_update())
     existing = db.scalar(select(AnalysisRun).where(AnalysisRun.revision_id == revision.id, AnalysisRun.kind == AnalysisKind.PCB_OPTIMIZATION,
@@ -112,11 +115,20 @@ def process(
         db.commit()
         return run
     cfg = run.config
+
+    def phase(text: str) -> None:
+        # Only what's being worked on: the work isn't measurable ahead of time, so there is no percentage.
+        run.result_summary = {"phase": text}
+        run.heartbeat_at = utcnow()
+        db.commit()
+
     result = optimize(
         design,
         [Objective(o) for o in cfg["objectives"]],
         Constraints.model_validate(cfg["constraints"]),
         cfg.get("options"),
+        {Objective(o): float(w) for o, w in cfg.get("weights", {}).items()},
+        phase,
     )
     db.execute(
         delete(DesignChange).where(
@@ -132,7 +144,8 @@ def process(
             algorithm=c.algorithm, algorithm_version=c.algorithm_version, objectives=c.objectives, title=c.title, summary=c.summary,
             metrics_before=c.metrics_before, metrics_after=c.metrics_after, expected_benefits=c.expected_benefits,
             trade_offs=c.trade_offs, validation=c.validation.model_dump(mode="json"), pareto=c.key in result.pareto,
-            status=c.status.value, details=c.details,
+            status=c.status.value, details=c.details, warnings=c.warnings, limitations=c.limitations,
+            execution=c.execution, score=c.score.model_dump(mode="json") if c.score else None, candidate_hash=c.candidate_hash,
         )  # fmt: skip
         db.add(row)
         db.flush()

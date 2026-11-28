@@ -8,6 +8,10 @@ compared on a Pareto front over the requested objectives.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import time
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,13 +21,15 @@ from via_opt.candidates import Candidate, CandidateStatus, Validation, Validatio
 from via_opt.changes import Change, ChangeKind, Target
 from via_opt.comparison import pareto_front
 from via_opt.constraints import Constraints
+from via_opt.modules import spec_for
 from via_opt.objectives import METRIC_FOR, Objective, metrics
+from via_opt.ranking import rank
 from via_opt.validation import validate
 from via_pcb.analysis import default_engine
 from via_pcb.analysis.context import AnalysisContext
 from via_pcb.models import PCBDesign
 
-OPTIMIZER_VERSION = "1.0.0"
+OPTIMIZER_VERSION = "1.1.0"
 
 #: Human-readable metric names and units, for benefits/trade-offs text.
 LABELS = {
@@ -77,6 +83,7 @@ def _candidate(
     extra_trade_offs: list[str] | None = None,
     details: dict[str, Any] | None = None,
 ) -> Candidate:
+    started = time.perf_counter()
     validation, after = validate(design, changes, cons, options)
     after_metrics = metrics(after, options) if after is not None else {}
     benefits, worse = _deltas(baseline, after_metrics)
@@ -86,23 +93,56 @@ def _candidate(
         ValidationStatus.FAILED: CandidateStatus.REJECTED,
         ValidationStatus.REQUIRES_REROUTING: CandidateStatus.AWAITING_VALIDATION,
         ValidationStatus.MANUAL: CandidateStatus.PROPOSED,
+        ValidationStatus.UNVERIFIED: CandidateStatus.AWAITING_VALIDATION,
     }[validation.status]
-    return Candidate(
-        key=key,
-        algorithm=algorithm,
-        algorithm_version=version,
-        objectives=[o.value for o in objectives],
-        title=title,
-        summary=summary,
-        changes=changes,
-        metrics_before=baseline,
-        metrics_after=after_metrics,
-        expected_benefits=benefits,
-        trade_offs=trade_offs,
-        validation=validation,
-        status=status,
-        details=details or {},
+    return finish(
+        Candidate(
+            key=key,
+            algorithm=algorithm,
+            algorithm_version=version,
+            objectives=[o.value for o in objectives],
+            title=title,
+            summary=summary,
+            changes=changes,
+            metrics_before=baseline,
+            metrics_after=after_metrics,
+            expected_benefits=benefits,
+            trade_offs=trade_offs,
+            validation=validation,
+            status=status,
+            details=details or {},
+        ),
+        started,
     )
+
+
+def _hash(c: Candidate) -> str:
+    canonical = {
+        "algorithm": c.algorithm,
+        "version": c.algorithm_version,
+        "changes": [ch.model_dump(mode="json") for ch in c.changes],
+    }
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def finish(c: Candidate, started: float) -> Candidate:
+    """Adds what every candidate carries: hash, warnings, limitations and execution metadata."""
+    spec = spec_for(c.key)
+    c.candidate_hash = _hash(c)
+    c.limitations = [
+        *(spec.limitations if spec else []),
+        "'Validated' means VIA's own checks found no new problem; KiCad DRC runs only after a change set is applied.",
+    ]
+    c.warnings = [
+        *c.validation.notes,
+        *(
+            f"{len(c.validation.new_problems)} new problem(s) seen on the modified design."
+            for _ in [0]
+            if c.validation.new_problems
+        ),
+    ]
+    c.execution = {"deterministic": True, "seed": None, "evaluation_seconds": round(time.perf_counter() - started, 3)}
+    return c
 
 
 def optimize(
@@ -110,17 +150,23 @@ def optimize(
     objectives: list[Objective],
     cons: Constraints | None = None,
     options: dict[str, Any] | None = None,
+    weights: Mapping[Objective, float] | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> OptimizationResult:
+    """``progress`` is told the phase being worked on (never a percentage: the work isn't measurable ahead of time)."""
+    say = progress or (lambda _: None)
     cons = cons or Constraints()
     options = dict(options or {})
     ctx = AnalysisContext(design=design, options=options)
     profile = ctx.profile
+    say("Measuring the original design")
     baseline = metrics(design, options)
     wanted = set(objectives)
     cands: list[Candidate] = []
     notes: list[str] = []
 
     if wanted & {Objective.AREA, Objective.COST}:
+        say("Board area")
         changes, why = outline.outline_fit(design, cons, profile)
         if changes:
             cands.append(
@@ -143,6 +189,7 @@ def optimize(
             notes.append(f"Area: {why}")
 
     if wanted & {Objective.MANUFACTURABILITY, Objective.COST}:
+        say("Manufacturability")
         vias, blocked = copper.standardize_vias(ctx, profile)
         if vias:
             cands.append(
@@ -188,6 +235,7 @@ def optimize(
             notes.append(f"Manufacturability: tracks and vias already meet {profile.name} (or can't grow).")
 
     if Objective.THERMAL in wanted:
+        say("Current capacity")
         power = options.get("power")
         targets = copper.power_targets(ctx, power) if isinstance(power, dict) else {}
         if not targets:
@@ -218,6 +266,7 @@ def optimize(
                 notes.append("Thermal: power tracks already meet their targets, or can't grow within clearance.")
 
     if wanted & {Objective.PLACEMENT, Objective.ROUTING}:
+        say("Placement")
         moves, before_r, after_r = placement.improve_placement(design, cons)
         if moves:
             cands.append(
@@ -240,6 +289,7 @@ def optimize(
             notes.append("Placement: no move that shortens connections fits within the constraints.")
 
     if Objective.LAYERS in wanted:
+        say("Layer usage")
         usage = default_engine().run(design, options=options, only={"copper_layer_usage"})
         unused = [f.objects[0].id for f in usage.findings]
         count = design.stats.copper_layer_count
@@ -250,18 +300,20 @@ def optimize(
                 change = Change(kind=ChangeKind.SET_COPPER_LAYER_COUNT, target=Target(kind="stackup", id="stackup", label="Copper layers"),
                                 before={"count": count, "unused": unused}, after={"count": target},
                                 reason=f"{', '.join(unused)} carry no routing; a {target}-layer stackup may suffice.")  # fmt: skip
-                cands.append(Candidate(
+                cands.append(finish(Candidate(
                     key="layer_reduction", algorithm="layer_usage", algorithm_version="1.0.0", objectives=[Objective.LAYERS.value, Objective.COST.value],
                     title=f"Consider a {target}-layer board", summary=change.reason, changes=[change], metrics_before=baseline, metrics_after={},
                     expected_benefits=[f"copper layers: {count} -> {target}"],
                     trade_offs=["Needs a new stackup and re-check of impedance and plane strategy in KiCad.", "Unused layers may be planned for shielding or symmetry."],
                     validation=Validation(status=ValidationStatus.MANUAL, notes=["Layer count changes are made in KiCad, not exported by VIA."]),
                     status=CandidateStatus.PROPOSED,
-                ))  # fmt: skip
+                ), time.perf_counter()))  # fmt: skip
         else:
             notes.append("Layers: every copper layer carries routing.")
 
+    say("Comparing candidates")
     keys = [METRIC_FOR[o] for o in objectives]
+    rank(cands, baseline, weights or {})
     points = {c.key: c.metrics_after for c in cands if c.metrics_after and c.status != CandidateStatus.REJECTED}
     return OptimizationResult(
         objectives=list(objectives),

@@ -7,14 +7,14 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Response, status
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-from via_opt import METRIC_FOR, Constraints, Objective, dominates, pareto_front
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import exists, func, select
+from via_opt import METRIC_FOR, MODULES, Constraints, ModuleSpec, Objective, dominates, lifecycle, pareto_front
 
 from via_api.deps import DB, Client, CurrentAuth, Limiter, Queue
 from via_api.errors import APIError, error_responses
-from via_api.models import AnalysisRun, DesignChange, DesignRevision, OptimizationCandidate
-from via_api.models.enums import AnalysisKind, ProjectRole
+from via_api.models import AnalysisRun, ChangeSet, DesignChange, DesignRevision, OptimizationCandidate
+from via_api.models.enums import AnalysisKind, ChangeSetStatus, ProjectRole
 from via_api.ratelimit import ANALYSES_PER_USER
 from via_api.schemas.analysis import AnalysisOptions
 from via_api.services import designs as design_svc
@@ -28,6 +28,18 @@ class OptimizationStart(BaseModel):
     objectives: list[Objective] = Field(min_length=1, max_length=7)
     constraints: Constraints = Field(default_factory=Constraints)
     options: AnalysisOptions | None = None
+    weights: dict[Objective, float] | None = Field(
+        default=None,
+        description="Optional preference weights (>= 0) over the requested objectives. Order only: never changes validation.",
+    )
+
+    @model_validator(mode="after")
+    def _weights_match_objectives(self) -> OptimizationStart:
+        if self.weights:
+            extra = set(self.weights) - set(self.objectives)
+            if extra or any(not 0 <= w <= 1000 for w in self.weights.values()):
+                raise ValueError("weights must be between 0 and 1000 and only for the requested objectives")
+        return self
 
 
 class OptimizationRunOut(BaseModel):
@@ -77,6 +89,14 @@ class CandidateOut(BaseModel):
     status_reason: str | None
     change_count: int
     exportable_changes: int
+    # Added in optimizer 1.1.0 (older candidates have empty values)
+    lifecycle: str
+    constraints_evaluated: list[dict[str, Any]]
+    warnings: list[str]
+    limitations: list[str]
+    execution: dict[str, Any]
+    score: dict[str, Any] | None
+    candidate_hash: str
 
 
 class CandidateDetail(CandidateOut):
@@ -120,13 +140,22 @@ def _counts(db: DB, cand_id: uuid.UUID) -> tuple[int, int]:
     return total, exp
 
 
+def _applied(db: DB, cand_id: uuid.UUID) -> bool:
+    """True when a change set made from this candidate has been applied."""
+    return bool(db.scalar(select(exists().where(DesignChange.origin_candidate_id == cand_id, DesignChange.change_set_id == ChangeSet.id,
+                                                ChangeSet.status == ChangeSetStatus.APPLIED))))  # fmt: skip
+
+
 def _cand_out(db: DB, c: OptimizationCandidate) -> CandidateOut:
     total, exp = _counts(db, c.id)
     return CandidateOut(id=c.id, run_id=c.run_id, key=c.key, algorithm=c.algorithm, algorithm_version=c.algorithm_version,
                         objectives=list(c.objectives), title=c.title, summary=c.summary, metrics_before=c.metrics_before,
                         metrics_after=c.metrics_after, expected_benefits=c.expected_benefits, trade_offs=c.trade_offs,
                         validation=c.validation, pareto=c.pareto, status=c.status, status_reason=c.status_reason,
-                        change_count=total, exportable_changes=exp)  # fmt: skip
+                        change_count=total, exportable_changes=exp,
+                        lifecycle=lifecycle(c.status, str(c.validation.get("status", "")), c.status_reason, _applied(db, c.id)),
+                        constraints_evaluated=c.validation.get("constraints", []), warnings=c.warnings, limitations=c.limitations,
+                        execution=c.execution, score=c.score, candidate_hash=c.candidate_hash)  # fmt: skip
 
 
 def _detail(db: DB, c: OptimizationCandidate) -> CandidateDetail:
@@ -138,13 +167,19 @@ def _detail(db: DB, c: OptimizationCandidate) -> CandidateDetail:
                                               after=ch.after, reason=ch.reason, source=ch.source, exportable=ch.exportable) for ch in changes])  # fmt: skip
 
 
+@router.get("/optimization-modules", response_model=list[ModuleSpec], responses=error_responses(401))
+def list_modules(ctx: CurrentAuth) -> list[ModuleSpec]:
+    """What each optimization module understands, requires, can't evaluate and preserves, and how complete it is."""
+    return MODULES
+
+
 @router.post("/designs/{design_id}/optimization-runs", response_model=OptimizationRunOut, status_code=status.HTTP_202_ACCEPTED,
              responses=error_responses(401, 403, 404, 409, 422, 429, 503))  # fmt: skip
 def start_run(design_id: uuid.UUID, body: OptimizationStart, response: Response, db: DB, ctx: CurrentAuth, client: Client,
               limiter: Limiter, queue: Queue) -> OptimizationRunOut:  # fmt: skip
     """Generate, validate and compare candidates for the objectives, in the background. Never changes the design."""
     options = body.options.model_dump(exclude_none=True) if body.options else None
-    run, created = svc.start(db, ctx, design_id, body.objectives, body.constraints, options, client)
+    run, created = svc.start(db, ctx, design_id, body.objectives, body.constraints, options, client, body.weights)
     if not created:
         response.status_code = status.HTTP_200_OK
         return _run_out(db, run)

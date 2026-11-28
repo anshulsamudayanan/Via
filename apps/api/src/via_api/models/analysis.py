@@ -219,6 +219,12 @@ class OptimizationCandidate(UUIDPk, Timestamps, Base):
     decided_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    warnings: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    limitations: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    execution: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    #: Weighted preference (display order only); null when the run had no weights or the candidate isn't ranked
+    score: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    candidate_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
 
 
 class ChangeSet(UUIDPk, Timestamps, Base):
