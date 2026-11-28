@@ -83,7 +83,7 @@ export function AnalysisPanel({ projectId, designId, revisionId, canEdit, onHigh
       {run?.status === "succeeded" ? (
         <Findings key={run.id} run={run} projectId={projectId} canEdit={canEdit} ai={ai.data ?? null} onHighlight={onHighlight} />
       ) : null}
-      {run?.status === "succeeded" ? <Recommendations designId={designId} run={run} canEdit={canEdit} ai={ai.data ?? null} /> : null}
+      {run?.status === "succeeded" ? <Recommendations designId={designId} projectId={projectId} run={run} canEdit={canEdit} ai={ai.data ?? null} /> : null}
     </div>
   );
 }
@@ -381,18 +381,21 @@ function Explain({ findingId, projectId, external }: { findingId: string; projec
   );
 }
 
-function Recommendations({ designId, run, canEdit, ai }: { designId: string; run: AnalysisRun; canEdit: boolean; ai: AIStatus | null }) {
+function Recommendations({ designId, projectId, run, canEdit, ai }: { designId: string; projectId: string; run: AnalysisRun; canEdit: boolean; ai: AIStatus | null }) {
   const client = useApi();
   const recs = useAsync((s) => client.ai.recommendations(designId, undefined, s), [client, designId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsConsent, setNeedsConsent] = useState(false);
   async function review() {
     setBusy(true);
     setError(null);
+    setNeedsConsent(false);
     try {
       await client.ai.review(designId, run.id);
       recs.reload();
     } catch (err) {
+      setNeedsConsent(err instanceof ApiError && err.code === "consent_required");
       setError(errorMessage(err));
     } finally {
       setBusy(false);
@@ -418,6 +421,13 @@ function Recommendations({ designId, run, canEdit, ai }: { designId: string; run
         {canEdit && ai?.enabled ? <Button size="sm" onClick={() => void review()} disabled={busy}><Bot /> {busy ? "Reviewing…" : "AI design review"}</Button> : null}
       </CardHeader>
       {error ? <ErrorState className="mx-4 mb-3" title={error} /> : null}
+      {needsConsent ? (
+        <div className="mx-4 mb-3">
+          <Button size="sm" variant="ghost" onClick={() => void client.ai.grantConsent(projectId).then(() => review(), (e: unknown) => setError(errorMessage(e)))}>
+            Allow AI processing for this project
+          </Button>
+        </div>
+      ) : null}
       {items.length === 0 ? <EmptyState title="No recommendations yet" /> : (
         <ul className="divide-y divide-border text-sm">
           {items.map((r) => (
