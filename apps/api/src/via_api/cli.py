@@ -53,6 +53,24 @@ def _init_storage() -> int:
     return 0
 
 
+def _learn_reviewer(email: str, revoke: bool) -> int:
+    """Grant or remove the VIA Learn reviewer flag. Only an operator with server access can do this."""
+    from sqlalchemy import select
+
+    from via_api.db import get_sessionmaker
+    from via_api.models import User
+
+    with get_sessionmaker()() as db:
+        user = db.scalar(select(User).where(User.email == email.strip().lower()))
+        if user is None:
+            print(f"No user with email {email!r}.", file=sys.stderr)
+            return 1
+        user.learn_reviewer = not revoke
+        db.commit()
+        print(f"{user.email}: VIA Learn reviewer {'removed' if revoke else 'granted'}.")
+    return 0
+
+
 def _serve(host: str, port: int, reload: bool) -> int:
     import uvicorn
 
@@ -106,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     worker = sub.add_parser("worker", help="process background jobs (PCB imports)")
     worker.add_argument("--burst", action="store_true", help="exit when the queue is empty")
     sub.add_parser("check", help="run readiness checks")
+    reviewer = sub.add_parser("learn-reviewer", help="grant or remove the VIA Learn reviewer flag for a user")
+    reviewer.add_argument("email")
+    reviewer.add_argument("--revoke", action="store_true", help="remove the flag instead of granting it")
     args = parser.parse_args(argv)
     if args.command == "migrate":
         return _migrate()
@@ -115,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
         return _serve(args.host, args.port, args.reload)
     if args.command == "worker":
         return _worker(args.burst)
+    if args.command == "learn-reviewer":
+        return _learn_reviewer(args.email, args.revoke)
     return _check()
 
 

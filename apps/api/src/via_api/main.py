@@ -22,6 +22,7 @@ from via_api.routes import (
     files,
     health,
     intelligence,
+    learn,
     optimization,
     organizations,
     pcb,
@@ -77,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(designs.router)
     v1.include_router(files.router)
     v1.include_router(ai.router)
+    v1.include_router(learn.router)
     v1.include_router(analysis.router)
     v1.include_router(intelligence.router)
     v1.include_router(optimization.router)

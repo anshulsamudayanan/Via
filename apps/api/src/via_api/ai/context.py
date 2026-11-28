@@ -18,11 +18,14 @@ from sqlalchemy.orm import Session
 from via_ai.context import (
     MAX_COMPONENTS,
     MAX_FINDINGS,
+    MAX_KNOWLEDGE,
+    MAX_KNOWLEDGE_CHARS,
     MAX_NETS,
     ContextComponent,
     ContextComponentRecord,
     ContextFinding,
     ContextFocus,
+    ContextKnowledge,
     ContextLayer,
     ContextPurpose,
     ProjectContext,
@@ -39,7 +42,7 @@ from via_api.models import (
     PCBNet,
 )
 from via_api.models.enums import AnalysisKind, AnalysisStatus, ConsentScope
-from via_api.services import components, designs
+from via_api.services import components, designs, learn
 from via_api.services.consent import active_consent
 
 
@@ -65,6 +68,7 @@ class DatabaseContextProvider:
         external: bool,
         focus: tuple[str, str] | None = None,
         run_id: uuid.UUID | None = None,
+        question: str | None = None,
     ) -> ProjectContext:
         db = self.db
         design, project, _ = designs.get_design(db, user_id, design_id)
@@ -124,7 +128,24 @@ class DatabaseContextProvider:
             focus=context_focus,
             design_rules=self._rules(revision),
             component_records=self._records(project.id, revision.id),
+            knowledge=self._knowledge(question, findings),
         )
+
+    def _knowledge(self, question: str | None, findings: list[ContextFinding]) -> list[ContextKnowledge]:
+        """Approved library entries relevant to the question and top findings. Reads only the Learn store
+        (``learn.search`` takes no project input), so no project data can come back as knowledge."""
+        text = " ".join([question or "", *(f"{f.title} {f.rule}" for f in findings[:10])])
+        if not text.strip():
+            return []
+        hits, _ = learn.search(self.db, text, ai_only=True, limit=MAX_KNOWLEDGE)
+        return [
+            ContextKnowledge(
+                id=str(h.entry.id), version=h.entry.version, category=h.entry.category.value, title=h.entry.title,
+                text=h.entry.description[:MAX_KNOWLEDGE_CHARS], verification=h.entry.verification_status.value,
+                source=h.entry.source[:200], score=round(h.score, 3),
+            )
+            for h in hits
+        ]  # fmt: skip
 
     # --- Stage 2 additions ------------------------------------------------------------------
 

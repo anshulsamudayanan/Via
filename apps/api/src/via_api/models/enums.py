@@ -86,3 +86,52 @@ class ConsentScope(StrEnum):
     EXTERNAL_AI_PROCESSING = "external_ai_processing"
     #: Allow looking up the design's manufacturer part numbers with a supplier (Mouser) for prices and stock.
     SUPPLIER_LOOKUP = "supplier_lookup"
+
+
+class FeedbackType(StrEnum):
+    """What a user says about an AI recommendation. Accepting is *not* proof it is correct."""
+
+    HELPFUL = "helpful"
+    UNHELPFUL = "unhelpful"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CORRECTION = "correction"
+    INCORRECT_ASSUMPTION = "incorrect_assumption"
+    COMMENT = "comment"
+
+
+class LearnCategory(StrEnum):
+    PCB_DESIGN_PATTERN = "pcb_design_pattern"
+    COMPONENT_SELECTION = "component_selection"
+    ROUTING_PRACTICE = "routing_practice"
+    THERMAL_DESIGN = "thermal_design"
+    SIGNAL_INTEGRITY = "signal_integrity"
+    MANUFACTURING_CONSTRAINT = "manufacturing_constraint"
+    BOM_COST_INSIGHT = "bom_cost_insight"
+    OPTIMIZATION_EXAMPLE = "optimization_example"
+    VERIFIED_RECOMMENDATION = "verified_recommendation"
+
+
+class LearnStatus(StrEnum):
+    """Lifecycle of a contribution. Only ``approved`` entries are searchable or reach the AI."""
+
+    DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
+class LearnVerification(StrEnum):
+    """How much a reviewer vouches for an entry. Approval alone does not make it verified."""
+
+    UNVERIFIED = "unverified"
+    REVIEWED = "reviewed"
+    VERIFIED = "verified"
+
+
+class LearnOrigin(StrEnum):
+    #: Derived from a recommendation on a private project (identifiers removed; owner consent required).
+    PROJECT_DERIVED = "project_derived"
+    #: Written by the contributor, not derived from any project.
+    FREE_TEXT = "free_text"

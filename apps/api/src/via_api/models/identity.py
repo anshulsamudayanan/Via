@@ -22,6 +22,8 @@ class User(UUIDPk, Timestamps, Base):
     display_name: Mapped[str] = mapped_column(String(120))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: May approve and verify VIA Learn contributions. Set only through the server CLI (`via-api learn-reviewer`).
+    learn_reviewer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     sessions: Mapped[list[UserSession]] = relationship(back_populates="user", cascade="all, delete-orphan")

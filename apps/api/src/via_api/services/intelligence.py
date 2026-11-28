@@ -15,9 +15,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from via_ai import AIError, AIProvider, AIRefusedError, AIResult, ContextPurpose, explain, review
+from via_ai.verification import cited_knowledge
 from via_api.ai.context import DatabaseContextProvider
 from via_api.errors import APIError
-from via_api.models import AIOutput, DesignRevision, RecommendationRow
+from via_api.models import AIOutput, AIOutputKnowledge, DesignRevision, RecommendationRow
 from via_api.services import activity
 from via_api.services.activity import ClientInfo
 from via_api.services.auth import AuthContext
@@ -48,6 +49,16 @@ def _store(db: Session, ctx: AuthContext, provider: AIProvider, kind: str, conte
         created_by_id=ctx.user.id,
     )  # fmt: skip
     db.add(row)
+    db.flush()
+    # Which library entries the model was shown, and which it cited (only a citation shows influence).
+    cited = cited_knowledge(result.value)
+    for rank, k in enumerate(context.knowledge):
+        db.add(
+            AIOutputKnowledge(
+                ai_output_id=row.id, entry_id=uuid.UUID(k.id), entry_version=k.version, rank=rank, score=k.score,
+                cited=k.id in cited,
+            )
+        )  # fmt: skip
     db.flush()
     return row
 
@@ -83,7 +94,7 @@ def explain_design(db: Session, ctx: AuthContext, provider: AIProvider, design_i
     _require(provider)
     context = DatabaseContextProvider(db).build(
         user_id=ctx.user.id, design_id=design_id, purpose=ContextPurpose.EXPLAIN,
-        external=provider.capabilities.external, focus=focus, run_id=run_id,
+        external=provider.capabilities.external, focus=focus, run_id=run_id, question=question,
     )  # fmt: skip
     result = _call(explain, provider, context, question)
     row = _store(db, ctx, provider, "explanation", context, result, question,

@@ -21,6 +21,9 @@ from pydantic import BaseModel, ConfigDict, Field
 MAX_COMPONENTS = 500
 MAX_NETS = 1000
 MAX_FINDINGS = 200
+#: Knowledge entries shown to the model per request, and how much of each (the token budget is tight).
+MAX_KNOWLEDGE = 3
+MAX_KNOWLEDGE_CHARS = 600
 
 
 class ContextPurpose(StrEnum):
@@ -70,6 +73,21 @@ class ContextComponentRecord(BaseModel):
     verification: str = "unverified"
 
 
+class ContextKnowledge(BaseModel):
+    """An approved entry from the VIA Learn library. General engineering knowledge, never data about this board."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    version: int
+    category: str
+    title: str
+    text: str
+    verification: str = Field(description="verified | reviewed | unverified (unverified = nobody has confirmed it)")
+    source: str
+    score: float = Field(description="Relevance times verification weight")
+
+
 class ContextComponent(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -110,6 +128,8 @@ class ProjectContext(BaseModel):
     focus: ContextFocus | None = None
     design_rules: dict[str, float | bool | str | None] = Field(default_factory=dict)
     component_records: list[ContextComponentRecord] = Field(default_factory=list)
+    #: Approved VIA Learn entries relevant to the question or findings (best first); empty when none match.
+    knowledge: list[ContextKnowledge] = Field(default_factory=list)
 
 
 class ContextProvider(Protocol):
@@ -122,6 +142,7 @@ class ContextProvider(Protocol):
         external: bool,
         focus: tuple[str, str] | None = None,
         run_id: uuid.UUID | None = None,
+        question: str | None = None,
     ) -> ProjectContext:
         """Build context for a model call, enforcing access and consent. Raises on denial."""
         ...

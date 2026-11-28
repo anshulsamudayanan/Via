@@ -33,6 +33,8 @@ class UserOut(APIModel):
     email: str
     display_name: str
     email_verified_at: datetime | None
+    #: May review VIA Learn contributions (set only through the server CLI).
+    learn_reviewer: bool = False
     created_at: datetime
 
 

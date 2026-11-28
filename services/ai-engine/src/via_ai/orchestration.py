@@ -48,19 +48,21 @@ def fit_context(
     provider: AIProvider, context: ProjectContext, size_of: Callable[[ProjectContext], int]
 ) -> ProjectContext:
     """Trim the context until the prompt fits the provider's input budget. Lowest-priority data goes first
-    (nets, then components, then the tail of the severity-ordered findings); what was left out is recorded in
-    ``truncated`` so the model and the verifier work from exactly what it was shown."""
+    (nets and components, then library knowledge, then the tail of the severity-ordered findings). What was
+    left out is recorded in ``truncated`` so the model and the verifier work from exactly what it was shown."""
     budget = provider.input_token_budget
     if budget is None:
         return context
-    lists = ("net_names", "components", "findings")
+    # Trimmed in this order: board lists first, then knowledge (it only supplements), findings last.
+    tiers = (("net_names", "components"), ("knowledge",), ("findings",))
     dropped = dict(context.truncated)
     current = context
     while size_of(current) // CHARS_PER_TOKEN > budget:
-        field = max(lists, key=lambda f: len(getattr(current, f)))
-        items = getattr(current, field)
-        if not items:
+        tier = next((t for t in tiers if any(getattr(current, f) for f in t)), None)
+        if tier is None:
             raise AIError("This design's context is too large for the configured AI input limit.")
+        field = max(tier, key=lambda f: len(getattr(current, f)))
+        items = getattr(current, field)
         keep = len(items) // 2
         dropped[field] = dropped.get(field, 0) + len(items) - keep
         current = current.model_copy(update={field: items[:keep], "truncated": dict(dropped)})

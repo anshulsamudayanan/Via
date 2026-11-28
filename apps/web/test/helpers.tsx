@@ -9,7 +9,7 @@ import { ApiProvider } from "@/components/api-context";
 import { SessionContext } from "@/components/session";
 
 export const me: MeResponse = {
-  user: { id: "u1", email: "ada@example.com", display_name: "Ada Lovelace", email_verified_at: null, created_at: "2026-11-01T10:00:00Z" },
+  user: { id: "u1", email: "ada@example.com", display_name: "Ada Lovelace", email_verified_at: null, learn_reviewer: false, created_at: "2026-11-01T10:00:00Z" },
   organizations: [{ id: "o1", name: "Ada Lovelace's workspace", slug: "u-1", is_personal: true, role: "owner" }],
 };
 
@@ -78,6 +78,15 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
       consent: vi.fn(), grantConsent: vi.fn(), explain: vi.fn(), explainFinding: vi.fn(), review: vi.fn(),
       recommendations: vi.fn().mockResolvedValue([]), decideRecommendation: vi.fn(), componentMatches: vi.fn(),
     },
+    learn: {
+      meta: vi.fn().mockResolvedValue({ categories: [], verification_levels: [], is_reviewer: false, policy_version: "v", retrieval: { method: "postgres_full_text", semantic: false, note: "Keyword search." } }),
+      search: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 }), entry: vi.fn(), versions: vi.fn().mockResolvedValue([]),
+      contributions: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 }), contribute: vi.fn(), contributeRecommendation: vi.fn(),
+      submit: vi.fn(), deleteDraft: vi.fn(), withdraw: vi.fn(), setPermissions: vi.fn(),
+      reviewQueue: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 }), review: vi.fn(), setVerification: vi.fn(),
+      feedback: vi.fn(), feedbackHistory: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 }),
+      consent: vi.fn(), grantConsent: vi.fn(), revokeConsent: vi.fn(), evaluation: vi.fn(), globalEvaluation: vi.fn(),
+    },
     optimization: { start: vi.fn(), runs: vi.fn().mockResolvedValue([]), run: vi.fn(), candidates: vi.fn(), compare: vi.fn(), candidate: vi.fn(), decide: vi.fn(), reportUrl: vi.fn(() => "/report.md"), supplierStatus: vi.fn().mockResolvedValue({ provider: "mouser", configured: false }), supplierConsent: vi.fn().mockResolvedValue({ granted: false, granted_at: null, policy_version: "v" }), grantSupplierConsent: vi.fn(), revokeSupplierConsent: vi.fn() },
     changes: {
       create: vi.fn(), list: vi.fn().mockResolvedValue([]), get: vi.fn(), preview: vi.fn(), removeChange: vi.fn(), discard: vi.fn(), apply: vi.fn(),
@@ -89,8 +98,8 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
   return base as unknown as ViaClient;
 }
 
-export function renderWith(ui: ReactNode, client: ViaClient, session = true) {
-  const sessionValue = { me, setMe: vi.fn(), signOut: vi.fn() };
+export function renderWith(ui: ReactNode, client: ViaClient, session: boolean | { me: MeResponse } = true) {
+  const sessionValue = { me: typeof session === "object" ? session.me : me, setMe: vi.fn(), signOut: vi.fn() };
   return render(
     <ApiProvider client={client}>
       <TooltipProvider>

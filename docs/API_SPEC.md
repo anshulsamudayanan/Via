@@ -214,3 +214,6 @@ See docs/CHANGE_MANAGEMENT.md.
 ### Test coverage
 Every route is exercised by `tests/integration/test_security_regression.py` (authentication,
 CSRF, cross-user 404s, rate limits). Checkpoint 6 added no endpoints.
+
+## VIA Learn (Phase 4)
+Feedback, the knowledge library, contributions, review, per-project Learn consent and evaluation. Routes, roles and limits are in [VIA_LEARN.md](VIA_LEARN.md#api-apiv1).

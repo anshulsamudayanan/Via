@@ -42,6 +42,16 @@ QUERY_SCOPED = {
     ("GET", "/api/v1/designs"),
     ("GET", "/api/v1/files"),
     ("GET", "/api/v1/activity"),
+    ("GET", "/api/v1/learn/feedback"),
+    ("GET", "/api/v1/learn/evaluation"),
+}
+
+#: Routes only a VIA Learn reviewer may use: an ordinary user (stranger, or even the owner) gets 403, whatever the id.
+REVIEWER_ONLY = {
+    ("GET", "/api/v1/learn/review"),
+    ("GET", "/api/v1/learn/evaluation/global"),
+    ("POST", "/api/v1/learn/contributions/{entry_id}/review"),
+    ("PUT", "/api/v1/learn/entries/{entry_id}/verification"),
 }
 
 PROFILE = {
@@ -73,6 +83,18 @@ BODIES = {
     ("POST", "/api/v1/designs/{design_id}/optimization-runs"): {"objectives": ["area"]},
     ("POST", "/api/v1/optimization-candidates/{candidate_id}/decision"): {"status": "rejected", "reason": "pwned"},
     ("POST", "/api/v1/designs/{design_id}/change-sets"): {"title": "pwned"},
+    ("POST", "/api/v1/recommendations/{recommendation_id}/feedback"): {"feedback_type": "helpful"},
+    ("POST", "/api/v1/recommendations/{recommendation_id}/contribute"): {},
+    ("POST", "/api/v1/learn/contributions"): {
+        "category": "routing_practice",
+        "title": "A title that is long enough",
+        "description": "A description that is comfortably long enough to pass validation.",
+        "source": "own experience",
+        "confirm_rights": True,
+    },
+    ("PUT", "/api/v1/learn/contributions/{entry_id}/permissions"): {"ai_retrieval": False},
+    ("POST", "/api/v1/learn/contributions/{entry_id}/review"): {"decision": "approve"},
+    ("PUT", "/api/v1/learn/entries/{entry_id}/verification"): {"verification_status": "unverified"},
 }
 
 #: Required query parameters (other than project_id) for routes that take them.
@@ -99,6 +121,7 @@ ID_PARAMS = (
     "candidate_id",
     "change_set_id",
     "change_id",
+    "entry_id",
 )
 
 
@@ -167,7 +190,14 @@ def world(make_client, db):
         json={"changes": [{"kind": "move_component", "target": {"kind": "component", "id": comp["id"]},
                            "after": {"x": comp["position"]["x"] + 1, "y": comp["position"]["y"]}}]},
     ).json()  # fmt: skip
+    draft = owner.post(
+        "/api/v1/learn/contributions",
+        json={"category": "routing_practice", "title": "Keep return paths short", "source": "own experience",
+              "description": "Keep the return path of a fast signal directly under the trace to limit loop area.",
+              "confirm_rights": True},
+    ).json()  # fmt: skip
     ids = {
+        "entry_id": draft["id"],
         "project_id": project["id"],
         "design_id": imported["design"]["id"],
         "revision_id": imported["revision"]["id"],
@@ -252,6 +282,8 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     id_params = set(ID_PARAMS)
     checked: list[tuple[str, str]] = []
     for method, path in sorted(api_routes(app) - PUBLIC):
+        if (method, path) in REVIEWER_ONLY:
+            continue  # 403 for ordinary users: see test_reviewer_only_routes_refuse_ordinary_users
         params = set(re.findall(r"\{(\w+)\}", path))
         scoped = (method, path) in QUERY_SCOPED or (method, path) == ("POST", "/api/v1/pcb/import")
         if not (params & id_params or scoped):
@@ -284,6 +316,19 @@ def test_every_scoped_route_hides_other_users_data(app, world):
     cs = owner.get(f"/api/v1/change-sets/{ids['change_set_id']}").json()
     assert cs["status"] == "draft" and len(cs["changes"]) == 1  # not applied, discarded or edited by the stranger
     assert owner.get(f"/api/v1/designs/{ids['design_id']}").json()["revision_count"] == 1
+    mine = owner.get("/api/v1/learn/contributions").json()["items"]
+    assert [(e["id"], e["status"]) for e in mine] == [(ids["entry_id"], "draft")]  # not submitted, withdrawn or deleted
+    assert owner.get(f"/api/v1/projects/{ids['project_id']}/learn-consent").json()["granted"] is False
+
+
+def test_reviewer_only_routes_refuse_ordinary_users(app, world):
+    owner, stranger, ids = world
+    for method, path in sorted(REVIEWER_ONLY):
+        for client in (owner, stranger):
+            resp = send(client, method, path, ids)
+            assert resp.status_code == 403, (method, path, resp.status_code, resp.text[:200])
+            assert resp.json()["error"]["code"] == "forbidden"
+    assert owner.get(f"/api/v1/learn/entries/{ids['entry_id']}").json()["status"] == "draft"
 
 
 @pytest.mark.parametrize(
@@ -301,8 +346,13 @@ def test_every_scoped_route_hides_other_users_data(app, world):
          {"email": "stranger@example.com", "role": "viewer"}),
         (ratelimit.ANALYSES_PER_USER, "{user_id}", "post", "/api/v1/designs/{design_id}/analysis-runs",
          {"checks": ["board_outline"]}),
+        (ratelimit.FEEDBACK_PER_USER, "{user_id}", "post", "/api/v1/recommendations/{recommendation_id}/feedback",
+         {"feedback_type": "helpful"}),
+        (ratelimit.LEARN_WRITES_PER_USER, "{user_id}", "post", "/api/v1/learn/contributions",
+         BODIES[("POST", "/api/v1/learn/contributions")]),
     ],
-    ids=["register", "login", "password-reset", "password-change", "member-lookup", "analysis"],
+    ids=["register", "login", "password-reset", "password-change", "member-lookup", "analysis", "feedback",
+         "learn-write"],
 )  # fmt: skip
 def test_rate_limits_are_enforced(world, test_redis, limit, key, method, path, body):
     owner, _, ids = world

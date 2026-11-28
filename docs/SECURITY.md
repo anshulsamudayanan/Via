@@ -79,7 +79,14 @@ Also recorded: design uploaded / upload rejected (with reason) / parsed / parse 
 
 ## Privacy & consent
 - Uploaded files are **never** automatically contributed to VIA Learn or used for model training.
-- `data_consents` records explicit, scoped, revocable consent. No consent is granted by default and Stage 1 has no flow that uses it *(CP2 schema)*.
+- `data_consents` records explicit, scoped, revocable consent. No consent is granted by default and `via_learn_contribution` is used only by VIA Learn, per project, owner-granted and revocable ✅.
+- VIA Learn (Phase 4, see [VIA_LEARN.md](VIA_LEARN.md)) ✅:
+  - nothing is contributed automatically; project-derived drafts need owner consent, a deterministic scrub (designators, nets, names, UUIDs, file names) and a per-item submit;
+  - the collective tables have no foreign keys to projects, designs, revisions or files, and retrieval returns approved entries only;
+  - reviewers are set only by the server CLI, cannot review their own entries, and see only global counts and rates;
+  - withdrawal removes an entry from retrieval at once and erases its content;
+  - contributor identity is never in library responses; writes are rate limited and audited;
+  - a separate database role for the collective store is not yet in place.
 - AI providers are **disabled by default** (`VIA_AI_PROVIDER=none`): the disabled provider raises on every call and nothing fabricates output in its place ✅.
 - API keys only come from the environment, read by the provider SDK; `/ai/status` never exposes them ✅.
 - Project data reaches a model only through `ContextProvider` (`via_api/ai/context.py`), which checks project access (404 otherwise) and, for external providers, an active per-project `external_ai_processing` consent granted by the project owner (403 `consent_required` otherwise). Consent is policy-versioned, revocable with immediate effect, and audited ✅.

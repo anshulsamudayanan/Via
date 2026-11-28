@@ -199,9 +199,10 @@ Stage 1 is built to run locally. A public deployment additionally needs, at mini
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): system design, decisions, risks, dependencies
-- [docs/DATABASE.md](docs/DATABASE.md): schema, migrations, authorization model, VIA Learn readiness
+- [docs/DATABASE.md](docs/DATABASE.md): schema, migrations, authorization model, VIA Learn tables
 - [docs/API_SPEC.md](docs/API_SPEC.md): API conventions, error format, endpoints
 - [docs/ENGINEERING.md](docs/ENGINEERING.md): PCB engine, KiCad support and validation
+- [docs/VIA_LEARN.md](docs/VIA_LEARN.md): opt-in knowledge library, feedback, retrieval, evaluation
 - [docs/SECURITY.md](docs/SECURITY.md): security and privacy design
 - [docs/ROADMAP.md](docs/ROADMAP.md): checkpoints and later stages
 - [docs/PRD.md](docs/PRD.md): product requirements

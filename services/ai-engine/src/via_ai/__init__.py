@@ -17,7 +17,14 @@ through an authorized, consented ``ContextProvider``; outputs are never
 fabricated (a disabled or refusing provider raises instead of answering).
 """
 
-from via_ai.context import ContextFinding, ContextFocus, ContextProvider, ContextPurpose, ProjectContext
+from via_ai.context import (
+    ContextFinding,
+    ContextFocus,
+    ContextKnowledge,
+    ContextProvider,
+    ContextPurpose,
+    ProjectContext,
+)
 from via_ai.orchestration import AIResult, explain, review
 from via_ai.providers import (
     AIError,
@@ -49,6 +56,7 @@ __all__ = [
     "ChatMessage",
     "ContextFinding",
     "ContextFocus",
+    "ContextKnowledge",
     "ContextProvider",
     "ContextPurpose",
     "DesignReview",

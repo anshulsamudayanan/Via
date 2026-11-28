@@ -22,11 +22,13 @@ from via_api.models.identity import (
     User,
     UserSession,
 )
+from via_api.models.learn import AIOutputKnowledge, LearnEntry, LearnEntryVersion, RecommendationFeedback
 from via_api.models.pcb import PCBComponent, PCBGeometry, PCBLayer, PCBNet
 from via_api.models.project import Project, ProjectMembership
 
 __all__ = [
     "AIOutput",
+    "AIOutputKnowledge",
     "ActivityLog",
     "AnalysisFinding",
     "AnalysisRun",
@@ -40,6 +42,8 @@ __all__ = [
     "DesignRevision",
     "FindingEvidence",
     "FindingReviewEvent",
+    "LearnEntry",
+    "LearnEntryVersion",
     "ManufacturingProfileRow",
     "OptimizationCandidate",
     "Organization",
@@ -51,6 +55,7 @@ __all__ = [
     "PasswordResetToken",
     "Project",
     "ProjectMembership",
+    "RecommendationFeedback",
     "RecommendationRow",
     "UploadRecord",
     "User",

@@ -182,3 +182,46 @@ def test_design_rules_in_the_context_can_be_cited_but_invented_ones_cannot():
     assert not report.ok and report.unknown_references == ["design_rule:min_hole_to_hole"]
     assert not verify(ok, context()).ok  # no rules in the context: nothing to cite
     assert not verify(ok.model_copy(update={"references": [Reference(kind="design_rule", id="rules_source")]}), ctx).ok
+
+
+def _entry(i: int, text: str = "Join the outline into one closed loop."):
+    from via_ai import ContextKnowledge
+
+    return ContextKnowledge(id=f"k-{i}", version=1, category="manufacturing_constraint", title=f"Note {i}", text=text,
+                            verification="unverified", source="own bench", score=0.4)  # fmt: skip
+
+
+def test_only_retrieved_knowledge_can_be_cited_and_citations_are_reported():
+    from via_ai.schemas import Reference
+    from via_ai.verification import cited_knowledge, verify
+
+    ctx = context(knowledge=[_entry(1), _entry(2)])
+    cited = GOOD.model_copy(update={"references": [Reference(kind="knowledge", id="k-2")], "numbers_used": []})
+    assert verify(cited, ctx).ok and cited_knowledge(cited) == {"k-2"}
+    invented = GOOD.model_copy(update={"references": [Reference(kind="knowledge", id="k-9")], "numbers_used": []})
+    report = verify(invented, ctx)
+    assert not report.ok and report.unknown_references == ["knowledge:k-9"]
+    assert not verify(cited, context()).ok  # nothing retrieved, nothing citable
+
+
+def test_trimming_drops_board_lists_first_then_knowledge_then_findings():
+    from via_ai.orchestration import fit_context
+    from via_ai.prompts import review_messages
+
+    big = context(knowledge=[_entry(i, "Detail. " * 80) for i in range(3)]).model_copy(
+        update={"net_names": [f"NET{i}" for i in range(400)]}
+    )
+    provider = ScriptedProvider([])
+    size = lambda c: sum(map(len, review_messages(c)))  # noqa: E731
+
+    provider.input_token_budget = (size(big) - 2000) // 3  # trimming some of the nets is enough
+    fitted = fit_context(provider, big, size)
+    assert len(fitted.knowledge) == 3 and len(fitted.net_names) < 400 and fitted.findings == big.findings
+
+    lean = big.model_copy(update={"net_names": [], "components": [], "knowledge": []})
+    provider.input_token_budget = (
+        size(lean) // 3 + 60
+    )  # room for the findings and the trim note, but not for any knowledge
+    fitted = fit_context(provider, big, size)
+    assert fitted.net_names == [] and fitted.components == [] and fitted.knowledge == [] and len(fitted.findings) == 1
+    assert fitted.truncated["knowledge"] == 3

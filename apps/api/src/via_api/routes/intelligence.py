@@ -16,10 +16,11 @@ from via_api.ai import get_ai_provider
 from via_api.deps import DB, Client, CurrentAuth, Limiter
 from via_api.errors import APIError, error_responses, not_found
 from via_api.models import AIOutput, AnalysisFinding, ComponentRecord, PCBComponent, RecommendationRow
-from via_api.models.enums import ProjectRole
+from via_api.models.enums import FeedbackType, ProjectRole
 from via_api.ratelimit import AI_REQUESTS_PER_USER
-from via_api.services import access, components
+from via_api.services import access, components, learn
 from via_api.services import designs as design_svc
+from via_api.services import feedback as feedback_svc
 from via_api.services import intelligence as svc
 
 router = APIRouter(tags=["intelligence"])
@@ -45,6 +46,20 @@ class ReviewRequest(BaseModel):
     run_id: uuid.UUID | None = None
 
 
+class KnowledgeUsedOut(BaseModel):
+    """A VIA Learn entry the model was shown, with attribution. `cited` entries are the only ones shown to have
+    influenced the answer; the rest were retrieved but not used."""
+
+    entry_id: uuid.UUID
+    version: int
+    title: str
+    category: str
+    verification_status: str
+    source: str
+    status: str
+    cited: bool
+
+
 class AIOutputOut(BaseModel):
     id: uuid.UUID
     kind: str
@@ -60,6 +75,7 @@ class AIOutputOut(BaseModel):
     analysis_run_id: uuid.UUID | None
     revision_id: uuid.UUID
     created_at: Any
+    knowledge: list[KnowledgeUsedOut] = Field(default_factory=list)
 
 
 class RecommendationOut(BaseModel):
@@ -83,6 +99,7 @@ class RecommendationOut(BaseModel):
     status: str
     status_reason: str | None
     created_at: Any
+    knowledge: list[KnowledgeUsedOut] = Field(default_factory=list)
 
 
 class ReviewOut(BaseModel):
@@ -95,14 +112,15 @@ class RecommendationUpdate(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
 
 
-def _out(row: AIOutput) -> AIOutputOut:
+def _out(row: AIOutput, db: Any) -> AIOutputOut:
     return AIOutputOut(id=row.id, kind=row.kind, question=row.question, focus=row.focus, output=row.output,
                        grounding=row.verification, provider=row.provider, model=row.model,
                        prompt_version=row.prompt_version, analysis_run_id=row.analysis_run_id,
-                       revision_id=row.revision_id, created_at=row.created_at)  # fmt: skip
+                       revision_id=row.revision_id, created_at=row.created_at,
+                       knowledge=[KnowledgeUsedOut(**k) for k in learn.knowledge_used(db, [row.id])[row.id]])  # fmt: skip
 
 
-def _rec(r: RecommendationRow) -> RecommendationOut:
+def _rec(r: RecommendationRow, knowledge: dict[uuid.UUID, list[dict[str, Any]]]) -> RecommendationOut:
     d = r.details or {}
     return RecommendationOut(
         id=r.id, ai_output_id=r.ai_output_id, design_id=r.design_id, revision_id=r.revision_id, problem=r.problem,
@@ -110,7 +128,7 @@ def _rec(r: RecommendationRow) -> RecommendationOut:
         trade_offs=d.get("trade_offs", []), required_validation=d.get("required_validation", []),
         uncertainty=d.get("uncertainty", ""), references=d.get("references", []), numbers_used=d.get("numbers_used", []),
         evidence_finding_ids=list(r.evidence_finding_ids), confidence=r.confidence, status=r.status,
-        status_reason=r.status_reason, created_at=r.created_at,
+        status_reason=r.status_reason, created_at=r.created_at, knowledge=[KnowledgeUsedOut(**k) for k in knowledge.get(r.ai_output_id, [])],
     )  # fmt: skip
 
 
@@ -125,7 +143,7 @@ def explain_design(design_id: uuid.UUID, body: ExplainRequest, db: DB, ctx: Curr
     focus = (body.focus.kind, body.focus.id) if body.focus else None
     row = svc.explain_design(db, ctx, provider, design_id, body.question, focus, body.run_id, client)
     db.commit()
-    return _out(row)
+    return _out(row, db)
 
 
 @router.post("/findings/{finding_id}/explain", response_model=AIOutputOut,
@@ -139,7 +157,7 @@ def explain_finding(finding_id: uuid.UUID, body: FindingExplainRequest, db: DB, 
     row = svc.explain_design(db, ctx, provider, finding.design_id, body.question, ("finding", str(finding.id)),
                              finding.run_id, client)  # fmt: skip
     db.commit()
-    return _out(row)
+    return _out(row, db)
 
 
 @router.post("/designs/{design_id}/ai/review", response_model=ReviewOut,
@@ -152,7 +170,8 @@ def review_design(design_id: uuid.UUID, body: ReviewRequest, db: DB, ctx: Curren
     limiter.hit(AI_REQUESTS_PER_USER, str(ctx.user.id))
     row, recs = svc.review_design(db, ctx, provider, design_id, body.run_id, client)
     db.commit()
-    return ReviewOut(review=_out(row), recommendations=[_rec(r) for r in recs])
+    know = learn.knowledge_used(db, [row.id])
+    return ReviewOut(review=_out(row, db), recommendations=[_rec(r, know) for r in recs])
 
 
 @router.get(
@@ -168,7 +187,9 @@ def list_recommendations(
     stmt = select(RecommendationRow).where(RecommendationRow.design_id == design_id)
     if status_:
         stmt = stmt.where(RecommendationRow.status == status_)
-    return [_rec(r) for r in db.scalars(stmt.order_by(RecommendationRow.created_at.desc()).limit(200))]
+    rows = list(db.scalars(stmt.order_by(RecommendationRow.created_at.desc()).limit(200)))
+    know = learn.knowledge_used(db, list({r.ai_output_id for r in rows}))
+    return [_rec(r, know) for r in rows]
 
 
 @router.patch(
@@ -190,8 +211,10 @@ def update_recommendation(
             raise not_found("Recommendation") from exc
         raise
     rec.status, rec.status_reason = body.status, (body.reason or None)
+    if body.status in ("accepted", "rejected"):  # also kept as feedback history; accepting is not proof it is right
+        feedback_svc.record(db, ctx.user.id, rec, FeedbackType(body.status), body.reason)
     db.commit()
-    return _rec(rec)
+    return _rec(rec, learn.knowledge_used(db, [rec.ai_output_id]))
 
 
 # --- Component records -------------------------------------------------------------------------

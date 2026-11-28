@@ -146,7 +146,7 @@ All tables: UUID primary keys, `created_at`/`updated_at` as `timestamptz` in UTC
 - **pcb_layers**, **pcb_nets**, **pcb_components**, **pcb_geometry** (outline, bbox, area, storage key of full geometry)
 - **analysis_runs** — Stage 1 records `pcb_import` runs (status, timings, error); later stages add analysis kinds
 - **activity_logs** — user-visible activity and security audit events (actor, action, target, ip, metadata)
-- **data_consents** — explicit, revocable consent records for future VIA Learn contribution (none granted by default)
+- **data_consents** — explicit, revocable consent records (AI processing, supplier pricing, VIA Learn contribution; none granted by default)
 
 ## 5. Request flow: PCB import (implemented in CP4)
 

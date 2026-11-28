@@ -56,6 +56,8 @@ export interface User {
   email: string;
   display_name: string;
   email_verified_at: string | null;
+  /** May review VIA Learn contributions (set only through the server CLI). */
+  learn_reviewer: boolean;
   created_at: string;
 }
 
@@ -710,6 +712,18 @@ export interface AIExplanationOutput {
   uncertainties?: string[];
 }
 
+/** A VIA Learn entry the model was shown. Only `cited` ones influenced the answer. */
+export interface KnowledgeUsed {
+  entry_id: string;
+  version: number;
+  title: string;
+  category: string;
+  verification_status: LearnVerification;
+  source: string;
+  status: LearnStatus;
+  cited: boolean;
+}
+
 export interface AIOutput {
   id: string;
   kind: string;
@@ -725,6 +739,7 @@ export interface AIOutput {
   analysis_run_id: string | null;
   revision_id: string;
   created_at: string;
+  knowledge?: KnowledgeUsed[];
 }
 
 export interface Recommendation {
@@ -748,6 +763,7 @@ export interface Recommendation {
   status: "open" | "accepted" | "rejected";
   status_reason: string | null;
   created_at: string;
+  knowledge?: KnowledgeUsed[];
 }
 
 export interface ComponentMatch {
@@ -1092,4 +1108,134 @@ export interface PartListItem {
 export interface PartListPage extends Page<PartListItem> {
   placements: number;
   designs: number;
+}
+
+
+// ----------------------------------------------------------------------------- VIA Learn
+
+export type FeedbackType = "helpful" | "unhelpful" | "accepted" | "rejected" | "correction" | "incorrect_assumption" | "comment";
+
+export interface FeedbackItem {
+  id: string;
+  recommendation_id: string;
+  project_id: string;
+  design_id: string;
+  analysis_run_id: string | null;
+  category: string;
+  feedback_type: FeedbackType;
+  explanation: string | null;
+  model: string;
+  prompt_version: string;
+  engine_version: string | null;
+  by: string;
+  mine: boolean;
+  created_at: string;
+}
+
+export type LearnCategory =
+  | "pcb_design_pattern"
+  | "component_selection"
+  | "routing_practice"
+  | "thermal_design"
+  | "signal_integrity"
+  | "manufacturing_constraint"
+  | "bom_cost_insight"
+  | "optimization_example"
+  | "verified_recommendation";
+export type LearnStatus = "draft" | "pending_review" | "approved" | "rejected" | "withdrawn";
+export type LearnVerification = "unverified" | "reviewed" | "verified";
+
+export interface LearnEntry {
+  id: string;
+  category: LearnCategory;
+  title: string;
+  description: string;
+  technical_metadata: Record<string, unknown>;
+  source: string;
+  provenance: Record<string, unknown>;
+  origin: "project_derived" | "free_text";
+  status: LearnStatus;
+  verification_status: LearnVerification;
+  verification_basis: string | null;
+  version: number;
+  mine: boolean;
+  score: number | null;
+  /** Only for the contributor and reviewers. */
+  permissions: { library_visible?: boolean; ai_retrieval?: boolean } | null;
+  review_note: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  withdrawn_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearnVersion {
+  version: number;
+  change: string;
+  title: string;
+  description: string;
+  verification_status: LearnVerification;
+  created_at: string;
+}
+
+export interface LearnMeta {
+  categories: LearnCategory[];
+  verification_levels: { id: LearnVerification; label: string; meaning: string }[];
+  is_reviewer: boolean;
+  policy_version: string;
+  retrieval: { method: string; semantic: boolean; note: string };
+}
+
+export interface ContributionInput {
+  category: LearnCategory;
+  title: string;
+  description: string;
+  source: string;
+  confirm_rights: boolean;
+}
+
+export interface LearnConsent {
+  project_id: string;
+  granted: boolean;
+  policy_version: string;
+  granted_at: string | null;
+  withdrawn_entries: number;
+}
+
+export interface EvaluationTally {
+  recommendations: number;
+  accepted: number;
+  rejected: number;
+  acceptance_rate: number | null;
+  rejection_rate: number | null;
+  helpful: number;
+  unhelpful: number;
+  helpful_rate: number | null;
+  corrections: number;
+  incorrect_assumptions: number;
+  evidence_resolved: number;
+  evidence_persisting: number;
+  evidence_not_checkable: number;
+  evidence_resolution_rate: number | null;
+}
+
+export interface Evaluation {
+  scope: "projects" | "global";
+  projects: number | null;
+  capped: boolean;
+  summary: EvaluationTally;
+  grounding: { reviews: number; rejected: number; rejection_rate: number | null };
+  by_category: (EvaluationTally & { category: string })[];
+  by_version: (EvaluationTally & {
+    model: string;
+    prompt_version: string;
+    engine_version: string | null;
+    reviews: number;
+    grounding_rejected: number;
+    grounding_rejection_rate: number | null;
+  })[];
+  by_board_bucket: (EvaluationTally & { bucket: string })[];
+  not_measurable: { metric: string; reason: string }[];
+  notes: string[];
 }

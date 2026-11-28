@@ -33,6 +33,9 @@ PASSWORD_CHANGE_PER_USER = Limit("password-change-user", 10, 3600)
 MEMBER_LOOKUP_PER_USER = Limit("member-lookup-user", 30, 3600)
 ANALYSES_PER_USER = Limit("analysis-user", 60, 3600)
 AI_REQUESTS_PER_USER = Limit("ai-user", 30, 3600)
+FEEDBACK_PER_USER = Limit("feedback-user", 120, 3600)
+LEARN_WRITES_PER_USER = Limit("learn-write-user", 60, 3600)
+LEARN_READS_PER_USER = Limit("learn-read-user", 600, 3600)
 
 
 class RateLimiter:

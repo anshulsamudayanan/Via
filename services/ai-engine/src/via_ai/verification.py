@@ -2,7 +2,7 @@
 
 An output is rejected (never shown as an answer) when it:
 
-* cites a component, net, layer, design rule or finding that isn't in the context;
+* cites a component, net, layer, design rule, knowledge entry or finding that isn't in the context;
 * names a reference designator in its text that isn't in the design;
 * uses a number (``numbers_used``) that doesn't appear anywhere in the context.
 
@@ -63,6 +63,8 @@ def _known(context: ProjectContext) -> dict[str, set[str]]:
         "layer": {layer.name for layer in context.layers},
         # Only the rules actually present in the context (rules_source is metadata, not a rule).
         "design_rule": {k for k in context.design_rules if k != "rules_source"},
+        # Only entries actually put in front of the model can be cited.
+        "knowledge": {k.id for k in context.knowledge},
     }
 
 
@@ -102,6 +104,12 @@ def _walk(output: BaseModel) -> tuple[list[Reference], list[str], list[NumberUse
     elif isinstance(output, Recommendation):
         rec(output)
     return refs, finding_ids, numbers, texts
+
+
+def cited_knowledge(output: BaseModel) -> set[str]:
+    """Ids of the knowledge entries the output cites (only a citation shows an entry influenced the answer)."""
+    refs, _, _, _ = _walk(output)
+    return {r.id for r in refs if r.kind == "knowledge"}
 
 
 def verify(output: BaseModel, context: ProjectContext) -> VerificationReport:

@@ -24,9 +24,9 @@ class Confidence(StrEnum):
 
 
 class Reference(_Out):
-    kind: str = Field(description="component | net | finding | layer | design_rule")
+    kind: str = Field(description="component | net | finding | layer | design_rule | knowledge")
     id: str = Field(
-        description="Designator, net name, finding id, layer name or design rule key, exactly as in the context"
+        description="Designator, net name, finding id, layer, design rule key or knowledge id, as in the context"
     )
 
 

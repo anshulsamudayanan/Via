@@ -79,5 +79,15 @@ Each request, accepted or rejected, records:
 - In tests it runs deterministically with the scripted provider (`tests/unit/ai`).
 - An operator with a configured provider and consent can run it on real projects. It measures grounding, not engineering quality, which needs human review.
 
+## VIA Learn knowledge in the context
+Prompt version `2026-11-28.1`. For a design review or explanation, `DatabaseContextProvider` retrieves up to
+3 approved VIA Learn entries (keyword search, 600 characters each, only entries whose contributor allowed AI
+use) and puts them in `ProjectContext.knowledge`. The prompt says unverified entries are unconfirmed
+suggestions and that cited entries must be listed with kind `knowledge`. The grounding check accepts a
+`knowledge` citation only for an id that was retrieved. `ai_output_knowledge` records each entry shown and
+whether it was cited; only a citation counts as influence. When the context exceeds the provider's input
+budget, `fit_context` trims nets and components first, then knowledge, and findings last. See
+[VIA_LEARN.md](VIA_LEARN.md).
+
 ## Rate limits
 30 AI requests per user per hour.

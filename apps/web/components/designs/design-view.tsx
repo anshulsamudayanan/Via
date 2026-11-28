@@ -285,7 +285,7 @@ function ParsedDesign({ design, projectId, canEdit, isOwner, revisionId, isCurre
       {tab === "nets" ? <NetsTable designId={design.id} revisionId={isCurrent ? undefined : revisionId} /> : null}
       {tab === "layers" ? <LayersTable designId={design.id} revisionId={isCurrent ? undefined : revisionId} /> : null}
       {tab === "analysis" ? (
-        <AnalysisPanel projectId={projectId} designId={design.id} revisionId={revisionId} canEdit={canEdit} onHighlight={setHighlight} />
+        <AnalysisPanel projectId={projectId} designId={design.id} revisionId={revisionId} canEdit={canEdit} isOwner={isOwner} onHighlight={setHighlight} />
       ) : null}
       {tab === "optimize" ? (
         isCurrent ? (

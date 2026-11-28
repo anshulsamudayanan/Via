@@ -12,6 +12,17 @@ import type {
   LineageEntry,
   Objective,
   SupplierConsent,
+  ContributionInput,
+  Evaluation,
+  FeedbackItem,
+  FeedbackType,
+  LearnCategory,
+  LearnConsent,
+  LearnEntry,
+  LearnMeta,
+  LearnStatus,
+  LearnVerification,
+  LearnVersion,
   OptimizationComparison,
   OptimizationRun,
   Recommendation,
@@ -286,6 +297,45 @@ export function createViaClient(options: ClientOptions = {}) {
         params: { q?: string; project_id?: string; include_archived?: boolean; sort?: PartSort; limit?: number; offset?: number } = {},
         signal?: AbortSignal,
       ) => request<PartListPage>(`/api/v1/components/parts${q({ ...params, include_archived: params.include_archived || undefined })}`, { signal }),
+    },
+    learn: {
+      meta: (signal?: AbortSignal) => request<LearnMeta>("/api/v1/learn/meta", { signal }),
+      search: (
+        params: { q?: string; category?: LearnCategory; verification?: LearnVerification; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<Page<LearnEntry>>(`/api/v1/learn/entries${q(params)}`, { signal }),
+      entry: (id: string, signal?: AbortSignal) => request<LearnEntry>(`/api/v1/learn/entries/${enc(id)}`, { signal }),
+      versions: (id: string, signal?: AbortSignal) => request<LearnVersion[]>(`/api/v1/learn/entries/${enc(id)}/versions`, { signal }),
+      contributions: (params: { status?: LearnStatus; limit?: number; offset?: number } = {}, signal?: AbortSignal) =>
+        request<Page<LearnEntry>>(`/api/v1/learn/contributions${q(params)}`, { signal }),
+      contribute: (body: ContributionInput) => request<LearnEntry>("/api/v1/learn/contributions", { method: "POST", body }),
+      /** A scrubbed draft from one of the project's recommendations (project owner, with Learn consent). */
+      contributeRecommendation: (recommendationId: string, category?: LearnCategory) =>
+        request<LearnEntry>(`/api/v1/recommendations/${enc(recommendationId)}/contribute`, { method: "POST", body: category ? { category } : {} }),
+      submit: (id: string) => request<LearnEntry>(`/api/v1/learn/contributions/${enc(id)}/submit`, { method: "POST" }),
+      deleteDraft: (id: string) => request<void>(`/api/v1/learn/contributions/${enc(id)}`, { method: "DELETE" }),
+      withdraw: (id: string) => request<LearnEntry>(`/api/v1/learn/contributions/${enc(id)}/withdraw`, { method: "POST" }),
+      setPermissions: (id: string, body: { library_visible?: boolean; ai_retrieval?: boolean }) =>
+        request<LearnEntry>(`/api/v1/learn/contributions/${enc(id)}/permissions`, { method: "PUT", body }),
+      reviewQueue: (params: { limit?: number; offset?: number } = {}, signal?: AbortSignal) =>
+        request<Page<LearnEntry>>(`/api/v1/learn/review${q(params)}`, { signal }),
+      review: (id: string, body: { decision: "approve" | "reject"; note?: string; verification_status?: LearnVerification; verification_basis?: string }) =>
+        request<LearnEntry>(`/api/v1/learn/contributions/${enc(id)}/review`, { method: "POST", body }),
+      setVerification: (id: string, body: { verification_status: LearnVerification; verification_basis?: string }) =>
+        request<LearnEntry>(`/api/v1/learn/entries/${enc(id)}/verification`, { method: "PUT", body }),
+      feedback: (recommendationId: string, body: { feedback_type: FeedbackType; explanation?: string }) =>
+        request<FeedbackItem>(`/api/v1/recommendations/${enc(recommendationId)}/feedback`, { method: "POST", body }),
+      feedbackHistory: (
+        params: { project_id?: string; recommendation_id?: string; mine?: boolean; limit?: number; offset?: number } = {},
+        signal?: AbortSignal,
+      ) => request<Page<FeedbackItem>>(`/api/v1/learn/feedback${q({ ...params, mine: params.mine || undefined })}`, { signal }),
+      consent: (projectId: string, signal?: AbortSignal) => request<LearnConsent>(`/api/v1/projects/${enc(projectId)}/learn-consent`, { signal }),
+      grantConsent: (projectId: string) => request<LearnConsent>(`/api/v1/projects/${enc(projectId)}/learn-consent`, { method: "PUT" }),
+      revokeConsent: (projectId: string, withdrawExisting = true) =>
+        request<LearnConsent>(`/api/v1/projects/${enc(projectId)}/learn-consent${q({ withdraw_existing: withdrawExisting })}`, { method: "DELETE" }),
+      evaluation: (projectId?: string, signal?: AbortSignal) =>
+        request<Evaluation>(`/api/v1/learn/evaluation${q({ project_id: projectId })}`, { signal }),
+      globalEvaluation: (signal?: AbortSignal) => request<Evaluation>("/api/v1/learn/evaluation/global", { signal }),
     },
     revisions: {
       get: (id: string, signal?: AbortSignal) => request<Revision>(`/api/v1/revisions/${enc(id)}`, { signal }),

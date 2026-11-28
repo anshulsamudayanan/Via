@@ -74,7 +74,7 @@ storage. These tables hold what the API paginates, searches and summarizes:
 |---|---|---|
 | `analysis_runs` | Processing runs | `kind = pcb_import` (Stage 1) or `pcb_analysis` (Stage 2); status queued/running/succeeded/failed, timings, safe error, `result_summary`. Since `0003`: `attempt` (1 = first try), `job_id` (queue job of the current attempt), `heartbeat_at` (refreshed every `VIA_JOB_HEARTBEAT_SECONDS` while running); index `(kind, status)` for the reaper |
 | `activity_logs` | Activity feed + security audit | append-only; `project_id`/`organization_id` are SET NULL on delete so entries outlive their subject; `target_id` has no FK; indexes `(project_id, created_at desc)`, `(actor_id, created_at desc)`, `(action)` |
-| `data_consents` | Explicit, revocable consent | `scope` ∈ via_learn_contribution / external_ai_processing, `policy_version`, `granted_at`, `revoked_at`. No row = no consent. Since CP5, project owners can grant/revoke `external_ai_processing` (`/api/v1/ai/consent/{project_id}`), and the AI context provider requires it; `via_learn_contribution` is still unused. |
+| `data_consents` | Explicit, revocable consent | `scope` ∈ via_learn_contribution / external_ai_processing, `policy_version`, `granted_at`, `revoked_at`. No row = no consent. Since CP5, project owners can grant/revoke `external_ai_processing` (`/api/v1/ai/consent/{project_id}`), and the AI context provider requires it; `via_learn_contribution` is used by VIA Learn (`/projects/{id}/learn-consent`). |
 
 ### Analysis (Stage 2, migration `0004`)
 | Table | Purpose | Notes |
@@ -113,13 +113,13 @@ Organization membership and project membership are **independent**:
 - Inaccessible projects return `404`, not `403`, so their existence isn't revealed.
 - Every query for project-scoped data (designs, revisions, files, PCB rows, analysis runs, project activity) filters through the accessible-project check. `project_id` is denormalized onto revisions and files to keep that check a single indexed lookup.
 
-## VIA Learn readiness (design, not implemented)
+## VIA Learn (implemented, migration 0011)
 
-Goal: allow future, opt-in contribution of *validated engineering knowledge* without
-ever exposing private project data.
+Full description in [VIA_LEARN.md](VIA_LEARN.md). Summary:
 
-1. **Consent first:** a contribution requires an active `data_consents` row (`scope = via_learn_contribution`, matching `policy_version`, `revoked_at IS NULL`) for that user and project. Revocation stops future contributions and triggers removal of past ones.
-2. **Separate store:** contributions go into a separate schema (e.g. `learn.*`) holding only **derived, de-identified artefacts** (statistics, validated rule outcomes). Tables there have **no foreign keys to `projects`, `designs` or `design_files`**; they reference only the consent record and an opaque contribution id.
-3. **No raw files:** source files and normalized JSON never leave the project's storage prefix. Learn pipelines read through an authorized, consent-checked export step, never directly.
-4. **Database role separation:** the Learn service would connect with a role that has no privileges on the private schema.
-5. **Defaults:** no consent rows exist, no project is contributing, and no Stage 1 code path writes to Learn storage.
+- `recommendation_feedback` and `ai_output_knowledge` are project-scoped and follow project access.
+- `learn_entries` and `learn_entry_versions` are the collective store: foreign keys only to `users`, `data_consents` and each other, never to projects, designs, revisions or files. Search uses a GIN-indexed `tsvector`.
+- A contribution derived from a project needs an active `via_learn_contribution` consent from the owner plus a per-item submit. Withdrawal erases content but keeps id, ownership and provenance.
+- `users.learn_reviewer` is set only through the server CLI.
+- Not done: a separate database role for the collective tables.
+- Defaults: no consent rows, no contributions, nothing collected automatically.

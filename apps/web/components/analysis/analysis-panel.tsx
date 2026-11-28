@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
+import { RecommendationFeedback } from "@/components/learn/recommendation-feedback";
 import { errorMessage, rejectedProblems } from "@/lib/errors";
 import { findingHighlight, SEVERITIES, severityTone, SOURCE_LABEL, VERIFICATION_LABEL } from "@/lib/findings";
 import { formatDateTime } from "@/lib/format";
@@ -22,6 +23,7 @@ interface Props {
   designId: string;
   revisionId: string;
   canEdit: boolean;
+  isOwner?: boolean;
   onHighlight: (h: Highlight | null) => void;
 }
 
@@ -34,7 +36,7 @@ export function usePolling(active: boolean, reload: () => void, ms = 2000) {
   });
 }
 
-export function AnalysisPanel({ projectId, designId, revisionId, canEdit, onHighlight }: Props) {
+export function AnalysisPanel({ projectId, designId, revisionId, canEdit, isOwner = false, onHighlight }: Props) {
   const client = useApi();
   const runs = useAsync((s) => client.analysis.runs(designId, { limit: 20 }, s), [client, designId]);
   const ai = useAsync((s) => client.ai.status(s), [client]);
@@ -83,7 +85,7 @@ export function AnalysisPanel({ projectId, designId, revisionId, canEdit, onHigh
       {run?.status === "succeeded" ? (
         <Findings key={run.id} run={run} projectId={projectId} canEdit={canEdit} ai={ai.data ?? null} onHighlight={onHighlight} />
       ) : null}
-      {run?.status === "succeeded" ? <Recommendations designId={designId} projectId={projectId} run={run} canEdit={canEdit} ai={ai.data ?? null} /> : null}
+      {run?.status === "succeeded" ? <Recommendations designId={designId} projectId={projectId} run={run} canEdit={canEdit} isOwner={isOwner} ai={ai.data ?? null} /> : null}
     </div>
   );
 }
@@ -392,7 +394,7 @@ function Explain({ findingId, projectId, external }: { findingId: string; projec
   );
 }
 
-function Recommendations({ designId, projectId, run, canEdit, ai }: { designId: string; projectId: string; run: AnalysisRun; canEdit: boolean; ai: AIStatus | null }) {
+function Recommendations({ designId, projectId, run, canEdit, isOwner, ai }: { designId: string; projectId: string; run: AnalysisRun; canEdit: boolean; isOwner: boolean; ai: AIStatus | null }) {
   const client = useApi();
   const recs = useAsync((s) => client.ai.recommendations(designId, undefined, s), [client, designId]);
   const [busy, setBusy] = useState(false);
@@ -462,6 +464,7 @@ function Recommendations({ designId, projectId, run, canEdit, ai }: { designId: 
                   <Button size="sm" variant="ghost" onClick={() => void decide(r, "rejected")}>Reject</Button>
                 </div>
               ) : null}
+              <RecommendationFeedback rec={r} canEdit={canEdit} isOwner={isOwner} />
             </li>
           ))}
         </ul>

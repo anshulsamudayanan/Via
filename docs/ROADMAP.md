@@ -235,7 +235,7 @@ Decisions (owner, 2026-11-26):
   audit; enable an AI provider (built, off by default).
 
 ## Later stages
-- **VIA Learn**: opt-in, privacy-first collective knowledge (consent records already modelled in Stage 1).
+- **VIA Learn**: delivered as Phase 4 (see [VIA_LEARN.md](VIA_LEARN.md)). Open: semantic retrieval (needs an embeddings provider and pgvector), a separate database role for the collective store, a model-bias review of accumulated feedback.
 - **VIA Studio**: native PCB editor.
 - **VIA Connect**: integrations with other EDA tools (more adapters: Altium, Eagle, ODB++, IPC-2581).
 - **Production readiness**: transactional email, deployment (TLS, secrets, backups, monitoring), S3
