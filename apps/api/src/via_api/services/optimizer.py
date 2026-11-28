@@ -14,13 +14,14 @@ from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from via_opt import OPTIMIZER_VERSION, Constraints, Objective, optimize
+from via_opt import OPTIMIZER_VERSION, Constraints, Objective, bom, optimize
 
+from via_api import suppliers
 from via_api.errors import APIError, not_found
 from via_api.models import AnalysisRun, DesignChange, DesignRevision, OptimizationCandidate
 from via_api.models.base import utcnow
-from via_api.models.enums import AnalysisKind, AnalysisStatus, ProjectRole, RevisionStatus
-from via_api.services import access, activity
+from via_api.models.enums import AnalysisKind, AnalysisStatus, ConsentScope, ProjectRole, RevisionStatus
+from via_api.services import access, activity, consent
 from via_api.services import designs as design_svc
 from via_api.services.activity import ClientInfo
 from via_api.services.analysis import _load_design, _needs_reimport, fail_run, resolve_profile
@@ -46,6 +47,7 @@ def start(
     options: dict[str, Any] | None,
     client: ClientInfo,
     weights: dict[Objective, float] | None = None,
+    build_quantity: int | None = None,
 ) -> tuple[AnalysisRun, bool]:
     design, project, _ = design_svc.get_design(
         db, ctx.user.id, design_id, ProjectRole.EDITOR, action="run optimizations"
@@ -59,6 +61,17 @@ def start(
         "constraints": constraints.model_dump(),
         "options": run_options,
     }
+    if build_quantity is not None:
+        if consent.active_consent(db, project.id, ConsentScope.SUPPLIER_LOOKUP) is None:
+            raise APIError(
+                403,
+                "consent_required",
+                "Looking up supplier prices sends the design's manufacturer part numbers to Mouser. "
+                "The project owner must allow it first.",
+            )
+        if supplier_factory() is None:
+            raise APIError(503, "supplier_unavailable", "Supplier pricing isn't set up on this server.")
+        config["bom"] = {"build_quantity": build_quantity}
     if weights:  # only when given, so runs without weights keep their old config shape
         config["weights"] = {o.value: w for o, w in sorted(weights.items(), key=lambda kv: kv[0].value)}
     # Serialize starts on this revision so identical concurrent requests share one run.
@@ -122,6 +135,7 @@ def process(
         run.heartbeat_at = utcnow()
         db.commit()
 
+    bom_cfg = cfg.get("bom")
     result = optimize(
         design,
         [Objective(o) for o in cfg["objectives"]],
@@ -130,6 +144,9 @@ def process(
         {Objective(o): float(w) for o, w in cfg.get("weights", {}).items()},
         phase,
     )
+    if bom_cfg:
+        phase("Looking up supplier prices")
+        result.analysis["bom"] = _bom_analysis(db, run.project_id, design, int(bom_cfg["build_quantity"]))
     db.execute(
         delete(DesignChange).where(
             DesignChange.candidate_id.in_(
@@ -156,12 +173,49 @@ def process(
     now = utcnow()
     run.status, run.finished_at = AnalysisStatus.SUCCEEDED, now
     run.design_parser_version, run.design_schema_version = design.engine_version, design.schema_version
-    run.result_summary = {"baseline": result.baseline, "pareto": result.pareto, "notes": result.notes, "candidate_count": len(result.candidates),
+    run.result_summary = {"baseline": result.baseline, "pareto": result.pareto, "notes": result.notes, "analysis": result.analysis, "candidate_count": len(result.candidates),
                           "duration_seconds": round((now - run.started_at).total_seconds(), 3) if run.started_at else None}  # fmt: skip
     activity.record(db, OPTIMIZATION_COMPLETED, actor_id=run.triggered_by_id, project_id=run.project_id, target_type="analysis_run",
                     target_id=run.id, details={"candidates": len(result.candidates)})  # fmt: skip
     db.commit()
     return run
+
+
+#: Part numbers looked up per run (Mouser allows about 30 calls a minute; a run has a few minutes).
+MAX_LOOKUPS = 100
+supplier_factory = suppliers.get_supplier  # replaced in tests
+
+
+def _bom_analysis(db: Session, project_id: uuid.UUID, design: Any, build_quantity: int) -> dict[str, Any]:
+    """Prices for the BOM from real supplier listings: part numbers only leave VIA with the owner's consent."""
+    lines = bom.extract_bom(design)
+    if consent.active_consent(db, project_id, ConsentScope.SUPPLIER_LOOKUP) is None:
+        return {
+            "status": "consent_revoked",
+            "reason": "Supplier lookups were switched off for this project.",
+            "lines": len(lines),
+        }
+    client = supplier_factory()
+    if client is None:
+        return {"status": "unavailable", "reason": "Supplier pricing isn't set up on this server.", "lines": len(lines)}
+    unlooked = {
+        ln.key: "No manufacturer part number in the design: add an MPN property to the footprint to price it."
+        for ln in lines
+        if not ln.mpn
+    }
+    offers: dict[str, list[bom.Offer]] = {}
+    stop: str | None = None
+    for i, ln in enumerate(x for x in lines if x.mpn):
+        if stop or i >= MAX_LOOKUPS:
+            unlooked[ln.key] = stop or f"Not looked up: a run looks up at most {MAX_LOOKUPS} part numbers."
+            continue
+        try:
+            offers[ln.key] = client.offers(ln.mpn or "")
+        except suppliers.SupplierError as exc:
+            unlooked[ln.key] = str(exc)
+            if exc.fatal:
+                stop = f"Not looked up: {exc}"
+    return bom.plan(lines, offers, build_quantity, unlooked=unlooked)
 
 
 def get_run(db: Session, user_id: uuid.UUID, run_id: uuid.UUID) -> AnalysisRun:

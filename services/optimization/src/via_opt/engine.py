@@ -16,9 +16,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from via_opt import analysis
 from via_opt.algorithms import copper, outline, placement
 from via_opt.candidates import Candidate, CandidateStatus, Validation, ValidationStatus
-from via_opt.changes import Change, ChangeKind, Target
+from via_opt.changes import Change, ChangeKind, Target, apply
 from via_opt.comparison import pareto_front
 from via_opt.constraints import Constraints
 from via_opt.modules import spec_for
@@ -53,6 +54,7 @@ class OptimizationResult(BaseModel):
     candidates: list[Candidate]
     pareto: list[str] = Field(description="Candidate keys no other candidate beats on every requested objective")
     notes: list[str] = Field(default_factory=list)
+    analysis: dict[str, Any] = Field(default_factory=dict, description="Area and manufacturing-margin measurements")
 
 
 def _deltas(before: dict[str, float | None], after: dict[str, float | None]) -> tuple[list[str], list[str]]:
@@ -82,6 +84,7 @@ def _candidate(
     baseline: dict[str, float | None],
     extra_trade_offs: list[str] | None = None,
     details: dict[str, Any] | None = None,
+    execution: dict[str, Any] | None = None,
 ) -> Candidate:
     started = time.perf_counter()
     validation, after = validate(design, changes, cons, options)
@@ -113,7 +116,12 @@ def _candidate(
             details=details or {},
         ),
         started,
+        execution,
     )
+
+
+def _rect_area(after: dict[str, Any]) -> float:
+    return float((after["max_x"] - after["min_x"]) * (after["max_y"] - after["min_y"]))
 
 
 def _hash(c: Candidate) -> str:
@@ -125,7 +133,7 @@ def _hash(c: Candidate) -> str:
     return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def finish(c: Candidate, started: float) -> Candidate:
+def finish(c: Candidate, started: float, execution: dict[str, Any] | None = None) -> Candidate:
     """Adds what every candidate carries: hash, warnings, limitations and execution metadata."""
     spec = spec_for(c.key)
     c.candidate_hash = _hash(c)
@@ -141,7 +149,12 @@ def finish(c: Candidate, started: float) -> Candidate:
             if c.validation.new_problems
         ),
     ]
-    c.execution = {"deterministic": True, "seed": None, "evaluation_seconds": round(time.perf_counter() - started, 3)}
+    c.execution = {
+        "deterministic": True,
+        "seed": None,
+        **(execution or {}),
+        "evaluation_seconds": round(time.perf_counter() - started, 3),
+    }
     return c
 
 
@@ -164,6 +177,13 @@ def optimize(
     wanted = set(objectives)
     cands: list[Candidate] = []
     notes: list[str] = []
+    measured: dict[str, Any] = {}
+    if wanted & {Objective.AREA, Objective.PLACEMENT, Objective.COST}:
+        say("Analysing board area")
+        measured["area"] = analysis.area_analysis(design)
+    if wanted & {Objective.MANUFACTURABILITY, Objective.COST}:
+        say("Measuring manufacturing margins")
+        measured["margins"] = analysis.margin_analysis(design, options, profile)
 
     if wanted & {Objective.AREA, Objective.COST}:
         say("Board area")
@@ -267,24 +287,58 @@ def optimize(
 
     if wanted & {Objective.PLACEMENT, Objective.ROUTING}:
         say("Placement")
-        moves, before_r, after_r = placement.improve_placement(design, cons)
+        placed = placement.improve_placement(design, cons)
+        moves = placed.changes
+        n_rot = sum(1 for ch in moves if ch.kind == ChangeKind.ROTATE_COMPONENT)
         if moves:
             cands.append(
                 _candidate(
                     design,
                     "placement_ratsnest",
-                    "greedy_ratsnest",
+                    "annealing_ratsnest",
                     placement.VERSION,
                     [Objective.PLACEMENT, Objective.ROUTING],
                     "Move parts closer to what they connect to",
-                    f"{len(moves)} component(s) moved; ratsnest {before_r:.1f} -> {after_r:.1f} mm.",
+                    f"{len(moves) - n_rot} component(s) moved and {n_rot} rotated; "
+                    f"ratsnest {placed.before:.1f} -> {placed.after:.1f} mm.",
                     moves,
                     cons,
                     options,
                     baseline,
                     ["Changes the layout: affected parts must be re-routed."],
+                    {"search": placed.execution},
+                    execution={**placed.execution, "deterministic": not placed.execution.get("budget_exhausted")},
                 )
             )
+            if Objective.AREA in wanted and not cons.outline_fixed:
+                packed = apply(design, moves)
+                fit, _ = outline.outline_fit(packed, cons, profile)
+                plain = next((c for c in cands if c.key == "outline_fit"), None)
+                new_area = _rect_area(fit[0].after) if fit else None
+                if new_area is not None and (plain is None or new_area < _rect_area(plain.changes[0].after) * 0.99):
+                    cands.append(
+                        _candidate(
+                            design,
+                            "placement_compaction",
+                            "annealing_ratsnest+outline_fit",
+                            placement.VERSION,
+                            [Objective.AREA, Objective.PLACEMENT, Objective.COST],
+                            "Re-place parts, then fit the outline",
+                            f"{fit[0].reason} after the placement changes.",
+                            [*moves, *fit],
+                            cons,
+                            options,
+                            baseline,
+                            [
+                                "Changes the layout: affected parts must be re-routed.",
+                                "Less margin around the parts: check enclosure fit and mounting.",
+                            ],
+                            execution={
+                                **placed.execution,
+                                "deterministic": not placed.execution.get("budget_exhausted"),
+                            },
+                        )
+                    )
         else:
             notes.append("Placement: no move that shortens connections fits within the constraints.")
 
@@ -321,4 +375,5 @@ def optimize(
         candidates=cands,
         pareto=pareto_front(points, keys) if points else [],
         notes=notes,
+        analysis=measured,
     )

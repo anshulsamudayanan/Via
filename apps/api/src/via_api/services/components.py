@@ -10,21 +10,9 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from via_opt.bom import part_identity
 
 from via_api.models import ComponentRecord, PCBComponent
-
-#: Footprint property names that hold a manufacturer part number / manufacturer (compared case-insensitively).
-MPN_KEYS = {"mpn", "manufacturer_part_number", "manufacturer part number", "partnumber", "part number", "pn",
-            "mfr_pn", "mfr. no", "mfr part number", "mfn"}  # fmt: skip
-MFR_KEYS = {"manufacturer", "mfr", "mfr.", "manufacturer_name"}
-
-
-def part_identity(properties: dict[str, str]) -> tuple[str | None, str | None]:
-    """(manufacturer, part number) from a component's properties, if present."""
-    lower = {k.strip().lower(): v.strip() for k, v in (properties or {}).items() if v and v.strip()}
-    mpn = next((lower[k] for k in MPN_KEYS if k in lower), None)
-    mfr = next((lower[k] for k in MFR_KEYS if k in lower), None)
-    return mfr, mpn
 
 
 def matches(

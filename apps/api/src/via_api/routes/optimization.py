@@ -7,16 +7,20 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Response, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import exists, func, select
+from sqlalchemy import func, select
 from via_opt import METRIC_FOR, MODULES, Constraints, ModuleSpec, Objective, dominates, lifecycle, pareto_front
+from via_opt.report import build_report, render_markdown
 
 from via_api.deps import DB, Client, CurrentAuth, Limiter, Queue
 from via_api.errors import APIError, error_responses
 from via_api.models import AnalysisRun, ChangeSet, DesignChange, DesignRevision, OptimizationCandidate
-from via_api.models.enums import AnalysisKind, ChangeSetStatus, ProjectRole
+from via_api.models.enums import AnalysisKind, ChangeSetStatus, ConsentScope, ProjectRole
 from via_api.ratelimit import ANALYSES_PER_USER
 from via_api.schemas.analysis import AnalysisOptions
+from via_api.services import access
+from via_api.services import consent as consent_svc
 from via_api.services import designs as design_svc
 from via_api.services import optimizer as svc
 from via_api.services.analysis import fail_run
@@ -28,6 +32,13 @@ class OptimizationStart(BaseModel):
     objectives: list[Objective] = Field(min_length=1, max_length=7)
     constraints: Constraints = Field(default_factory=Constraints)
     options: AnalysisOptions | None = None
+    build_quantity: int | None = Field(
+        default=None,
+        ge=1,
+        le=1_000_000,
+        description="Boards you plan to build. When given, the BOM is priced from Mouser's live listings "
+        "(needs the project owner's supplier consent). Without it no prices are looked up.",
+    )
     weights: dict[Objective, float] | None = Field(
         default=None,
         description="Optional preference weights (>= 0) over the requested objectives. Order only: never changes validation.",
@@ -97,6 +108,9 @@ class CandidateOut(BaseModel):
     execution: dict[str, Any]
     score: dict[str, Any] | None
     candidate_hash: str
+    applied_revision: dict[str, Any] | None = Field(
+        default=None, description="The revision a change set made from this candidate was applied as"
+    )
 
 
 class CandidateDetail(CandidateOut):
@@ -140,22 +154,33 @@ def _counts(db: DB, cand_id: uuid.UUID) -> tuple[int, int]:
     return total, exp
 
 
-def _applied(db: DB, cand_id: uuid.UUID) -> bool:
-    """True when a change set made from this candidate has been applied."""
-    return bool(db.scalar(select(exists().where(DesignChange.origin_candidate_id == cand_id, DesignChange.change_set_id == ChangeSet.id,
-                                                ChangeSet.status == ChangeSetStatus.APPLIED))))  # fmt: skip
+def _applied(db: DB, cand_id: uuid.UUID) -> dict[str, Any] | None:
+    """The applied change set (and revision) made from this candidate, if any."""
+    row = db.execute(
+        select(ChangeSet.id, ChangeSet.result_revision_id)
+        .join(DesignChange, DesignChange.change_set_id == ChangeSet.id)
+        .where(DesignChange.origin_candidate_id == cand_id, ChangeSet.status == ChangeSetStatus.APPLIED)
+        .order_by(ChangeSet.applied_at.desc())
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    rev = db.get(DesignRevision, row.result_revision_id) if row.result_revision_id else None
+    return {"change_set_id": str(row.id), "revision_id": str(rev.id) if rev else None,
+            "revision_number": rev.revision_number if rev else None}  # fmt: skip
 
 
 def _cand_out(db: DB, c: OptimizationCandidate) -> CandidateOut:
     total, exp = _counts(db, c.id)
+    applied = _applied(db, c.id)
     return CandidateOut(id=c.id, run_id=c.run_id, key=c.key, algorithm=c.algorithm, algorithm_version=c.algorithm_version,
                         objectives=list(c.objectives), title=c.title, summary=c.summary, metrics_before=c.metrics_before,
                         metrics_after=c.metrics_after, expected_benefits=c.expected_benefits, trade_offs=c.trade_offs,
                         validation=c.validation, pareto=c.pareto, status=c.status, status_reason=c.status_reason,
                         change_count=total, exportable_changes=exp,
-                        lifecycle=lifecycle(c.status, str(c.validation.get("status", "")), c.status_reason, _applied(db, c.id)),
+                        lifecycle=lifecycle(c.status, str(c.validation.get("status", "")), c.status_reason, applied is not None),
                         constraints_evaluated=c.validation.get("constraints", []), warnings=c.warnings, limitations=c.limitations,
-                        execution=c.execution, score=c.score, candidate_hash=c.candidate_hash)  # fmt: skip
+                        execution=c.execution, score=c.score, candidate_hash=c.candidate_hash, applied_revision=applied)  # fmt: skip
 
 
 def _detail(db: DB, c: OptimizationCandidate) -> CandidateDetail:
@@ -165,6 +190,60 @@ def _detail(db: DB, c: OptimizationCandidate) -> CandidateDetail:
     return CandidateDetail(**_cand_out(db, c).model_dump(), details=c.details,
                            changes=[ChangeOut(id=ch.id, ordinal=ch.ordinal, kind=ch.kind, target=ch.target, before=ch.before,
                                               after=ch.after, reason=ch.reason, source=ch.source, exportable=ch.exportable) for ch in changes])  # fmt: skip
+
+
+class SupplierStatus(BaseModel):
+    provider: str
+    configured: bool = Field(description="A supplier key is set on this server")
+
+
+class SupplierConsent(BaseModel):
+    granted: bool
+    granted_at: Any = None
+    policy_version: str
+
+
+@router.get("/suppliers/status", response_model=SupplierStatus, responses=error_responses(401))
+def supplier_status(ctx: CurrentAuth) -> SupplierStatus:
+    """Whether supplier pricing is set up on this server (it never reveals the key)."""
+    return SupplierStatus(provider="mouser", configured=svc.supplier_factory() is not None)
+
+
+def _consent_out(db: DB, project_id: uuid.UUID) -> SupplierConsent:
+    row = consent_svc.active_consent(db, project_id, ConsentScope.SUPPLIER_LOOKUP)
+    return SupplierConsent(
+        granted=row is not None, granted_at=row.granted_at if row else None, policy_version=consent_svc.POLICY_VERSION
+    )
+
+
+@router.get(
+    "/projects/{project_id}/supplier-consent", response_model=SupplierConsent, responses=error_responses(401, 404)
+)
+def get_supplier_consent(project_id: uuid.UUID, db: DB, ctx: CurrentAuth) -> SupplierConsent:
+    project, _ = access.get_project(db, ctx.user.id, project_id)
+    return _consent_out(db, project.id)
+
+
+@router.put(
+    "/projects/{project_id}/supplier-consent", response_model=SupplierConsent, responses=error_responses(401, 403, 404)
+)
+def grant_supplier_consent(project_id: uuid.UUID, db: DB, client: Client, ctx: CurrentAuth) -> SupplierConsent:
+    """The project owner allows the design's manufacturer part numbers to be sent to Mouser for pricing."""
+    project, _ = access.get_project(db, ctx.user.id, project_id, ProjectRole.OWNER, action="manage supplier lookups")
+    consent_svc.grant(db, ctx, project.id, ConsentScope.SUPPLIER_LOOKUP, client)
+    db.commit()
+    return _consent_out(db, project.id)
+
+
+@router.delete(
+    "/projects/{project_id}/supplier-consent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 403, 404),
+)
+def revoke_supplier_consent(project_id: uuid.UUID, db: DB, client: Client, ctx: CurrentAuth) -> None:
+    project, _ = access.get_project(db, ctx.user.id, project_id, ProjectRole.OWNER, action="manage supplier lookups")
+    consent_svc.revoke(db, ctx, project.id, ConsentScope.SUPPLIER_LOOKUP, client)
+    db.commit()
 
 
 @router.get("/optimization-modules", response_model=list[ModuleSpec], responses=error_responses(401))
@@ -179,7 +258,9 @@ def start_run(design_id: uuid.UUID, body: OptimizationStart, response: Response,
               limiter: Limiter, queue: Queue) -> OptimizationRunOut:  # fmt: skip
     """Generate, validate and compare candidates for the objectives, in the background. Never changes the design."""
     options = body.options.model_dump(exclude_none=True) if body.options else None
-    run, created = svc.start(db, ctx, design_id, body.objectives, body.constraints, options, client, body.weights)
+    run, created = svc.start(
+        db, ctx, design_id, body.objectives, body.constraints, options, client, body.weights, body.build_quantity
+    )
     if not created:
         response.status_code = status.HTTP_200_OK
         return _run_out(db, run)
@@ -274,6 +355,23 @@ def compare(run_id: uuid.UUID, db: DB, ctx: CurrentAuth,
         pareto=[uuid.UUID(i) for i in front],
         dominance=dominance,
     )
+
+
+@router.get("/optimization-runs/{run_id}/report", responses=error_responses(401, 404))
+def report(run_id: uuid.UUID, db: DB, ctx: CurrentAuth,
+           format: Annotated[Literal["json", "markdown"], Query(description="json (default) or a markdown document")] = "json") -> Any:  # fmt: skip
+    """A summary of the run built from what was stored: calculated metrics only, what each candidate changes,
+    which constraints were checked and which stayed unverified, and what 'validated' does not mean."""
+    run = svc.get_run(db, ctx.user.id, run_id)
+    rows = db.scalars(
+        select(OptimizationCandidate).where(OptimizationCandidate.run_id == run.id).order_by(OptimizationCandidate.key)
+    ).all()
+    data = build_report(
+        _run_out(db, run).model_dump(mode="json"), [_detail(db, c).model_dump(mode="json") for c in rows]
+    )
+    if format == "markdown":
+        return PlainTextResponse(render_markdown(data), media_type="text/markdown; charset=utf-8")
+    return data
 
 
 @router.get(

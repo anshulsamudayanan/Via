@@ -770,13 +770,118 @@ export interface OptimizationRun {
   revision_number: number;
   status: AnalysisStatus;
   attempt: number;
-  config: { objectives?: Objective[]; constraints?: Record<string, unknown>; options?: Record<string, unknown> };
-  summary: { baseline?: Record<string, number | null>; pareto?: string[]; notes?: string[]; candidate_count?: number; duration_seconds?: number | null };
+  config: {
+    objectives?: Objective[];
+    constraints?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    weights?: Partial<Record<Objective, number>>;
+    bom?: { build_quantity: number };
+  };
+  summary: {
+    baseline?: Record<string, number | null>;
+    pareto?: string[];
+    notes?: string[];
+    candidate_count?: number;
+    duration_seconds?: number | null;
+    /** What a running optimization is working on (never a percentage). */
+    phase?: string;
+    analysis?: OptimizationAnalysis;
+  };
   optimizer_version: string | null;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
   finished_at: string | null;
+}
+
+export interface AreaAnalysis {
+  available: boolean;
+  observations: string[];
+  board_width_mm?: number;
+  board_height_mm?: number;
+  outline_area_mm2?: number;
+  rectangular?: boolean;
+  occupied_area_mm2?: number;
+  utilisation?: number | null;
+  resolution_mm?: number;
+  unused_margin_mm?: { left: number; top: number; right: number; bottom: number };
+  largest_empty_rectangle?: { area_mm2: number; width_mm: number; height_mm: number; x_mm: number; y_mm: number } | null;
+  density_grid?: number[][];
+}
+
+export interface MarginRule {
+  check: string;
+  title: string;
+  ran: boolean;
+  reason?: string;
+  limits?: Record<string, number>;
+  violations?: number;
+  violating_features?: number;
+  potential_risk_features?: number;
+  risk_threshold?: Record<string, number>;
+  examples?: string[];
+}
+
+export interface MarginAnalysis {
+  profile: { key: string; name: string; source: string };
+  risk_fraction: number;
+  rules: MarginRule[];
+  violating_features: number;
+  potential_risk_features: number;
+  notes: string[];
+}
+
+export type SourcingStrategy = "cheapest" | "fastest" | "balanced";
+
+export interface BomPlanLine {
+  key: string;
+  references: string[];
+  mpn: string | null;
+  needed: number;
+  order_qty: number;
+  overbuy: number;
+  unit_price: number;
+  total: number;
+  in_stock: boolean | null;
+  lead_time_days: number | null;
+  supplier_part_number: string;
+  url: string | null;
+}
+
+export interface BomAnalysis {
+  status: "priced" | "partial" | "none" | "unavailable" | "consent_revoked";
+  reason?: string;
+  supplier?: string | null;
+  currency?: string | null;
+  build_quantity?: number;
+  lines: number;
+  lines_priced?: number;
+  unpriced?: { key: string; references: string[]; reason: string }[];
+  strategies?: Partial<Record<SourcingStrategy, { total: number; lines: BomPlanLine[] }>>;
+  generated_at?: string;
+  notes?: string[];
+}
+
+export interface OptimizationAnalysis {
+  area?: AreaAnalysis;
+  margins?: MarginAnalysis;
+  bom?: BomAnalysis;
+}
+
+export interface ConstraintResult {
+  id: string;
+  kind: "hard" | "soft";
+  status: "satisfied" | "violated" | "unverified" | "not_applicable";
+  detail: string;
+  violations: string[];
+}
+
+export type CandidateLifecycle = "validated" | "validation_failed" | "needs_review" | "accepted" | "applied" | "rejected";
+
+export interface SupplierConsent {
+  granted: boolean;
+  granted_at: string | null;
+  policy_version: string;
 }
 
 export interface DesignChangeDef {
@@ -794,7 +899,7 @@ export interface DesignChangeDef {
 export type CandidateStatus = "proposed" | "awaiting_validation" | "validated" | "rejected" | "accepted";
 
 export interface CandidateValidation {
-  status: "passed" | "failed" | "requires_rerouting" | "manual";
+  status: "passed" | "failed" | "requires_rerouting" | "manual" | "unverified";
   checks_run: string[];
   new_problems: string[];
   resolved_problems: number;
@@ -821,6 +926,14 @@ export interface Candidate {
   status_reason: string | null;
   change_count: number;
   exportable_changes: number;
+  lifecycle: CandidateLifecycle;
+  constraints_evaluated: ConstraintResult[];
+  warnings: string[];
+  limitations: string[];
+  execution: Record<string, unknown>;
+  score: { value: number | null; rank: number | null; partial: boolean; excluded: string[]; weights: Record<string, number> } | null;
+  candidate_hash: string;
+  applied_revision: { change_set_id: string; revision_id: string | null; revision_number: number | null } | null;
 }
 
 export interface CandidateDetail extends Candidate {

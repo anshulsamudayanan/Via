@@ -129,6 +129,7 @@ export function DesignView() {
           design={d}
           projectId={p.id}
           canEdit={canEdit}
+          isOwner={p.my_role === "owner"}
           revisionId={viewedRevisionId}
           isCurrent={viewedRevisionId === d.current_revision?.id}
           onDesignChanged={() => design.reload()}
@@ -161,10 +162,11 @@ function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: 
   );
 }
 
-function ParsedDesign({ design, projectId, canEdit, revisionId, isCurrent, onDesignChanged }: {
+function ParsedDesign({ design, projectId, canEdit, isOwner, revisionId, isCurrent, onDesignChanged }: {
   design: DesignDetail;
   projectId: string;
   canEdit: boolean;
+  isOwner: boolean;
   revisionId: string;
   isCurrent: boolean;
   onDesignChanged: () => void;
@@ -287,7 +289,7 @@ function ParsedDesign({ design, projectId, canEdit, revisionId, isCurrent, onDes
       ) : null}
       {tab === "optimize" ? (
         isCurrent ? (
-          <OptimizePanel designId={design.id} revisionId={revisionId} canEdit={canEdit} onHighlight={setHighlight}
+          <OptimizePanel projectId={projectId} isOwner={isOwner} designId={design.id} revisionId={revisionId} canEdit={canEdit} onHighlight={setHighlight}
             onChangeSetCreated={() => router.push(query("changes"))} />
         ) : <EmptyState title="Optimization works on the current revision" description="Switch to the current revision to optimize it." />
       ) : null}

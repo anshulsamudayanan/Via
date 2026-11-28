@@ -7,6 +7,8 @@ VIA Optimize proposes **explicit, measured, validated change sets**. It never ed
 design. Accepting a candidate records a decision; a change set (docs/CHANGE_MANAGEMENT.md) turns
 accepted, exportable changes into a new revision and an exported KiCad file.
 
+> Docs: [architecture](OPTIMIZATION_ARCHITECTURE.md), [algorithms](OPTIMIZATION_ALGORITHMS.md), [API](OPTIMIZATION_API.md), [roadmap](OPTIMIZATION_ROADMAP.md).
+
 > Constraint results, the weighted preference, the candidate lifecycle and module declarations (optimizer 1.1.0) are in [OPTIMIZATION_CONSTRAINTS.md](OPTIMIZATION_CONSTRAINTS.md).
 
 ## Pipeline
@@ -40,7 +42,8 @@ Candidate states: `proposed` (manual), `awaiting_validation` (needs re-routing),
 | `via_standardization` | manufacturability, cost | Vias failing the profile (drill, diameter, annular ring) grow to the smallest compliant size on a 0.01 mm grid. Skipped per via when growing would break clearance to other-net copper or the edge limit (reported) | Full |
 | `track_min_width` | manufacturability, cost | Tracks below the profile minimum widen as far as clearance and the edge limit allow | Full |
 | `power_track_widening` | thermal | Tracks of nets with user currents widen towards the IPC-2221 width (worst layer), within clearance and the edge limit | Full |
-| `placement_ratsnest` | placement, routing | Greedy, deterministic local search: each movable component tries moves towards the centroid of what it connects to (100/75/50/25 %), keeping inside the outline with the margin, clear of other components (gap) and of footprint keep-outs. Accepted only if the ratsnest shortens | `requires_rerouting` when moved parts carry routed nets |
+| `placement_ratsnest` | placement, routing | A descent pass (each part tries moving towards what it connects to) followed by **seeded simulated annealing** on the ratsnest, with shifts and quarter-turn rotations. Hard constraints (outline margin, component gap, keep-outs, fixed parts) are rejected, never traded against cost. A part is moved *or* rotated in one candidate. Nets over 40 pads are ignored while searching (the reported ratsnest includes them). Fixed seed and iteration count: reproducible | `requires_rerouting` when moved parts carry routed nets |
+| `placement_compaction` | area, placement, cost | The placement above, then the outline fitted to the result. Offered only when that outline is smaller than the plain fit | `requires_rerouting` |
 | `layer_reduction` | layers, cost | When copper layers carry no routing (only through-hole pads and vias), proposes a smaller even layer count | `manual`: layer changes are made in KiCad |
 
 ## Constraints (never relaxed silently)
@@ -69,6 +72,21 @@ Each change records:
 
 Runs are `analysis_runs` with `kind = pcb_optimization`. They share the worker lifecycle (heartbeat, reaper, retries, `worker_lost`) and snapshot their profile.
 
+## Analysis (not candidates)
+Stored in the run summary under `analysis`:
+- `area`: board size, occupied area and utilisation, unused margin per side, the largest empty rectangle (rectangular outlines), a 6x6 density map.
+- `margins`: per manufacturing rule, the features that break the profile and the features within 25 % above its limit (a VIA heuristic, not a fabricator's capability statement).
+- `bom`: priced BOM from Mouser's live listings, only when a run is started with `build_quantity`. See [Supplier pricing](#supplier-pricing).
+
+## Supplier pricing
+`POST /designs/{id}/optimization-runs` with `build_quantity` prices the BOM from Mouser. Rules:
+- Only **manufacturer part numbers** are sent, and only after the project **owner** allowed it (`PUT /projects/{id}/supplier-consent`; `403 consent_required` otherwise; revocable).
+- The key is `MOUSER_API_KEY` in the server's environment (`503 supplier_unavailable` without it). `GET /suppliers/status` says whether it is set.
+- A line is priced only from a listing with the **exact same** part number. Similar names are never treated as interchangeable and no substitute is suggested. Lines without a part number, or without a listing, are listed with the reason and left out of the totals, which say how many lines they cover.
+- Per line, three plans from the listing's price breaks, stock and lead time: `cheapest` (lowest total for the quantity, buying up to a higher break when that is cheaper), `fastest` (ships from stock now, cheapest of those; otherwise shortest stated lead time) and `balanced` (equal-weight cost and lead time; lead time scores 0 in stock, days/28 capped at 1 otherwise, 1 if unstated).
+- Prices are the supplier's listing at the time shown: not a quote. A run looks up at most 100 part numbers (Mouser allows about 30 calls a minute).
+- Mouser only: with one supplier the strategies differ by packaging listing, order quantity and stock, not by competing distributors. Adding a supplier means a second client behind the same `Offer` model.
+
 ## Measured on real boards
 - **KiCad 9 `video` demo** with 2 A on `+5V`: 371 power-track widenings, validated (no new problems).
   - Via standardization correctly finds nothing to change: its 0.889/0.4 mm vias meet VIA conservative.
@@ -78,5 +96,5 @@ Runs are `analysis_runs` with `kind = pcb_optimization`. They share the worker l
 ## Limitations
 - No autorouter: placement candidates can't be validated electrically until re-routed in KiCad.
 - Only rectangular outlines are resized.
-- Optimization doesn't rotate parts yet (rotation changes are supported by the change model and export).
+- Placement optimises connection length, not routability or congestion; bottom-side parts aren't rotated; a part is moved or rotated, not both.
 - Thermal optimization covers track width for given currents only.

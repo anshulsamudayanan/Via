@@ -78,7 +78,7 @@ export function mockClient(overrides: Record<string, Record<string, unknown>> = 
       consent: vi.fn(), grantConsent: vi.fn(), explain: vi.fn(), explainFinding: vi.fn(), review: vi.fn(),
       recommendations: vi.fn().mockResolvedValue([]), decideRecommendation: vi.fn(), componentMatches: vi.fn(),
     },
-    optimization: { start: vi.fn(), runs: vi.fn().mockResolvedValue([]), run: vi.fn(), candidates: vi.fn(), compare: vi.fn(), candidate: vi.fn(), decide: vi.fn() },
+    optimization: { start: vi.fn(), runs: vi.fn().mockResolvedValue([]), run: vi.fn(), candidates: vi.fn(), compare: vi.fn(), candidate: vi.fn(), decide: vi.fn(), reportUrl: vi.fn(() => "/report.md"), supplierStatus: vi.fn().mockResolvedValue({ provider: "mouser", configured: false }), supplierConsent: vi.fn().mockResolvedValue({ granted: false, granted_at: null, policy_version: "v" }), grantSupplierConsent: vi.fn(), revokeSupplierConsent: vi.fn() },
     changes: {
       create: vi.fn(), list: vi.fn().mockResolvedValue([]), get: vi.fn(), preview: vi.fn(), removeChange: vi.fn(), discard: vi.fn(), apply: vi.fn(),
       rollback: vi.fn(), downloadUrl: (id: string) => `/api/v1/change-sets/${id}/download`, lineage: vi.fn().mockResolvedValue([]), compare: vi.fn(),

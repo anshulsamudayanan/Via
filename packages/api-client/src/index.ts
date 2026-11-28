@@ -11,6 +11,7 @@ import type {
   ConsentStatus,
   LineageEntry,
   Objective,
+  SupplierConsent,
   OptimizationComparison,
   OptimizationRun,
   Recommendation,
@@ -352,7 +353,16 @@ export function createViaClient(options: ClientOptions = {}) {
         request<ComponentMatch[]>(`/api/v1/designs/${enc(designId)}/component-matches`, { signal }),
     },
     optimization: {
-      start: (designId: string, body: { objectives: Objective[]; constraints?: Record<string, unknown>; options?: Record<string, unknown> }) =>
+      start: (
+        designId: string,
+        body: {
+          objectives: Objective[];
+          constraints?: Record<string, unknown>;
+          options?: Record<string, unknown>;
+          weights?: Partial<Record<Objective, number>>;
+          build_quantity?: number;
+        },
+      ) =>
         request<OptimizationRun>(`/api/v1/designs/${enc(designId)}/optimization-runs`, { method: "POST", body }),
       runs: (designId: string, signal?: AbortSignal) =>
         request<OptimizationRun[]>(`/api/v1/designs/${enc(designId)}/optimization-runs`, { signal }),
@@ -364,6 +374,15 @@ export function createViaClient(options: ClientOptions = {}) {
       candidate: (id: string, signal?: AbortSignal) => request<CandidateDetail>(`/api/v1/optimization-candidates/${enc(id)}`, { signal }),
       decide: (id: string, status: "accepted" | "rejected", reason?: string) =>
         request<CandidateDetail>(`/api/v1/optimization-candidates/${enc(id)}/decision`, { method: "POST", body: { status, reason } }),
+      /** Same-origin URL of the run's report as a markdown document. */
+      reportUrl: (runId: string) => `${baseUrl}/api/v1/optimization-runs/${enc(runId)}/report?format=markdown`,
+      supplierStatus: (signal?: AbortSignal) => request<{ provider: string; configured: boolean }>("/api/v1/suppliers/status", { signal }),
+      supplierConsent: (projectId: string, signal?: AbortSignal) =>
+        request<SupplierConsent>(`/api/v1/projects/${enc(projectId)}/supplier-consent`, { signal }),
+      grantSupplierConsent: (projectId: string) =>
+        request<SupplierConsent>(`/api/v1/projects/${enc(projectId)}/supplier-consent`, { method: "PUT" }),
+      revokeSupplierConsent: (projectId: string) =>
+        request<void>(`/api/v1/projects/${enc(projectId)}/supplier-consent`, { method: "DELETE" }),
     },
     changes: {
       create: (designId: string, body: { title?: string; candidate_ids?: string[]; changes?: ChangeInput[] }) =>

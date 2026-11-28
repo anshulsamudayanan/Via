@@ -84,3 +84,5 @@ class ConsentScope(StrEnum):
     VIA_LEARN_CONTRIBUTION = "via_learn_contribution"
     #: Allow sending project data to an external AI provider for a user-initiated operation (future).
     EXTERNAL_AI_PROCESSING = "external_ai_processing"
+    #: Allow looking up the design's manufacturer part numbers with a supplier (Mouser) for prices and stock.
+    SUPPLIER_LOOKUP = "supplier_lookup"

@@ -192,7 +192,7 @@ See docs/AI_INTELLIGENCE.md. AI is disabled by default (`503 ai_disabled`); 30 r
 | GET | `/designs/{design_id}/component-matches` | viewer | Each component's part number from footprint properties and the matching record id |
 
 ### VIA Optimize (Milestone 5)
-See docs/OPTIMIZATION_ENGINE.md for request and response shapes: `POST|GET /designs/{id}/optimization-runs`, `GET /optimization-runs/{id}`, `/candidates`, `/compare`, `GET /optimization-candidates/{id}`, `POST /optimization-candidates/{id}/decision`. Also `GET /optimization-modules`.
+See docs/OPTIMIZATION_ENGINE.md for request and response shapes: `POST|GET /designs/{id}/optimization-runs`, `GET /optimization-runs/{id}`, `/candidates`, `/compare`, `GET /optimization-candidates/{id}`, `POST /optimization-candidates/{id}/decision`. Also `GET /optimization-modules`, `GET /optimization-runs/{id}/report`, `GET /suppliers/status` and `GET|PUT|DELETE /projects/{id}/supplier-consent`. Full table: docs/OPTIMIZATION_API.md.
 
 ### Change management (Milestone 6)
 See docs/CHANGE_MANAGEMENT.md.

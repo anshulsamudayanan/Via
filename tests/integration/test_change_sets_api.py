@@ -268,3 +268,31 @@ def test_viewers_can_read_but_not_change(client, make_client, setup):
     outsider = make_client()
     register(outsider, "cs-outsider@example.com")
     assert outsider.get(f"/api/v1/change-sets/{cs['id']}").status_code == 404
+
+
+def test_the_candidate_links_to_the_revision_it_was_applied_as_and_the_report_says_so(client, setup):
+    _, design = setup
+    cand = accepted_outline_candidate(client, design["id"])
+    before = client.get(f"/api/v1/optimization-candidates/{cand['id']}").json()
+    assert before["lifecycle"] == "accepted" and before["applied_revision"] is None
+    cs = client.post(f"/api/v1/designs/{design['id']}/change-sets", json={"candidate_ids": [cand["id"]]}).json()
+    assert (
+        client.get(f"/api/v1/optimization-candidates/{cand['id']}").json()["lifecycle"] == "accepted"
+    )  # a draft isn't applied
+    assert client.post(f"/api/v1/change-sets/{cs['id']}/apply").status_code == 202
+    after = client.get(f"/api/v1/optimization-candidates/{cand['id']}").json()
+    assert after["lifecycle"] == "applied"
+    cs = client.get(f"/api/v1/change-sets/{cs['id']}").json()
+    assert after["applied_revision"] == {
+        "change_set_id": cs["id"],
+        "revision_id": cs["result_revision_id"],
+        "revision_number": 2,
+    }
+    report = client.get(f"/api/v1/optimization-runs/{cand['run_id']}/report").json()
+    assert (
+        report["candidates"][0]["lifecycle"] == "applied"
+        and report["candidates"][0]["applied_revision"]["revision_number"] == 2
+    )
+    # After a rollback the revision is no longer applied.
+    client.post(f"/api/v1/change-sets/{cs['id']}/rollback")
+    assert client.get(f"/api/v1/optimization-candidates/{cand['id']}").json()["lifecycle"] == "accepted"

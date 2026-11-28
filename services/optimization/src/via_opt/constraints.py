@@ -33,6 +33,9 @@ class Constraints(BaseModel):
     component_gap_mm: float = Field(default=0.25, ge=0, le=20, description="Minimum gap between component extents")
     max_board_width_mm: float | None = Field(default=None, gt=0)
     max_board_height_mm: float | None = Field(default=None, gt=0)
+    allow_rotation: bool = Field(
+        default=True, description="Placement may rotate unlocked top-side parts by quarter turns"
+    )
     requirements: list[Requirement] = Field(default_factory=list, max_length=50)
 
 

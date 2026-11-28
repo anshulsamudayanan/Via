@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """What each optimization module understands, requires, can't evaluate and preserves, and how complete it is.
 
 Served read-only at ``GET /optimization-modules``. ``status`` is one of implemented, partial, planned or
@@ -101,16 +102,31 @@ MODULES: list[ModuleSpec] = [
     ),
     _m(
         "placement_ratsnest",
-        "Move parts closer to what they connect to",
+        "Re-place parts to shorten connections (descent + seeded simulated annealing, with rotation)",
         ["placement", "routing"],
         "partial",
         understands=PLACEMENT_UNDERSTANDS,
         cannot_evaluate=CANNOT_EVALUATE,
         preserves=PRESERVED,
         limitations=[
-            "Shortens the unrouted connection length (ratsnest), which is not the same as routability.",
+            "Shortens the unrouted connection length (ratsnest), which is not the same as routability or congestion.",
             "Moved parts that carry routed nets must be re-routed in KiCad before connectivity can be verified.",
-            "No rotation, density or grouping yet.",
+            "A part is moved or rotated in one candidate, not both; bottom-side parts are not rotated.",
+            "Nets with more than 40 pads (power, ground) are ignored while searching; the reported ratsnest includes them.",
+            "No grouping, thermal spacing or signal-aware placement.",
+        ],
+    ),
+    _m(
+        "placement_compaction",
+        "Re-place parts, then fit the outline to the result",
+        ["area", "placement", "cost"],
+        "partial",
+        understands=[*PLACEMENT_UNDERSTANDS, "outline_fixed"],
+        cannot_evaluate=CANNOT_EVALUATE,
+        preserves=PRESERVED,
+        limitations=[
+            "Placement is optimised for connection length, not for area: offered only when the outline then fits smaller than the plain fit.",
+            "Needs re-routing; check the enclosure and mounting before applying.",
         ],
     ),
     _m(
@@ -122,17 +138,50 @@ MODULES: list[ModuleSpec] = [
         preserves=[],
         limitations=["A proposal only: the stackup change and any re-routing are made in KiCad."],
     ),
-    _m("area_analysis", "Board area analysis (utilisation, empty regions)", ["area"], "planned"),
     _m(
-        "placement_annealing", "Seeded simulated-annealing placement with rotation", ["placement", "routing"], "planned"
+        "area_analysis",
+        "Board area analysis (utilisation, unused margins, largest empty rectangle, density)",
+        ["area"],
+        "implemented",
+        preserves=PRESERVED,
+        limitations=[
+            "Occupancy uses part extents (courtyard when present) on a grid; the largest empty rectangle needs a rectangular outline."
+        ],
     ),
-    _m("margin_analysis", "Manufacturing rule margins and risk classes", ["manufacturability"], "planned"),
+    _m(
+        "margin_analysis",
+        "Manufacturing rule margins: violations and potential risks per rule",
+        ["manufacturability"],
+        "implemented",
+        requires=["a manufacturing profile"],
+        preserves=PRESERVED,
+        limitations=["Risk bands are a VIA heuristic; compliance needs your fabricator's rules as a project profile."],
+    ),
     _m(
         "bom_cost",
-        "BOM cost from live supplier data (cheapest, fastest, balanced)",
+        "BOM cost from live Mouser listings (cheapest, fastest, balanced)",
+        ["cost"],
+        "partial",
+        requires=[
+            "a build quantity",
+            "MOUSER_API_KEY on the server",
+            "the project owner's supplier consent",
+            "manufacturer part numbers on the footprints",
+        ],
+        preserves=PRESERVED,
+        limitations=[
+            "One supplier (Mouser): the strategies differ by listing, order quantity and stock, not by competing distributors.",
+            "Only listings with exactly the same manufacturer part number are used; no substitutes are suggested.",
+            "Lines without a part number or a listing are left out of the totals and listed.",
+            "Prices are the supplier's listing at the time of the run, not a quote.",
+        ],
+    ),
+    _m(
+        "component_alternates",
+        "Alternative components checked for electrical and physical compatibility",
         ["cost"],
         "planned",
-        requires=["supplier data", "build quantity", "consent to look up part numbers"],
+        requires=["parametric component data", "engineer approval of each substitution"],
     ),
     _m("rerouting", "Re-routing and autorouting", ["routing"], "unsupported"),
     _m("signal_integrity", "Impedance, length matching and signal-integrity optimization", ["routing"], "unsupported"),

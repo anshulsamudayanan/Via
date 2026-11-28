@@ -241,9 +241,9 @@ Decisions (owner, 2026-11-26):
 - **Production readiness**: transactional email, deployment (TLS, secrets, backups, monitoring), S3
   validated against the chosen provider.
 
-## Phase 3: VIA Optimize (in progress)
+## Phase 3: VIA Optimize ✅ (CP1-CP7)
 
-Proposal approved 2026-11-28; each checkpoint needs the owner's approval. The engine's internals are rebuilt in
+Proposal approved 2026-11-28; the owner asked to continue through CP7 without per-checkpoint stops. The engine's internals are rebuilt in
 `services/optimization`; the PCB model, change-set/export pipeline, worker and existing routes are kept.
 
 - **CP3: optimization core ✅**
@@ -251,4 +251,7 @@ Proposal approved 2026-11-28; each checkpoint needs the owner's approval. The en
   - Weighted preference (order only), derived lifecycle, module declarations (`GET /optimization-modules`), candidate record (warnings, limitations, execution, score, hash), live run phase.
   - Migration `0009` (additive columns). Existing routes and stored statuses unchanged.
   - Details: [OPTIMIZATION_CONSTRAINTS.md](OPTIMIZATION_CONSTRAINTS.md).
-- CP4: first modules (area analysis, annealing placement with rotation, margin analysis, BOM cost from live supplier data). Next.
+- **CP4: modules ✅** area analysis, margin analysis, seeded annealing placement with rotation (v2.0.0) and compaction, BOM cost from Mouser (owner consent `supplier_lookup`, migration `0010`, `MOUSER_API_KEY`). Mouser's response handling is unverified against the live API.
+- **CP5: evaluation ✅** run report (`GET /optimization-runs/{id}/report`), applied-revision link on candidates.
+- **CP6: frontend ✅** constraint, weight and build-quantity forms; area, margin and BOM cards; comparison table; constraint results; honest lifecycle labels.
+- **CP7: tests and docs ✅** [architecture](OPTIMIZATION_ARCHITECTURE.md), [algorithms](OPTIMIZATION_ALGORITHMS.md), [API](OPTIMIZATION_API.md), [roadmap](OPTIMIZATION_ROADMAP.md).

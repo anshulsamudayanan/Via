@@ -32,9 +32,11 @@ class Board:
         return f'(net {self.nets.index(name) + 1} "{name}")'
 
     def footprint(self, ref: str, x: float, y: float, pads: list[dict], *, silk_width: float | None = None,
-                  rotation: float = 0, lib: str = "Lib:Part") -> Board:  # fmt: skip
+                  rotation: float = 0, lib: str = "Lib:Part", props: dict[str, str] | None = None) -> Board:  # fmt: skip
         body = [f'(footprint "{lib}" (layer "F.Cu") (uuid "{uid()}") (at {x} {y} {rotation})',
                 f'  (property "Reference" "{ref}" (at 0 0 0) (layer "F.SilkS"))']  # fmt: skip
+        for key, val in (props or {}).items():
+            body.append(f'  (property "{key}" "{val}" (at 0 0 0) (layer "F.Fab") (hide yes))')
         for p in pads:
             kind = p.get("type", "smd")
             layers = p.get("layers") or ('"*.Cu"' if kind in ("thru_hole", "np_thru_hole") else '"F.Cu"')

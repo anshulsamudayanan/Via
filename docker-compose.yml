@@ -45,6 +45,7 @@ x-api-env: &api-env
   VIA_AI_MODEL: ${VIA_AI_MODEL:-}
   VIA_AI_EFFORT: ${VIA_AI_EFFORT:-high}
   GROQ_API_KEY: ${GROQ_API_KEY:-}
+  MOUSER_API_KEY: ${MOUSER_API_KEY:-}
 
 services:
   postgres:
