@@ -6,6 +6,13 @@ export function errorMessage(err: unknown, fallback = "Something went wrong. Ple
   return fallback;
 }
 
+/** What VIA's grounding check found wrong in a discarded AI answer (`ai_output_rejected`), if anything. */
+export function rejectedProblems(err: unknown): string[] {
+  if (!(err instanceof ApiError) || err.code !== "ai_output_rejected") return [];
+  const problems = (err.details as { problems?: unknown } | undefined)?.problems;
+  return Array.isArray(problems) ? problems.filter((p): p is string => typeof p === "string") : [];
+}
+
 /**
  * Map a 422 validation error's details to per-field messages.
  * The API reports `{loc: ["body", "email"], message}` entries.

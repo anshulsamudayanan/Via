@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useApi } from "@/components/api-context";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, rejectedProblems } from "@/lib/errors";
 import { findingHighlight, SEVERITIES, severityTone, SOURCE_LABEL, VERIFICATION_LABEL } from "@/lib/findings";
 import { formatDateTime } from "@/lib/format";
 import type { Highlight } from "@/lib/pcb/overlay";
@@ -349,6 +349,16 @@ export function AIAnswer({ output }: { output: AIOutput }) {
   );
 }
 
+function Problems({ list }: { list: string[] }) {
+  if (!list.length) return null;
+  return (
+    <div className="space-y-1 text-xs text-muted">
+      <p>What VIA&apos;s check found wrong with the answer:</p>
+      <ul className="list-disc pl-5">{list.map((p, i) => <li key={i}>{p}</li>)}</ul>
+    </div>
+  );
+}
+
 function Explain({ findingId, projectId, external }: { findingId: string; projectId: string; external: boolean }) {
   const client = useApi();
   const [answer, setAnswer] = useState<AIOutput | null>(null);
@@ -371,6 +381,7 @@ function Explain({ findingId, projectId, external }: { findingId: string; projec
       <Button size="sm" onClick={() => void ask()} disabled={busy}><Bot /> {busy ? "Asking…" : "Explain with AI"}</Button>
       {external ? <p className="text-xs text-muted">The AI provider is external: project data leaves VIA only with the project&apos;s consent.</p> : null}
       {error ? <p className="text-xs text-danger">{errorMessage(error)}</p> : null}
+      <Problems list={rejectedProblems(error)} />
       {needsConsent ? (
         <Button size="sm" variant="ghost" onClick={() => void client.ai.grantConsent(projectId).then(() => ask(), (e: unknown) => setError(e as Error))}>
           Allow AI processing for this project
@@ -387,15 +398,18 @@ function Recommendations({ designId, projectId, run, canEdit, ai }: { designId: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [problems, setProblems] = useState<string[]>([]);
   async function review() {
     setBusy(true);
     setError(null);
     setNeedsConsent(false);
+    setProblems([]);
     try {
       await client.ai.review(designId, run.id);
       recs.reload();
     } catch (err) {
       setNeedsConsent(err instanceof ApiError && err.code === "consent_required");
+      setProblems(rejectedProblems(err));
       setError(errorMessage(err));
     } finally {
       setBusy(false);
@@ -421,6 +435,7 @@ function Recommendations({ designId, projectId, run, canEdit, ai }: { designId: 
         {canEdit && ai?.enabled ? <Button size="sm" onClick={() => void review()} disabled={busy}><Bot /> {busy ? "Reviewing…" : "AI design review"}</Button> : null}
       </CardHeader>
       {error ? <ErrorState className="mx-4 mb-3" title={error} /> : null}
+      {problems.length ? <div className="mx-4 mb-3"><Problems list={problems} /></div> : null}
       {needsConsent ? (
         <div className="mx-4 mb-3">
           <Button size="sm" variant="ghost" onClick={() => void client.ai.grantConsent(projectId).then(() => review(), (e: unknown) => setError(errorMessage(e)))}>
