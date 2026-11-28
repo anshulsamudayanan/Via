@@ -166,3 +166,19 @@ def test_the_response_schema_is_counted_in_the_prompt_budget():
     with contextlib.suppress(Exception):  # the scripted provider has nothing queued; only the size matters
         explain(provider, big, "Why?")
     assert sizes and sizes[0] // 3 <= 3500
+
+
+def test_design_rules_in_the_context_can_be_cited_but_invented_ones_cannot():
+    from via_ai.schemas import Reference
+    from via_ai.verification import verify
+
+    ctx = context(design_rules={"rules_source": "board_file", "min_via_diameter": 0.4, "min_via_drill": 0.3})
+    ok = GOOD.model_copy(update={"references": [Reference(kind="design_rule", id="min_via_drill")], "numbers_used": []})
+    assert verify(ok, ctx).ok
+    bad = GOOD.model_copy(
+        update={"references": [Reference(kind="design_rule", id="min_hole_to_hole")], "numbers_used": []}
+    )
+    report = verify(bad, ctx)
+    assert not report.ok and report.unknown_references == ["design_rule:min_hole_to_hole"]
+    assert not verify(ok, context()).ok  # no rules in the context: nothing to cite
+    assert not verify(ok.model_copy(update={"references": [Reference(kind="design_rule", id="rules_source")]}), ctx).ok

@@ -2,7 +2,7 @@
 
 An output is rejected (never shown as an answer) when it:
 
-* cites a component, net, layer or finding that isn't in the context;
+* cites a component, net, layer, design rule or finding that isn't in the context;
 * names a reference designator in its text that isn't in the design;
 * uses a number (``numbers_used``) that doesn't appear anywhere in the context.
 
@@ -61,6 +61,8 @@ def _known(context: ProjectContext) -> dict[str, set[str]]:
         "net": nets,
         "finding": {f.id for f in context.findings},
         "layer": {layer.name for layer in context.layers},
+        # Only the rules actually present in the context (rules_source is metadata, not a rule).
+        "design_rule": {k for k in context.design_rules if k != "rules_source"},
     }
 
 

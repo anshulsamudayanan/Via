@@ -24,8 +24,10 @@ class Confidence(StrEnum):
 
 
 class Reference(_Out):
-    kind: str = Field(description="component | net | finding | layer")
-    id: str = Field(description="Reference designator, net name, finding id or layer name exactly as in the context")
+    kind: str = Field(description="component | net | finding | layer | design_rule")
+    id: str = Field(
+        description="Designator, net name, finding id, layer name or design rule key, exactly as in the context"
+    )
 
 
 class NumberUsed(_Out):
