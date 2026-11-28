@@ -58,6 +58,7 @@ def _call(fn: Any, *args: Any) -> Any:
     except AIRefusedError as exc:
         raise APIError(422, "ai_refused", "The AI model declined to answer this request.") from exc
     except AIError as exc:
+        logger.warning("AI call failed: %s", exc)
         raise APIError(503, "ai_unavailable", str(exc) or "The AI provider is unavailable.") from exc
     except Exception as exc:  # a provider or parsing bug must not surface as an opaque HTTP 500
         logger.exception("AI call failed unexpectedly")
