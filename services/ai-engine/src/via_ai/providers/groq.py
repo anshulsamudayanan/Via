@@ -35,6 +35,8 @@ import contextlib
 import http.client
 import json
 import os
+import re
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -61,6 +63,35 @@ USER_AGENT = "via-ai-engine/0.1 (+https://github.com/anshulsamudayanan/Via)"
 TIMEOUT_SECONDS = 120
 #: VIA effort -> Groq reasoning_effort (gpt-oss models accept low | medium | high).
 REASONING_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high", "max": "high"}
+
+#: Longest rate-limit wait VIA sits through before retrying once; longer waits are reported to the user.
+MAX_RATE_LIMIT_WAIT_SECONDS = 25.0
+
+
+class AIRateLimitError(AIError):
+    """Groq's rate limit; ``retry_after`` is how long Groq said to wait, when it said."""
+
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+_WAIT = re.compile(r"try again in (?:(\d+)m(?=\d))?(?:(\d+(?:\.\d+)?)(ms|s))?", re.IGNORECASE)
+
+
+def _retry_after(message: str, header: str | None) -> float | None:
+    """Seconds to wait, from Groq's ``Retry-After`` header or its "try again in 1m2.5s" text."""
+    if header:
+        with contextlib.suppress(ValueError):
+            return float(header)
+    m = _WAIT.search(message)
+    if not m or not (m.group(1) or m.group(2)):
+        return None
+    seconds = float(int(m.group(1) or 0) * 60)
+    if m.group(2):
+        seconds += float(m.group(2)) / (1000 if m.group(3).lower() == "ms" else 1)
+    return seconds
+
 
 #: (url, headers, body) -> parsed JSON response. Injectable for tests.
 Transport = Callable[[str, dict[str, str], dict[str, Any]], dict[str, Any]]
@@ -90,7 +121,10 @@ def _http_post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
                 "Lower VIA_AI_MAX_INPUT_TOKENS / VIA_AI_MAX_OUTPUT_TOKENS or use a plan with a higher limit."
             ) from None
         if exc.code == 429:
-            raise AIError(f"Groq's rate limit was reached ({detail or 'HTTP 429'}). Try again in a minute.") from None
+            wait = _retry_after(detail, exc.headers.get("retry-after") if exc.headers else None)
+            raise AIRateLimitError(
+                f"Groq's rate limit was reached ({detail or 'HTTP 429'}). Try again in a minute.", wait
+            ) from None
         if exc.code == 403:
             # Cloudflare in front of Groq answers 403 to blocked clients; Groq itself uses it for
             # keys or organisations without access to a model, or unsupported regions.
@@ -198,13 +232,20 @@ class GroqProvider(AIProvider):
     name = "groq"
     capabilities = Capabilities(text=True, structured_output=True, embeddings=False, external=True)
 
-    def __init__(self, config: AIConfig, api_key: str | None = None, transport: Transport | None = None) -> None:
+    def __init__(
+        self,
+        config: AIConfig,
+        api_key: str | None = None,
+        transport: Transport | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.config = config
         key = api_key if api_key is not None else os.environ.get("GROQ_API_KEY", "")
         if not key.strip():
             raise AIUnavailableError("VIA_AI_PROVIDER=groq needs a GROQ_API_KEY in the environment.")
         self._key = key.strip()
         self._post = transport or _http_post
+        self._sleep = sleep
         self.input_token_budget = config.max_input_tokens
 
     def __repr__(self) -> str:  # never show the key
@@ -236,7 +277,14 @@ class GroqProvider(AIProvider):
             # A real client name: Groq's edge rejects the default "Python-urllib" agent with 403.
             "User-Agent": USER_AGENT,
         }
-        return self._post(API_URL, headers, body)
+        try:
+            return self._post(API_URL, headers, body)
+        except AIRateLimitError as exc:
+            # Free-tier limits are per minute: a short wait usually clears it, so wait once and retry.
+            if exc.retry_after is None or exc.retry_after > MAX_RATE_LIMIT_WAIT_SECONDS:
+                raise
+            self._sleep(exc.retry_after + 1.0)
+            return self._post(API_URL, headers, body)
 
     def generate_text(self, request: TextRequest) -> TextResult:
         response = self._call(self._body(request))

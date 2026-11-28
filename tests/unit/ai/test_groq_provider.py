@@ -304,3 +304,46 @@ def test_high_effort_is_lowered_to_medium_when_the_answer_budget_is_small():
     t = FakeTransport(reply(GOOD))
     GroqProvider(config, api_key="k", transport=t).generate_structured(REQUEST, Review)
     assert t.calls[0][2]["reasoning_effort"] == "medium"
+
+
+def _rate_limited(message: str, retry_after: float | None):
+    from via_ai.providers.groq import AIRateLimitError
+
+    return AIRateLimitError(message, retry_after)
+
+
+def test_a_short_rate_limit_wait_is_honoured_once_then_the_request_succeeds():
+    waits: list[float] = []
+    calls = []
+
+    def transport(url, headers, body):
+        calls.append(body)
+        if len(calls) == 1:
+            raise _rate_limited("Groq's rate limit was reached (try again in 11.985s).", 11.985)
+        return reply(GOOD)
+
+    p = GroqProvider(AIConfig(provider="groq"), api_key="k", transport=transport, sleep=waits.append)
+    assert p.generate_structured(REQUEST, Review).value.verdict == "ok"
+    assert len(calls) == 2 and 11.985 <= waits[0] <= 14
+
+
+def test_a_long_rate_limit_wait_is_reported_not_slept_through():
+    waits: list[float] = []
+
+    def transport(url, headers, body):
+        raise _rate_limited("Groq's rate limit was reached (try again in 600s).", 600.0)
+
+    p = GroqProvider(AIConfig(provider="groq"), api_key="k", transport=transport, sleep=waits.append)
+    with pytest.raises(AIError, match="rate limit"):
+        p.generate_structured(REQUEST, Review)
+    assert waits == []
+
+
+def test_retry_after_is_read_from_groqs_message_and_header():
+    from via_ai.providers.groq import _retry_after
+
+    assert _retry_after("Please try again in 11.985s.", None) == pytest.approx(11.985)
+    assert _retry_after("Please try again in 1m2.5s.", None) == pytest.approx(62.5)
+    assert _retry_after("Please try again in 250ms.", None) == pytest.approx(0.25)
+    assert _retry_after("no hint", "7") == 7.0
+    assert _retry_after("no hint", None) is None
