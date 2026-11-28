@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 
 import pytest
@@ -146,3 +147,22 @@ def test_no_budget_means_the_context_is_untouched():
 
     c = context()
     assert fit_context(ScriptedProvider([]), c, lambda c: 10**9) is c
+
+
+def test_the_response_schema_is_counted_in_the_prompt_budget():
+    """Groq counts the schema sent with the prompt; a request that only just fits without it must not be sent."""
+    big = context().model_copy(update={"net_names": [f"NET{i}" for i in range(600)]})
+    provider = ScriptedProvider([])
+    provider.input_token_budget = 3500
+    sizes = []
+    original = provider.generate_structured
+
+    def spy(request, schema):
+        text = (request.system or "") + "".join(m.content for m in request.messages)
+        sizes.append(len(text) + len(__import__("json").dumps(schema.model_json_schema())))
+        return original(request, schema)
+
+    provider.generate_structured = spy
+    with contextlib.suppress(Exception):  # the scripted provider has nothing queued; only the size matters
+        explain(provider, big, "Why?")
+    assert sizes and sizes[0] // 3 <= 3500

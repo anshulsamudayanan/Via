@@ -222,7 +222,10 @@ class GroqProvider(AIProvider):
             "max_completion_tokens": min(request.max_tokens, self.config.max_output_tokens),
         }
         if model.startswith("openai/gpt-oss"):
-            body["reasoning_effort"] = REASONING_EFFORT.get(request.effort or self.config.effort, "medium")
+            effort = REASONING_EFFORT.get(request.effort or self.config.effort, "medium")
+            if effort == "high" and self.config.max_output_tokens < 8000:
+                effort = "medium"  # thinking shares the small answer budget; "high" would be cut off
+            body["reasoning_effort"] = effort
         return body
 
     def _call(self, body: dict[str, Any]) -> dict[str, Any]:

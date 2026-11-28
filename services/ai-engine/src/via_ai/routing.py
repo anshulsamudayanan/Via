@@ -57,8 +57,8 @@ class AIConfig:
     effort: str = "high"
     #: Per-request token budgets. Groq counts prompt + reserved answer against the plan's tokens-per-minute
     #: limit, so the defaults suit its free tier; raise them on a paid plan.
-    max_input_tokens: int = 4500
-    max_output_tokens: int = 4000
+    max_input_tokens: int = 3500
+    max_output_tokens: int = 3500
 
     @property
     def enabled(self) -> bool:

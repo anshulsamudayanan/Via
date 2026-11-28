@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -33,6 +34,11 @@ class AIResult[T: BaseModel]:
 
 def _context_hash(context: ProjectContext) -> str:
     return hashlib.sha256(context_json(context).encode()).hexdigest()
+
+
+def _schema_chars(schema: type[BaseModel]) -> int:
+    """The response schema is sent with the prompt and counts against the provider's token limit."""
+    return len(json.dumps(schema.model_json_schema()))
 
 
 CHARS_PER_TOKEN = 3  # JSON tokenizes poorly; erring low only means trimming a little more
@@ -79,12 +85,14 @@ def _call[T: BaseModel](provider: AIProvider, system: str, user: str, task: Task
 
 def explain(provider: AIProvider, context: ProjectContext, question: str) -> AIResult[Explanation]:
     """Answer an engineering question about the design. Raises AIError subclasses on provider failure/refusal."""
-    context = fit_context(provider, context, lambda c: sum(map(len, explain_messages(c, question))))
+    context = fit_context(
+        provider, context, lambda c: sum(map(len, explain_messages(c, question))) + _schema_chars(Explanation)
+    )
     system, user = explain_messages(context, question)
     return _call(provider, system, user, Task.EXPLAIN, Explanation, context)
 
 
 def review(provider: AIProvider, context: ProjectContext) -> AIResult[DesignReview]:
-    context = fit_context(provider, context, lambda c: sum(map(len, review_messages(c))))
+    context = fit_context(provider, context, lambda c: sum(map(len, review_messages(c))) + _schema_chars(DesignReview))
     system, user = review_messages(context)
     return _call(provider, system, user, Task.DESIGN_REVIEW, DesignReview, context)

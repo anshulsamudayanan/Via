@@ -58,6 +58,7 @@ def provider(
         provider="groq",
         routing=ModelRouting(default_model=model, by_task={Task.SUMMARIZE: "llama-3.3-70b-versatile"}),
         effort=effort,
+        max_output_tokens=16000,
     )
     return GroqProvider(config, api_key="gsk_test", transport=transport), transport
 
@@ -295,3 +296,11 @@ def test_token_budgets_come_from_the_environment_and_are_validated():
     assert AIConfig.from_env({"VIA_AI_PROVIDER": "groq", "VIA_AI_MAX_INPUT_TOKENS": "9000"}).max_input_tokens == 9000
     with pytest.raises(ValueError, match="VIA_AI_MAX_OUTPUT_TOKENS"):
         AIConfig.from_env({"VIA_AI_PROVIDER": "groq", "VIA_AI_MAX_OUTPUT_TOKENS": "10"})
+
+
+def test_high_effort_is_lowered_to_medium_when_the_answer_budget_is_small():
+    routing = ModelRouting(default_model="openai/gpt-oss-120b")
+    config = AIConfig(provider="groq", effort="high", max_output_tokens=3500, routing=routing)
+    t = FakeTransport(reply(GOOD))
+    GroqProvider(config, api_key="k", transport=t).generate_structured(REQUEST, Review)
+    assert t.calls[0][2]["reasoning_effort"] == "medium"
