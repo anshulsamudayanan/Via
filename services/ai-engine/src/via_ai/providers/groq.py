@@ -58,6 +58,8 @@ from via_ai.routing import AIConfig
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 USER_AGENT = "via-ai-engine/0.1 (+https://github.com/anshulsamudayanan/Via)"
 TIMEOUT_SECONDS = 120
+#: Largest completion budget VIA will ask for when a structured reply is cut off.
+MAX_COMPLETION_TOKENS = 32000
 #: VIA effort -> Groq reasoning_effort (gpt-oss models accept low | medium | high).
 REASONING_EFFORT = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high", "max": "high"}
 
@@ -100,6 +102,22 @@ def _http_post(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
         raise AIError(f"Groq returned an error (HTTP {exc.code}). Try again later.") from None
     except (urllib.error.URLError, TimeoutError) as exc:
         raise AIError("Couldn't reach Groq. Check the server's internet connection.") from exc
+
+
+def _json_text(content: str) -> str:
+    """The JSON object in a reply that may be wrapped in a code fence or surrounded by prose.
+    Nothing is repaired: the text between the first ``{`` and the last ``}`` still has to validate."""
+    text = content.strip()
+    start, end = text.find("{"), text.rfind("}")
+    return text[start : end + 1] if 0 <= start < end else text
+
+
+def _retryable(exc: AIError) -> bool:
+    message = str(exc)
+    return any(
+        marker in message
+        for marker in ("Failed to validate JSON", "Failed to generate JSON", "did not match", "ran out of room")
+    )
 
 
 def _usage(response: dict[str, Any]) -> Usage:
@@ -228,7 +246,7 @@ class GroqProvider(AIProvider):
                     "schema": strict_schema(schema.model_json_schema()),
                 },
             }
-            attempts = 1
+            attempts = 2
         else:
             # JSON mode: the schema goes in the system prompt; Groq checks the reply is JSON.
             spec = json.dumps(schema.model_json_schema())
@@ -242,21 +260,31 @@ class GroqProvider(AIProvider):
                 messages.insert(0, {"role": "system", "content": instruction})
             body["response_format"] = {"type": "json_object"}
             attempts = 2
-        for attempt in range(attempts):
+        budget = body["max_completion_tokens"]
+        last: AIError | None = None
+        for _ in range(attempts):
             try:
                 response = self._call(body)
-                break
+                choice = _first_choice(response)
+                if choice.get("finish_reason") == "length":
+                    # Reasoning models spend the same budget on thinking, so a long answer can be cut off.
+                    budget = min(budget * 2, MAX_COMPLETION_TOKENS)
+                    body["max_completion_tokens"] = budget
+                    raise AIError("The model ran out of room before finishing its answer. Try again.")
+                content = (choice.get("message") or {}).get("content") or ""
+                value = schema.model_validate_json(_json_text(content))
+                return StructuredResult(value=value, model=str(response.get("model", "")), usage=_usage(response))
+            except ValidationError as exc:
+                where = ", ".join(sorted({".".join(str(x) for x in e["loc"]) or "(root)" for e in exc.errors()}))
+                last = AIError(
+                    f"The model's response did not match the expected structure (problem with: {where[:200]})."
+                )
             except AIError as exc:
-                if attempt + 1 < attempts and "Failed to validate JSON" in str(exc):
-                    continue
-                raise
-        choice = _first_choice(response)
-        content = (choice.get("message") or {}).get("content") or ""
-        try:
-            value = schema.model_validate_json(content)
-        except ValidationError as exc:
-            raise AIError("The model's response did not match the expected structure.") from exc
-        return StructuredResult(value=value, model=str(response.get("model", "")), usage=_usage(response))
+                if isinstance(exc, AIRefusedError) or not _retryable(exc):
+                    raise
+                last = exc
+        assert last is not None
+        raise last
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         raise CapabilityNotSupportedError("The Groq provider does not offer embeddings.")

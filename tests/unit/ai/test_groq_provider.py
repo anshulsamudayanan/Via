@@ -187,3 +187,55 @@ def test_json_mode_retries_once_when_groq_rejects_the_json():
     config = AIConfig(provider="groq", routing=ModelRouting(default_model="llama-3.3-70b-versatile"))
     result = GroqProvider(config, api_key="k", transport=flaky).generate_structured(REQUEST, Review)
     assert result.value.verdict == "ok" and len(calls) == 2
+
+
+GOOD = json.dumps({"verdict": "ok", "issues": []})
+
+
+def sequence(*responses):
+    """A transport returning (or raising) each item in turn; records the bodies it saw."""
+    bodies: list[dict] = []
+    items = list(responses)
+
+    def transport(url, headers, body):
+        bodies.append(json.loads(json.dumps(body)))
+        item = items.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    return GroqProvider(AIConfig(provider="groq"), api_key="k", transport=transport), bodies
+
+
+def test_json_wrapped_in_a_code_fence_or_prose_is_still_read_and_validated():
+    for text in (f"```json\n{GOOD}\n```", f"Here is the review:\n{GOOD}\nHope that helps."):
+        p, _ = sequence(reply(text))
+        assert p.generate_structured(REQUEST, Review).value.verdict == "ok"
+
+
+def test_a_reply_cut_off_by_the_token_limit_is_retried_with_a_bigger_budget():
+    p, bodies = sequence(reply('{"verdict": "ok", "issu', finish="length"), reply(GOOD))
+    assert p.generate_structured(REQUEST, Review).value.verdict == "ok"
+    assert bodies[1]["max_completion_tokens"] > bodies[0]["max_completion_tokens"]
+
+
+def test_a_reply_that_is_always_cut_off_says_so_instead_of_a_generic_error():
+    cut = reply('{"verdict": "ok", "issu', finish="length")
+    p, _ = sequence(cut, cut)
+    with pytest.raises(AIError, match="ran out of room"):
+        p.generate_structured(REQUEST, Review)
+
+
+def test_groqs_json_generation_failure_is_retried_once_in_strict_mode_too():
+    p, bodies = sequence(
+        AIError("Groq couldn't process the request: Failed to generate JSON. Please adjust your prompt."), reply(GOOD)
+    )
+    assert p.generate_structured(REQUEST, Review).value.verdict == "ok" and len(bodies) == 2
+
+
+def test_a_reply_that_does_not_fit_the_schema_is_retried_once_then_names_the_field():
+    bad = reply('{"verdict": "ok"}')
+    p, bodies = sequence(bad, bad)
+    with pytest.raises(AIError, match="issues"):
+        p.generate_structured(REQUEST, Review)
+    assert len(bodies) == 2

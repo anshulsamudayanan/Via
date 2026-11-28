@@ -37,7 +37,7 @@ def _context_hash(context: ProjectContext) -> str:
 def _call[T: BaseModel](provider: AIProvider, system: str, user: str, task: Task, schema: type[T],
                         context: ProjectContext) -> AIResult[T]:  # fmt: skip
     result = provider.generate_structured(
-        TextRequest(messages=[ChatMessage(role="user", content=user)], system=system, task=task, max_tokens=8000),
+        TextRequest(messages=[ChatMessage(role="user", content=user)], system=system, task=task, max_tokens=16000),
         schema,
     )
     return AIResult(
